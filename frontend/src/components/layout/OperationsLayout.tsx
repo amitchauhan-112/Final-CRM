@@ -4,6 +4,7 @@ import {
   Mountain, LayoutDashboard, CalendarRange, Truck, Bell,
   LogOut, ChevronDown, Menu, X, Settings, UserCircle, Map,
 } from 'lucide-react';
+import BookingLookup from './BookingLookup';
 import { useAuthStore } from '../../store/authStore';
 import { useNotifications, useMarkAllAsRead, useMarkAsRead } from '../../hooks/useNotifications';
 import { useRealtimeSync } from '../../hooks/useRealtimeSync';
@@ -130,6 +131,7 @@ export default function OperationsLayout() {
           </div>
 
           <div className="flex items-center gap-2">
+            <BookingLookup />
             <div ref={notifRef} className="relative">
               <button
                 onClick={() => setNotifOpen(!notifOpen)}

@@ -7,6 +7,59 @@ const orgFilter = (req: AuthenticatedRequest) => (orgId(req) ? { organizationId:
 
 const LIMIT = 5;
 
+// ─── GET /erp/booking-lookup?q= ──────────────────────────────────────────────
+// Search bookings by booking number OR registered mobile number.
+// Accessible to all authenticated roles (Admin, Employee, Finance, Operations).
+export const bookingLookup = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const q = String(req.query.q ?? '').trim();
+    if (q.length < 3) { res.json({ success: true, data: [] }); return; }
+
+    const oid = orgId(req);
+    const contains = { contains: q, mode: 'insensitive' as const };
+
+    const bookings = await prisma.booking.findMany({
+      where: {
+        ...(oid ? { organizationId: oid } : {}),
+        OR: [
+          { bookingNumber: contains },
+          { lead: { phone: contains } },
+          { travelerName: contains },
+        ],
+      },
+      include: {
+        lead: {
+          select: {
+            id: true, name: true, phone: true, email: true, destination: true,
+            assignedTo: { select: { id: true, name: true } },
+          },
+        },
+        package: { select: { id: true, name: true, code: true } },
+        departure: { select: { id: true, departureDate: true, destination: true, status: true } },
+        payments: {
+          select: { id: true, amount: true, method: true, status: true, reference: true, receiptNo: true, createdAt: true },
+          orderBy: { createdAt: 'desc' },
+        },
+        travelers: {
+          select: { id: true, name: true, age: true, gender: true, mobile: true },
+          orderBy: { createdAt: 'asc' },
+        },
+        paymentSchedule: {
+          select: { id: true, dueDate: true, amount: true, label: true, paidAmount: true, status: true },
+          orderBy: { dueDate: 'asc' },
+        },
+      },
+      take: 10,
+      orderBy: { createdAt: 'desc' },
+    });
+
+    res.json({ success: true, data: bookings });
+  } catch (e) {
+    console.error('[search] bookingLookup error:', e);
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+};
+
 // ─── GET /search?q= ───────────────────────────────────────────────────────────
 // Cross-entity search, capped to LIMIT results per entity, grouped by type.
 // Deliberately simple `contains` matching (no full-text index) — this
