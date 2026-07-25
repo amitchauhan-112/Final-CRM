@@ -44,6 +44,7 @@ export const createBooking = async (req: AuthenticatedRequest, res: Response): P
       foodPreference, roomSharing, departureLocation, departurePackage,
       tourType, specialRequest, finalPrice, amountPaid, balanceDueDate,
       packageId, departureDate, returnDate, bookingNotes,
+      paymentMode, paymentMethod, paymentReference, handedOverTo,
     } = req.body;
 
     if (!leadId) { res.status(400).json({ success: false, error: 'leadId is required' }); return; }
@@ -129,13 +130,18 @@ export const createBooking = async (req: AuthenticatedRequest, res: Response): P
     // Record advance payment as PENDING — it only credits amountPaid once
     // Finance verifies it (see payment.controller.ts approvePayment).
     if (paid > 0) {
+      const resolvedMethod = paymentMode === 'CASH' ? 'CASH' : (paymentMethod === 'BANK_TRANSFER' ? 'BANK_TRANSFER' : 'UPI');
+      const resolvedNotes = paymentMode === 'CASH' && handedOverTo
+        ? `Cash received — handed to: ${handedOverTo}`
+        : 'Initial payment at booking';
       await prisma.payment.create({
         data: {
           bookingId: booking.id,
           amount: paid,
           type: 'ADVANCE',
-          method: 'CASH',
-          notes: 'Initial payment at booking',
+          method: resolvedMethod,
+          notes: resolvedNotes,
+          reference: paymentReference || null,
           status: 'PENDING',
           recordedById: req.user!.id,
         },

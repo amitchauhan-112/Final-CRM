@@ -27,6 +27,10 @@ interface BookingForm {
   finalPrice: number;
   amountPaid: number;
   balanceDueDate: string;
+  paymentMode: 'CASH' | 'ONLINE';
+  paymentMethod: 'UPI' | 'BANK_TRANSFER';
+  paymentReference: string;
+  handedOverTo: string;
 }
 
 interface Props {
@@ -69,6 +73,10 @@ export default function BookingConfirmModal({ open, onClose, lead, existingBooki
       finalPrice: existingBooking?.finalPrice ?? lead.budget ?? 0,
       amountPaid: existingBooking?.amountPaid ?? 0,
       balanceDueDate: existingBooking?.balanceDueDate ? existingBooking.balanceDueDate.split('T')[0] : '',
+      paymentMode: 'CASH',
+      paymentMethod: 'UPI',
+      paymentReference: '',
+      handedOverTo: '',
     },
   });
 
@@ -77,6 +85,7 @@ export default function BookingConfirmModal({ open, onClose, lead, existingBooki
   const watchedTourType = useWatch({ control, name: 'tourType' });
   const watchedPackageId = useWatch({ control, name: 'packageId' });
   const watchedDepartureDate = useWatch({ control, name: 'departureDate' });
+  const watchedPaymentMode = useWatch({ control, name: 'paymentMode' });
 
   const balanceAmount = Math.max(0, Number(finalPrice || 0) - Number(amountPaid || 0));
 
@@ -137,6 +146,10 @@ export default function BookingConfirmModal({ open, onClose, lead, existingBooki
       setValue('finalPrice', existingBooking?.finalPrice ?? lead.budget ?? 0);
       setValue('amountPaid', existingBooking?.amountPaid ?? 0);
       setValue('balanceDueDate', existingBooking?.balanceDueDate ? existingBooking.balanceDueDate.split('T')[0] : '');
+      setValue('paymentMode', 'CASH');
+      setValue('paymentMethod', 'UPI');
+      setValue('paymentReference', '');
+      setValue('handedOverTo', '');
     }
   }, [open, existingBooking, lead]);
 
@@ -159,6 +172,10 @@ export default function BookingConfirmModal({ open, onClose, lead, existingBooki
       finalPrice: Number(data.finalPrice),
       amountPaid: Number(data.amountPaid),
       balanceDueDate: data.balanceDueDate || undefined,
+      paymentMode: data.paymentMode,
+      paymentMethod: data.paymentMethod,
+      paymentReference: data.paymentReference || undefined,
+      handedOverTo: data.handedOverTo || undefined,
     };
 
     if (isEdit && existingBooking) {
@@ -448,6 +465,68 @@ export default function BookingConfirmModal({ open, onClose, lead, existingBooki
               </p>
             </div>
           </div>
+
+          {/* Payment mode — only for new bookings when advance is entered */}
+          {!isEdit && Number(amountPaid) > 0 && (
+            <div className="mt-3 p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">How was the payment received?</p>
+
+              {/* Cash / Online toggle */}
+              <div className="flex gap-2">
+                {(['CASH', 'ONLINE'] as const).map((mode) => (
+                  <label key={mode} className={cn(
+                    'flex-1 flex items-center justify-center gap-2 py-2.5 border-2 rounded-xl cursor-pointer transition-colors text-sm font-medium',
+                    watchedPaymentMode === mode
+                      ? mode === 'CASH'
+                        ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
+                        : 'border-indigo-500 bg-indigo-50 text-indigo-700'
+                      : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300'
+                  )}>
+                    <input type="radio" value={mode} {...register('paymentMode')} className="sr-only" />
+                    {mode === 'CASH' ? 'Cash' : 'Online'}
+                  </label>
+                ))}
+              </div>
+
+              {/* Online sub-options */}
+              {watchedPaymentMode === 'ONLINE' && (
+                <div className="space-y-2">
+                  <div>
+                    <label className="label">Select Mode</label>
+                    <select {...register('paymentMethod')} className="input bg-white">
+                      <option value="UPI">UPI</option>
+                      <option value="BANK_TRANSFER">Bank Transfer</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="label">Transaction / UTR ID</label>
+                    <input
+                      {...register('paymentReference')}
+                      className="input bg-white font-mono"
+                      placeholder="Enter transaction or UTR ID"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Cash — handed over to */}
+              {watchedPaymentMode === 'CASH' && (
+                <div>
+                  <label className="label">Cash Handed Over To *</label>
+                  <input
+                    {...register('handedOverTo', {
+                      validate: (v) =>
+                        watchedPaymentMode !== 'CASH' || Number(amountPaid) <= 0 || !!v?.trim() ||
+                        'Enter the name of the person who received the cash',
+                    })}
+                    className="input bg-white"
+                    placeholder="Enter name of person who received the cash"
+                  />
+                  {errors.handedOverTo && <p className="text-red-500 text-xs mt-1">{errors.handedOverTo.message}</p>}
+                </div>
+              )}
+            </div>
+          )}
 
           {balanceAmount > 0 && (
             <div className="mt-3">
