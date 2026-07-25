@@ -1,11 +1,11 @@
 import { useState } from 'react';
-import { Download, FileDown, Printer, FileBarChart } from 'lucide-react';
+import { Download, FileDown, FileText, Printer, FileBarChart } from 'lucide-react';
 import {
   useCollectionReport, useEmployeeCollectionReport, useDestinationRevenueReport, useDepartureRevenueReport,
   useOutstandingReport, useVendorPaymentReport, useRefundReport, useExpenseReport,
   useTripProfitabilityReport, usePackageProfitabilityReport, useProfitLossReport,
 } from '../../hooks/useFinance';
-import { exportRowsToExcel, exportRowsToCSV } from '../../utils/reportExport';
+import { exportRowsToExcel, exportRowsToCSV, exportRowsToPDF } from '../../utils/reportExport';
 import { formatCurrency } from '../../utils/helpers';
 
 type Tab = 'collections' | 'employees' | 'destinations' | 'departures' | 'outstanding' | 'vendors' | 'refunds' | 'expenses' | 'tripProfit' | 'packageProfit' | 'pnl';
@@ -88,9 +88,10 @@ export default function FinanceReportsPage() {
           <p className="text-sm text-slate-500 mt-0.5">Collections, revenue, outstanding, vendor, and refund reporting</p>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={handlePrint} className="btn-secondary text-sm"><Printer className="w-4 h-4" />Print / PDF</button>
           <button onClick={() => exportRowsToCSV(`${tab}-report.csv`, currentRows)} disabled={currentRows.length === 0} className="btn-secondary text-sm"><FileDown className="w-4 h-4" />CSV</button>
-          <button onClick={() => exportRowsToExcel(`${tab}-report.xlsx`, currentRows)} disabled={currentRows.length === 0} className="btn-primary text-sm"><Download className="w-4 h-4" />Export Excel</button>
+          <button onClick={() => exportRowsToExcel(`${tab}-report.xlsx`, currentRows)} disabled={currentRows.length === 0} className="btn-secondary text-sm"><Download className="w-4 h-4" />Excel</button>
+          <button onClick={() => exportRowsToPDF(`${tab}-report.pdf`, currentRows, TABS.find(t => t.key === tab)?.label ?? 'Finance Report')} disabled={currentRows.length === 0} className="btn-secondary text-sm"><FileText className="w-4 h-4" />PDF</button>
+          <button onClick={handlePrint} className="btn-secondary text-sm"><Printer className="w-4 h-4" />Print</button>
         </div>
       </div>
 

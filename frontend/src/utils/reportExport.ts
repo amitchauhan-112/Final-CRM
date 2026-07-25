@@ -1,4 +1,6 @@
 import * as XLSX from 'xlsx';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import api from '../services/api';
 
 // ─── Consolidated report export ──────────────────────────────────────────────
@@ -38,6 +40,27 @@ export async function downloadSheetFromEndpoint(endpoint: string, filename: stri
   const { data } = await api.get(endpoint);
   const rows: Record<string, unknown>[] = data.data;
   exportRowsToExcel(filename, rows);
+}
+
+export function exportRowsToPDF(filename: string, rows: Record<string, unknown>[], title = 'Report') {
+  if (!rows.length) return;
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
+  doc.setFontSize(14);
+  doc.text(title, 40, 36);
+  doc.setFontSize(9);
+  doc.setTextColor(150);
+  doc.text(`Generated: ${new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}`, 40, 52);
+  const columns = Object.keys(rows[0]).map((k) => ({ header: k, dataKey: k }));
+  autoTable(doc, {
+    startY: 64,
+    columns,
+    body: rows as any,
+    styles: { fontSize: 8, cellPadding: 4 },
+    headStyles: { fillColor: [99, 102, 241], textColor: 255, fontStyle: 'bold' },
+    alternateRowStyles: { fillColor: [248, 250, 252] },
+    margin: { left: 40, right: 40 },
+  });
+  doc.save(filename);
 }
 
 export function todayStamp() {

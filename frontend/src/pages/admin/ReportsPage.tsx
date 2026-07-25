@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import {
-  BarChart2, Download, FileDown, TrendingUp, Users, CheckCircle,
+  BarChart2, Download, FileDown, FileText, TrendingUp, Users, CheckCircle,
   XCircle, Loader2, Megaphone, AlertTriangle,
 } from 'lucide-react';
 import {
@@ -14,7 +14,7 @@ import {
   useCampaignReport,
   useDailyTrend,
 } from '../../hooks/useReports';
-import { exportRowsToExcel, exportRowsToCSV } from '../../utils/reportExport';
+import { exportRowsToExcel, exportRowsToCSV, exportRowsToPDF } from '../../utils/reportExport';
 import Avatar from '../../components/ui/Avatar';
 import { cn } from '../../utils/helpers';
 
@@ -94,13 +94,12 @@ export default function ReportsPage() {
   const campaigns = campaignData?.data?.campaigns ?? [];
   const trend = trendData?.data?.trend ?? [];
 
-  const handleExport = (format: 'xlsx' | 'csv') => {
+  const getExportRows = () => {
     const date = `${startDate}-to-${endDate}`;
-    const doExport = format === 'xlsx' ? exportRowsToExcel : exportRowsToCSV;
-    const ext = format;
-
-    if (activeTab === 'leads') {
-      doExport(`lead-analytics-${date}.${ext}`, [
+    if (activeTab === 'leads') return {
+      name: `lead-analytics-${date}`,
+      title: 'Lead Analytics Report',
+      rows: [
         ...(leadSummary ? [
           { Metric: 'Total Leads', Value: leadSummary.totalLeads },
           { Metric: 'Confirmed', Value: leadSummary.confirmedLeads },
@@ -108,40 +107,44 @@ export default function ReportsPage() {
           { Metric: 'Conversion Rate %', Value: leadSummary.conversionRate },
         ] : []),
         ...byStatus.map((r: any) => ({ 'By Status': r.name, Count: r.count })),
-      ]);
-    } else if (activeTab === 'performance') {
-      doExport(`employee-performance-${date}.${ext}`, employees.map((e: any) => ({
-        Employee: e.name,
-        'Total Leads': e.totalLeads,
-        Confirmed: e.confirmed,
-        Lost: e.lost,
-        'Follow-ups': e.followUps,
-        'Conversion Rate %': e.conversionRate,
-      })));
-    } else if (activeTab === 'campaigns') {
-      doExport(`campaign-report-${date}.${ext}`, campaigns.map((c: any) => ({
-        Campaign: c.name,
-        Status: c.status,
-        Destination: c.destination || '',
-        Total: c.total,
-        Confirmed: c.confirmed,
-        Lost: c.lost,
-        'Conversion Rate %': c.conversionRate,
-      })));
-    } else if (activeTab === 'lost_reasons') {
-      doExport(`lost-reasons-${date}.${ext}`, lostReasons.map((r: any) => ({
-        Reason: r.reason,
-        Count: r.count,
+      ],
+    };
+    if (activeTab === 'performance') return {
+      name: `employee-performance-${date}`,
+      title: 'Employee Performance Report',
+      rows: employees.map((e: any) => ({
+        Employee: e.name, 'Total Leads': e.totalLeads, Confirmed: e.confirmed,
+        Lost: e.lost, 'Follow-ups': e.followUps, 'Conversion Rate %': e.conversionRate,
+      })),
+    };
+    if (activeTab === 'campaigns') return {
+      name: `campaign-report-${date}`,
+      title: 'Campaign Report',
+      rows: campaigns.map((c: any) => ({
+        Campaign: c.name, Status: c.status, Destination: c.destination || '',
+        Total: c.total, Confirmed: c.confirmed, Lost: c.lost, 'Conversion Rate %': c.conversionRate,
+      })),
+    };
+    if (activeTab === 'lost_reasons') return {
+      name: `lost-reasons-${date}`,
+      title: 'Lost Reasons Report',
+      rows: lostReasons.map((r: any) => ({
+        Reason: r.reason, Count: r.count,
         'Percentage %': lostTotal > 0 ? ((r.count / lostTotal) * 100).toFixed(1) : 0,
-      })));
-    } else if (activeTab === 'trend') {
-      doExport(`daily-trend-${date}.${ext}`, trend.map((t: any) => ({
-        Date: t.date,
-        'Leads Created': t.created,
-        Confirmed: t.confirmed,
-        Lost: t.lost,
-      })));
-    }
+      })),
+    };
+    return {
+      name: `daily-trend-${date}`,
+      title: 'Daily Trend Report',
+      rows: trend.map((t: any) => ({ Date: t.date, 'Leads Created': t.created, Confirmed: t.confirmed, Lost: t.lost })),
+    };
+  };
+
+  const handleExport = (format: 'xlsx' | 'csv' | 'pdf') => {
+    const { name, title, rows } = getExportRows();
+    if (format === 'xlsx') exportRowsToExcel(`${name}.xlsx`, rows, title);
+    else if (format === 'csv') exportRowsToCSV(`${name}.csv`, rows);
+    else exportRowsToPDF(`${name}.pdf`, rows, title);
   };
 
   return (
@@ -154,12 +157,13 @@ export default function ReportsPage() {
         </div>
         <div className="flex items-center gap-2">
           <button onClick={() => handleExport('csv')} className="btn-secondary flex items-center gap-2 text-sm">
-            <FileDown className="w-4 h-4" />
-            CSV
+            <FileDown className="w-4 h-4" />CSV
           </button>
           <button onClick={() => handleExport('xlsx')} className="btn-secondary flex items-center gap-2 text-sm">
-            <Download className="w-4 h-4" />
-            Export Excel
+            <Download className="w-4 h-4" />Excel
+          </button>
+          <button onClick={() => handleExport('pdf')} className="btn-secondary flex items-center gap-2 text-sm">
+            <FileText className="w-4 h-4" />PDF
           </button>
         </div>
       </div>
