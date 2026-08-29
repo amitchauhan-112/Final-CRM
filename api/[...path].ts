@@ -1,4 +1,3 @@
-import serverless from 'serverless-http';
 import app from '../backend/src/app.js';
 
 // Wraps the existing Express app (all 32 route groups, unchanged) as one
@@ -7,4 +6,13 @@ import app from '../backend/src/app.js';
 // ever matches the exact path /api, and a vercel.json rewrite to it strips
 // the rest of the path before Express ever sees it (confirmed: every
 // request landed on Express as "/", regardless of the real URL).
-export default serverless(app);
+//
+// No serverless-http wrapper: Vercel's Node runtime hands the handler a
+// plain (req, res) pair compatible with Node's http.IncomingMessage /
+// ServerResponse, which is exactly what an Express app already expects —
+// serverless-http's Lambda-style event/callback translation never
+// completed the response here (requests were logged as received by
+// Express but the client never got a byte back), so it's unnecessary
+// indirection for Vercel specifically (unlike AWS Lambda, which really
+// does need that translation layer).
+export default app;
