@@ -8,7 +8,8 @@ import {
 } from '../controllers/campaign.controller.js';
 import { getArchiveDownload } from './metaConnection.routes.js';
 import { authenticate, requireAdmin } from '../middleware/auth.js';
-import { upload } from '../middleware/upload.js';
+import { createUpload } from '../middleware/upload.js';
+const upload = createUpload('campaign-attachments');
 
 const router = Router();
 

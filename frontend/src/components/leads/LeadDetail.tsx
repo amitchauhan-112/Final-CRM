@@ -3,11 +3,11 @@ import {
   Phone, Mail, Calendar, User, Megaphone, DollarSign,
   Users, MapPin, MessageSquare, Clock, CheckCircle, Edit, ArrowRightLeft,
   Star, Save, FileText, Activity, X, Utensils, BedDouble, Package,
-  IndianRupee, ChevronRight, CreditCard, Trash2, Plus, CheckSquare, AlertTriangle,
+  IndianRupee, ChevronRight, CreditCard, Trash2, Plus, CheckSquare, AlertTriangle, Download,
 } from 'lucide-react';
-import { Lead, LeadStatus, Booking, Payment, BookingTask, TaskStatus, TaskType, TaskDepartment } from '../../types/index';
+import { Lead, LeadStatus, Booking, Payment, BookingTask, TaskStatus, TaskType, TaskDepartment, FinanceDocumentType } from '../../types/index';
 import { useLead, useUpdateLead, useTransferLead, useLeadJourney } from '../../hooks/useLeads';
-import { useBookingByLead, useMarkReviewCollected, useMarkReferralReceived } from '../../hooks/useBookings';
+import { useBookingByLead, useMarkReviewCollected, useMarkReferralReceived, useBookingDocuments } from '../../hooks/useBookings';
 import { useBookingPayments, useRecordPayment, useDeletePayment } from '../../hooks/usePayments';
 import JourneyTracker from './JourneyTracker';
 import { useBookingTasks, useUpdateTask, useCreateTask } from '../../hooks/useTasks';
@@ -17,6 +17,7 @@ import Badge from '../ui/Badge';
 import Avatar from '../ui/Avatar';
 import Modal from '../ui/Modal';
 import LeadForm from './LeadForm';
+import FollowUpModal from './FollowUpModal';
 import PriorityBadge from '../ui/PriorityBadge';
 import TagChip from '../ui/TagChip';
 import CommentsSection from './CommentsSection';
@@ -36,7 +37,12 @@ interface LeadDetailProps {
 
 type WorkspaceTab = 'overview' | 'notes' | 'activity' | 'comments' | 'payments' | 'tasks';
 
-const statusOrder: LeadStatus[] = ['NEW', 'CONTACTED', 'INTERESTED', 'FOLLOW_UP_SCHEDULED', 'CONFIRMED', 'LOST'];
+const statusOrder: LeadStatus[] = ['NEW', 'NOT_CONTACTED', 'CONTACTED', 'INTERESTED', 'FOLLOW_UP_SCHEDULED', 'CONFIRMED', 'LOST'];
+
+// Statuses that open their own modal to collect required info before saving
+// (booking details, follow-up date) — these never go through the staged
+// "pick then Save Changes" flow, since the modal itself is the save step.
+const SELF_CONFIRMING_STATUSES: LeadStatus[] = ['CONFIRMED', 'FOLLOW_UP_SCHEDULED'];
 
 // ─── Skeleton Loading ─────────────────────────────────────────────────────────
 
@@ -89,13 +95,16 @@ function InfoCell({ icon: Icon, label, value }: { icon: React.ElementType; label
 
 // ─── Status Quick-Update Bar ──────────────────────────────────────────────────
 
-function StatusBar({ current, onUpdate, disabled, isEmployee }: { current: LeadStatus; onUpdate: (s: LeadStatus) => void; disabled: boolean; isEmployee: boolean }) {
+function StatusBar({ current, pending, onUpdate, disabled, isEmployee }: {
+  current: LeadStatus; pending: LeadStatus | null; onUpdate: (s: LeadStatus) => void; disabled: boolean; isEmployee: boolean;
+}) {
   const currentIdx = statusOrder.indexOf(current);
   return (
     <div className="flex flex-wrap gap-1.5">
       {statusOrder.map((s, idx) => {
         const cfg = leadStatusConfig[s];
         const isCurrent = current === s;
+        const isPending = pending === s && !isCurrent;
         // Once confirmed: only CONFIRMED (current) and LOST are valid
         const isLocked = current === 'CONFIRMED' && s !== 'CONFIRMED' && s !== 'LOST';
         // Employees cannot set CONFIRMED directly (booking flow handles it) or go backward
@@ -119,12 +128,14 @@ function StatusBar({ current, onUpdate, disabled, isEmployee }: { current: LeadS
               'px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all whitespace-nowrap',
               isCurrent
                 ? `${cfg.bg} ${cfg.color} border-transparent ring-2 ring-offset-1 ring-current shadow-sm`
-                : inactive
-                  ? 'bg-slate-50 border-slate-100 text-slate-300 cursor-not-allowed'
-                  : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300 hover:text-slate-800 hover:bg-slate-50 disabled:cursor-default'
+                : isPending
+                  ? `${cfg.bg} ${cfg.color} border-dashed border-current ring-2 ring-offset-1 ring-current/50`
+                  : inactive
+                    ? 'bg-slate-50 border-slate-100 text-slate-300 cursor-not-allowed'
+                    : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300 hover:text-slate-800 hover:bg-slate-50 disabled:cursor-default'
             )}
           >
-            {isCurrent && <span className="mr-1">✓</span>}{cfg.label}
+            {isCurrent && <span className="mr-1">✓</span>}{isPending && <span className="mr-1">●</span>}{cfg.label}
           </button>
         );
       })}
@@ -257,6 +268,40 @@ function ActivityTimeline({ logs }: { logs: NonNullable<Lead['activityLogs']> })
 
 // ─── Overview Tab ─────────────────────────────────────────────────────────────
 
+const DOCUMENT_TYPE_LABEL: Record<FinanceDocumentType, string> = {
+  TAX_INVOICE: 'Tax Invoice', RECEIPT: 'Receipt', CREDIT_NOTE: 'Credit Note',
+  DEBIT_NOTE: 'Debit Note', REFUND_VOUCHER: 'Refund Voucher',
+};
+
+function ReceiptsStrip({ bookingId }: { bookingId: string }) {
+  const { data } = useBookingDocuments(bookingId);
+  const documents = data?.data ?? [];
+  if (documents.length === 0) return null;
+
+  return (
+    <div className="px-4 py-2.5 border-t border-emerald-200">
+      <p className="text-[10px] text-emerald-600 font-semibold uppercase tracking-wider mb-1.5">Receipts & Invoices</p>
+      <div className="flex flex-wrap gap-2">
+        {documents.map((d) => (
+          <a
+            key={d.id}
+            href={d.pdfUrl ? (d.pdfUrl.startsWith('/') ? `${window.location.origin}${d.pdfUrl}` : d.pdfUrl) : undefined}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 hover:border-primary-300 hover:text-primary-700 transition-colors"
+          >
+            <FileText className="w-3 h-3 text-slate-400" />
+            {DOCUMENT_TYPE_LABEL[d.type]}
+            <span className="text-slate-400">· {d.documentNumber}</span>
+            <Download className="w-3 h-3 text-slate-400 ml-0.5" />
+          </a>
+        ))}
+      </div>
+      <p className="text-[10px] text-slate-400 mt-1.5">Download and share with the customer via WhatsApp or email.</p>
+    </div>
+  );
+}
+
 function BookingSummary({ booking, onEdit }: { booking: Booking; onEdit: () => void }) {
   const foodLabel: Record<string, string> = {
     VEG: 'Vegetarian', NON_VEG: 'Non-Vegetarian', JAIN: 'Jain', NO_PREFERENCE: 'No Preference',
@@ -370,6 +415,8 @@ function BookingSummary({ booking, onEdit }: { booking: Booking; onEdit: () => v
           </p>
         </div>
       </div>
+
+      <ReceiptsStrip bookingId={booking.id} />
 
       {booking.specialRequest && (
         <div className="px-4 py-2.5 border-t border-emerald-200 flex items-start gap-2">
@@ -887,6 +934,8 @@ export default function LeadDetail({ leadId, open, onClose, isStarred, onToggleS
   const [transferToId, setTransferToId] = useState('');
   const [transferReason, setTransferReason] = useState('');
   const [bookingOpen, setBookingOpen] = useState(false);
+  const [pendingStatus, setPendingStatus] = useState<LeadStatus | null>(null);
+  const [followUpModalOpen, setFollowUpModalOpen] = useState(false);
 
   const { data, isLoading } = useLead(leadId);
   const updateLead = useUpdateLead();
@@ -907,8 +956,34 @@ export default function LeadDetail({ leadId, open, onClose, isStarred, onToggleS
       setBookingOpen(true);
       return;
     }
-    updateLead.mutate({ id: lead.id, status });
+    if (status === 'FOLLOW_UP_SCHEDULED') {
+      setFollowUpModalOpen(true);
+      return;
+    }
+    // Simple statuses (New, Not Contacted, Contacted, Interested, Lost) are
+    // staged, not saved immediately — the employee reviews and clicks Save
+    // Changes to commit.
+    setPendingStatus(status);
   };
+
+  const handleSaveStatus = () => {
+    if (!lead || !pendingStatus) return;
+    updateLead.mutate({ id: lead.id, status: pendingStatus }, { onSuccess: () => setPendingStatus(null) });
+  };
+
+  const handleConfirmFollowUp = (followUpDate: string, followUpNotes?: string) => {
+    if (!lead) return;
+    updateLead.mutate(
+      { id: lead.id, status: 'FOLLOW_UP_SCHEDULED', followUpDate, followUpNotes },
+      { onSuccess: () => setFollowUpModalOpen(false) }
+    );
+  };
+
+  // Reset any staged-but-unsaved status when switching leads or after the
+  // lead's real status changes underneath us.
+  useEffect(() => {
+    setPendingStatus(null);
+  }, [leadId, lead?.status]);
 
   const handleEdit = (formData: any) => {
     if (!lead) return;
@@ -1037,10 +1112,31 @@ export default function LeadDetail({ leadId, open, onClose, isStarred, onToggleS
                 <div className="px-6 pb-3">
                   <StatusBar
                     current={lead.status}
+                    pending={pendingStatus}
                     onUpdate={handleStatusChange}
                     disabled={updateLead.isPending}
                     isEmployee={user?.role === 'EMPLOYEE'}
                   />
+                  {pendingStatus && (
+                    <div className="flex items-center justify-between gap-3 mt-2.5 px-3 py-2 bg-amber-50 border border-amber-200 rounded-xl">
+                      <p className="text-xs text-amber-700">
+                        Status set to <strong>{leadStatusConfig[pendingStatus].label}</strong> — not saved yet.
+                      </p>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <button onClick={() => setPendingStatus(null)} className="text-xs font-medium text-slate-500 hover:text-slate-700">
+                          Discard
+                        </button>
+                        <button
+                          onClick={handleSaveStatus}
+                          disabled={updateLead.isPending}
+                          className="btn-primary py-1 px-3 text-xs gap-1.5"
+                        >
+                          <Save className="w-3 h-3" />
+                          {updateLead.isPending ? 'Saving…' : 'Save Changes'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -1107,6 +1203,13 @@ export default function LeadDetail({ leadId, open, onClose, isStarred, onToggleS
           />
         )}
       </Modal>
+
+      {/* ── Follow-up Date/Time Modal ────────────────────────────────────── */}
+      <FollowUpModal
+        open={followUpModalOpen}
+        onConfirm={handleConfirmFollowUp}
+        onCancel={() => setFollowUpModalOpen(false)}
+      />
 
       {/* ── Booking Confirm Modal ────────────────────────────────────────── */}
       {lead && (

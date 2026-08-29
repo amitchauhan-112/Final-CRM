@@ -1034,39 +1034,213 @@ function calcVehiclesForPax(pax: number) {
   return result;
 }
 
-export const getStayPlan = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-  try {
-    const activeUpcomingFilter = { ...orgFilter(req), status: { in: ['UPCOMING', 'ACTIVE'] } } as const;
-    const departures = await prisma.departure.findMany({
-      where: activeUpcomingFilter,
-      include: {
-        bookings: {
-          where: { status: { not: 'CANCELLED' } },
-          select: { numberOfTravelers: true, roomSharing: true },
+// ─── Shared date+location aggregation engine ───────────────────────────────
+// Used by both getStayPlan and getRoomsRequired so the two views can never
+// disagree about what's actually required on a given date/location.
+
+type BookingInfo = {
+  bookingId: string;
+  bookingNumber: string | null;
+  travelerName: string;
+  numberOfTravelers: number;
+  roomSharing: string;
+  specialRequest: string | null;
+  salesExecutive: { id: string; name: string } | null;
+};
+
+type PkgBreakdown = {
+  packageId: string;
+  packageName: string;
+  packageType: string | null; // GIT | FIT | null (no package)
+  guestCount: number;
+  rooms: { SINGLE: number; DOUBLE: number; TRIPLE: number; QUAD: number; total: number };
+  departureIds: string[];
+  checkOutDate: string;
+  nights: number;
+  bookings: BookingInfo[];
+};
+
+type DestEntry = {
+  guestCount: number;
+  rooms: { SINGLE: number; DOUBLE: number; TRIPLE: number; QUAD: number; total: number };
+  vehicles: { type: string; count: number; seats: number }[];
+  departureIds: string[];
+  packageNames: string[];
+  checkOutDate: string;
+  nights: number;
+  breakdown: Record<string, PkgBreakdown>;
+};
+
+function addDaysStr(dateStr: string, days: number): string {
+  const d = new Date(`${dateStr}T00:00:00.000Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().split('T')[0];
+}
+
+async function buildStayDateMap(req: AuthenticatedRequest) {
+  const activeUpcomingFilter = { ...orgFilter(req), status: { in: ['UPCOMING', 'ACTIVE'] } } as const;
+  const departures = await prisma.departure.findMany({
+    where: activeUpcomingFilter,
+    include: {
+      bookings: {
+        where: { status: { not: 'CANCELLED' } },
+        select: {
+          id: true, bookingNumber: true, travelerName: true, numberOfTravelers: true,
+          roomSharing: true, specialRequest: true, salesExecutiveId: true,
         },
-        package: {
-          select: {
-            id: true, name: true, code: true, nights: true,
-            itineraryItems: {
-              where: { taskType: 'TRIP_DAY' },
-              select: { dayOffset: true, title: true, notes: true, description: true },
-              orderBy: { dayOffset: 'asc' },
-            },
+      },
+      package: {
+        select: {
+          id: true, name: true, code: true, nights: true, packageType: true,
+          itineraryItems: {
+            where: { taskType: 'TRIP_DAY' },
+            select: { dayOffset: true, title: true, notes: true, description: true },
+            orderBy: { dayOffset: 'asc' },
           },
         },
       },
-      orderBy: { departureDate: 'asc' },
-    });
+    },
+    orderBy: { departureDate: 'asc' },
+  });
 
-    // date → destination → aggregated data
-    type DestEntry = {
-      guestCount: number;
-      rooms: { SINGLE: number; DOUBLE: number; TRIPLE: number; QUAD: number; total: number };
-      vehicles: { type: string; count: number; seats: number }[];
-      departureIds: string[];
-      packageNames: string[];
-    };
-    const dateMap: Record<string, Record<string, DestEntry>> = {};
+  // salesExecutiveId has no Prisma relation defined on Booking (plain scalar,
+  // matching the organizationId pattern elsewhere) — resolve names with one
+  // batched lookup instead of a per-row query.
+  const salesExecIds = Array.from(new Set(
+    departures.flatMap((d) => d.bookings.map((b) => b.salesExecutiveId).filter((id): id is string => !!id))
+  ));
+  const salesExecs = salesExecIds.length
+    ? await prisma.user.findMany({ where: { id: { in: salesExecIds } }, select: { id: true, name: true } })
+    : [];
+  const salesExecById = new Map(salesExecs.map((u) => [u.id, u]));
+
+  const dateMap: Record<string, Record<string, DestEntry>> = {};
+
+  for (const dep of departures) {
+    const depDate = new Date(dep.departureDate);
+    depDate.setHours(0, 0, 0, 0);
+    const items = dep.package?.itineraryItems ?? [];
+    const totalGuests = dep.bookings.reduce((s, b) => s + b.numberOfTravelers, 0);
+    if (totalGuests === 0) continue;
+
+    const rooms = calcRoomsForBookings(dep.bookings);
+
+    // Turn each STAY night into its calendar date, then collapse consecutive
+    // nights at the SAME location into one stay block (checkIn → checkOut).
+    // This is what makes "Manali Night 1 + Night 2" show as one 2-night stay
+    // instead of two identical, independently-counted entries — and it's why
+    // vehicles/rooms below get computed once per block, not once per night.
+    // A package that returns to the same city later (Night 1 Manali, Night 2
+    // Kasol, Night 3 Manali) still gets two separate blocks, because the
+    // nights aren't consecutive.
+    const nights = items
+      .filter((item) => item.notes === 'STAY')
+      .map((item) => {
+        const dayIndex = Math.floor(item.dayOffset / 2);
+        const date = new Date(depDate);
+        date.setDate(date.getDate() + dayIndex);
+        return {
+          dateStr: date.toISOString().split('T')[0],
+          dest: (item.description || dep.destination || '').trim() || 'Unknown',
+        };
+      });
+
+    type StayBlock = { dest: string; checkIn: string; checkOut: string; nights: number };
+    const blocks: StayBlock[] = [];
+    for (const n of nights) {
+      const last = blocks[blocks.length - 1];
+      if (last && last.dest === n.dest && last.checkOut === n.dateStr) {
+        last.checkOut = addDaysStr(n.dateStr, 1);
+        last.nights += 1;
+      } else {
+        blocks.push({ dest: n.dest, checkIn: n.dateStr, checkOut: addDaysStr(n.dateStr, 1), nights: 1 });
+      }
+    }
+
+    for (const block of blocks) {
+      const dateStr = block.checkIn;
+      const dest = block.dest;
+
+      if (!dateMap[dateStr]) dateMap[dateStr] = {};
+      if (!dateMap[dateStr][dest]) {
+        dateMap[dateStr][dest] = {
+          guestCount: 0,
+          rooms: { SINGLE: 0, DOUBLE: 0, TRIPLE: 0, QUAD: 0, total: 0 },
+          vehicles: [],
+          departureIds: [],
+          packageNames: [],
+          checkOutDate: block.checkOut,
+          nights: block.nights,
+          breakdown: {},
+        };
+      }
+      const entry = dateMap[dateStr][dest];
+      entry.guestCount += totalGuests;
+      entry.rooms.SINGLE += rooms.SINGLE;
+      entry.rooms.DOUBLE += rooms.DOUBLE;
+      entry.rooms.TRIPLE += rooms.TRIPLE;
+      entry.rooms.QUAD += rooms.QUAD;
+      entry.rooms.total += rooms.total;
+      // The whole point of this entry is one date+location bucket — if two
+      // departures share it but leave on different days, show the longer
+      // stay so Ops books rooms for the full window either group needs.
+      if (block.checkOut > entry.checkOutDate) { entry.checkOutDate = block.checkOut; entry.nights = block.nights; }
+      if (!entry.departureIds.includes(dep.id)) {
+        entry.departureIds.push(dep.id);
+        entry.packageNames.push(dep.package?.name ?? dep.destination);
+      }
+      // Vehicles are computed once per stay block (not once per night it
+      // spans) — a 2-night Manali stay needs one transfer in, not two.
+      entry.vehicles = calcVehiclesForPax(entry.guestCount);
+
+      // Per-package breakdown — same date+location, multiple packages
+      // overlapping (e.g. 4 different Manali packages all with a Day-1
+      // Manali night) each get their own row inside the same total.
+      const pkgKey = dep.package?.id ?? `__no_package__${dep.destination}`;
+      if (!entry.breakdown[pkgKey]) {
+        entry.breakdown[pkgKey] = {
+          packageId: dep.package?.id ?? '',
+          packageName: dep.package?.name ?? dep.destination,
+          packageType: dep.package?.packageType ?? null,
+          guestCount: 0,
+          rooms: { SINGLE: 0, DOUBLE: 0, TRIPLE: 0, QUAD: 0, total: 0 },
+          departureIds: [],
+          checkOutDate: block.checkOut,
+          nights: block.nights,
+          bookings: [],
+        };
+      }
+      const pb = entry.breakdown[pkgKey];
+      pb.guestCount += totalGuests;
+      pb.rooms.SINGLE += rooms.SINGLE;
+      pb.rooms.DOUBLE += rooms.DOUBLE;
+      pb.rooms.TRIPLE += rooms.TRIPLE;
+      pb.rooms.QUAD += rooms.QUAD;
+      pb.rooms.total += rooms.total;
+      if (block.checkOut > pb.checkOutDate) { pb.checkOutDate = block.checkOut; pb.nights = block.nights; }
+      if (!pb.departureIds.includes(dep.id)) {
+        pb.departureIds.push(dep.id);
+        for (const b of dep.bookings) {
+          pb.bookings.push({
+            bookingId: b.id,
+            bookingNumber: b.bookingNumber,
+            travelerName: b.travelerName,
+            numberOfTravelers: b.numberOfTravelers,
+            roomSharing: b.roomSharing,
+            specialRequest: b.specialRequest,
+            salesExecutive: b.salesExecutiveId ? (salesExecById.get(b.salesExecutiveId) ?? null) : null,
+          });
+        }
+      }
+    }
+  }
+
+  return { dateMap, departures };
+}
+
+export const getStayPlan = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const { dateMap, departures } = await buildStayDateMap(req);
 
     // packageId → dates
     type PkgDate = { date: string; destination: string; guestCount: number };
@@ -1077,11 +1251,12 @@ export const getStayPlan = async (req: AuthenticatedRequest, res: Response): Pro
       depDate.setHours(0, 0, 0, 0);
       const items = dep.package?.itineraryItems ?? [];
       const totalGuests = dep.bookings.reduce((s, b) => s + b.numberOfTravelers, 0);
-      if (totalGuests === 0) continue;
+      if (totalGuests === 0 || !dep.package) continue;
 
-      const rooms = calcRoomsForBookings(dep.bookings);
-      const veh = calcVehiclesForPax(totalGuests);
-
+      const pkgId = dep.package.id;
+      if (!packageMap[pkgId]) {
+        packageMap[pkgId] = { packageId: pkgId, packageName: dep.package.name, dates: [] };
+      }
       for (const item of items) {
         if (item.notes !== 'STAY') continue;
         const dayIndex = Math.floor(item.dayOffset / 2);
@@ -1089,48 +1264,87 @@ export const getStayPlan = async (req: AuthenticatedRequest, res: Response): Pro
         date.setDate(date.getDate() + dayIndex);
         const dateStr = date.toISOString().split('T')[0];
         const dest = (item.description || dep.destination || '').trim() || 'Unknown';
-
-        if (!dateMap[dateStr]) dateMap[dateStr] = {};
-        if (!dateMap[dateStr][dest]) {
-          dateMap[dateStr][dest] = {
-            guestCount: 0,
-            rooms: { SINGLE: 0, DOUBLE: 0, TRIPLE: 0, QUAD: 0, total: 0 },
-            vehicles: [],
-            departureIds: [],
-            packageNames: [],
-          };
-        }
-        const entry = dateMap[dateStr][dest];
-        entry.guestCount += totalGuests;
-        entry.rooms.SINGLE += rooms.SINGLE;
-        entry.rooms.DOUBLE += rooms.DOUBLE;
-        entry.rooms.TRIPLE += rooms.TRIPLE;
-        entry.rooms.QUAD += rooms.QUAD;
-        entry.rooms.total += rooms.total;
-        if (!entry.departureIds.includes(dep.id)) {
-          entry.departureIds.push(dep.id);
-          entry.packageNames.push(dep.package?.name ?? dep.destination);
-        }
-        // Recompute vehicles based on cumulative guests for this date/dest
-        entry.vehicles = calcVehiclesForPax(entry.guestCount);
+        const existing = packageMap[pkgId].dates.find((d) => d.date === dateStr && d.destination === dest);
+        if (existing) existing.guestCount += totalGuests;
+        else packageMap[pkgId].dates.push({ date: dateStr, destination: dest, guestCount: totalGuests });
       }
+    }
 
-      // Package-wise
-      if (dep.package) {
-        const pkgId = dep.package.id;
-        if (!packageMap[pkgId]) {
-          packageMap[pkgId] = { packageId: pkgId, packageName: dep.package.name, dates: [] };
-        }
-        for (const item of items) {
-          if (item.notes !== 'STAY') continue;
-          const dayIndex = Math.floor(item.dayOffset / 2);
-          const date = new Date(depDate);
-          date.setDate(date.getDate() + dayIndex);
-          const dateStr = date.toISOString().split('T')[0];
-          const dest = (item.description || dep.destination || '').trim() || 'Unknown';
-          const existing = packageMap[pkgId].dates.find((d) => d.date === dateStr && d.destination === dest);
-          if (existing) existing.guestCount += totalGuests;
-          else packageMap[pkgId].dates.push({ date: dateStr, destination: dest, guestCount: totalGuests });
+    const dateWise = Object.entries(dateMap)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([date, destMap]) => ({
+        date,
+        entries: Object.entries(destMap)
+          .sort(([a], [b]) => a.localeCompare(b))
+          .map(([destination, data]) => ({
+            destination,
+            ...data,
+            breakdown: Object.values(data.breakdown).sort((a, b) => b.rooms.total - a.rooms.total),
+          })),
+      }));
+
+    const packageWise = Object.values(packageMap)
+      .sort((a, b) => a.packageName.localeCompare(b.packageName))
+      .map((p) => ({ ...p, dates: p.dates.sort((a, b) => a.date.localeCompare(b.date)) }));
+
+    res.json({ success: true, data: { dateWise, packageWise } });
+  } catch (e: any) {
+    console.error('[operations] getStayPlan error:', e);
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+};
+
+// ─── Rooms Required — date → location → required/booked/pending/status ────
+// Same aggregation engine as getStayPlan, plus a real "booked" count pulled
+// from actual Hotel records so Operations can see at a glance what's still
+// outstanding, without manually cross-checking departures one by one.
+
+export const getRoomsRequired = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const { dateMap, departures } = await buildStayDateMap(req);
+    const allDepartureIds = departures.map((d) => d.id);
+
+    const hotels = allDepartureIds.length
+      ? await prisma.hotel.findMany({
+          where: { departureId: { in: allDepartureIds }, status: 'CONFIRMED' },
+          select: { departureId: true, location: true, checkInDate: true, numberOfRooms: true },
+        })
+      : [];
+
+    // departureId → location (lowercased, trimmed) → checkInDate-keyed room counts,
+    // plus a fallback bucket (no checkInDate recorded) for backward compatibility
+    // with hotels booked before this date-aware attribution existed.
+    type HotelBucket = { byDate: Record<string, number>; noDate: number };
+    const hotelIndex: Record<string, Record<string, HotelBucket>> = {};
+    for (const h of hotels) {
+      if (!h.departureId || !h.location) continue;
+      const loc = h.location.trim().toLowerCase();
+      if (!loc) continue;
+      if (!hotelIndex[h.departureId]) hotelIndex[h.departureId] = {};
+      if (!hotelIndex[h.departureId][loc]) hotelIndex[h.departureId][loc] = { byDate: {}, noDate: 0 };
+      const bucket = hotelIndex[h.departureId][loc];
+      if (h.checkInDate) {
+        const key = h.checkInDate.toISOString().split('T')[0];
+        bucket.byDate[key] = (bucket.byDate[key] ?? 0) + (h.numberOfRooms ?? 0);
+      } else {
+        bucket.noDate += h.numberOfRooms ?? 0;
+      }
+    }
+
+    // departureId → location → set of distinct dates that location appears
+    // on for that departure. A package can revisit the same city on
+    // non-adjacent nights (Manali Night 1 and Night 3) — when that happens,
+    // an un-dated legacy hotel entry can't be safely attributed to either
+    // night, so it's excluded rather than risking double-counting it into
+    // both.
+    const depLocationDates: Record<string, Record<string, Set<string>>> = {};
+    for (const [date, destMap] of Object.entries(dateMap)) {
+      for (const [destination, data] of Object.entries(destMap)) {
+        const loc = destination.trim().toLowerCase();
+        for (const depId of data.departureIds) {
+          if (!depLocationDates[depId]) depLocationDates[depId] = {};
+          if (!depLocationDates[depId][loc]) depLocationDates[depId][loc] = new Set();
+          depLocationDates[depId][loc].add(date);
         }
       }
     }
@@ -1141,16 +1355,38 @@ export const getStayPlan = async (req: AuthenticatedRequest, res: Response): Pro
         date,
         entries: Object.entries(destMap)
           .sort(([a], [b]) => a.localeCompare(b))
-          .map(([destination, data]) => ({ destination, ...data })),
+          .map(([destination, data]) => {
+            const loc = destination.trim().toLowerCase();
+            let booked = 0;
+            for (const depId of data.departureIds) {
+              const bucket = hotelIndex[depId]?.[loc];
+              if (!bucket) continue;
+              // Prefer an exact date match; only fall back to the
+              // undated bucket when this departure has just one
+              // occurrence of this location (otherwise we can't tell
+              // which night an undated hotel entry belongs to, and
+              // guessing risks double-counting).
+              booked += bucket.byDate[date] ?? 0;
+              const occurrences = depLocationDates[depId]?.[loc]?.size ?? 1;
+              if (!bucket.byDate[date] && occurrences <= 1) booked += bucket.noDate;
+            }
+            const required = data.rooms.total;
+            const pending = Math.max(0, required - booked);
+            const status = booked === 0 ? 'PENDING' : booked >= required ? (booked > required ? 'OVERBOOKED' : 'FULLY_BOOKED') : 'PARTIALLY_BOOKED';
+            return {
+              destination,
+              ...data,
+              breakdown: Object.values(data.breakdown).sort((a, b) => b.rooms.total - a.rooms.total),
+              roomsBooked: booked,
+              roomsPending: pending,
+              status,
+            };
+          }),
       }));
 
-    const packageWise = Object.values(packageMap)
-      .sort((a, b) => a.packageName.localeCompare(b.packageName))
-      .map((p) => ({ ...p, dates: p.dates.sort((a, b) => a.date.localeCompare(b.date)) }));
-
-    res.json({ success: true, data: { dateWise, packageWise } });
+    res.json({ success: true, data: { dateWise } });
   } catch (e: any) {
-    console.error('[operations] getStayPlan error:', e);
+    console.error('[operations] getRoomsRequired error:', e);
     res.status(500).json({ success: false, error: 'Internal server error' });
   }
 };

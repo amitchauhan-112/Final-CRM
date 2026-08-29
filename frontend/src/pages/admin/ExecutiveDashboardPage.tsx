@@ -3,6 +3,7 @@ import {
   PlaneTakeoff, BookOpen, CheckSquare, UserCheck, Building2, Truck,
   Award, MapPin, Megaphone, Users, UserPlus, Repeat, Percent, Gauge, LucideIcon,
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useExecutiveDashboard } from '../../hooks/useDashboard';
 import StatsCard from '../../components/ui/StatsCard';
 import { Skeleton } from '../../components/ui/Skeleton';
@@ -29,37 +30,38 @@ function TopCard({ icon: Icon, label, name, sub }: { icon: LucideIcon; label: st
 }
 
 export default function ExecutiveDashboardPage() {
+  const navigate = useNavigate();
   const { data, isLoading } = useExecutiveDashboard();
   const stats = data?.data;
 
   const financeCards = stats
     ? [
-        { label: "Today's Revenue", value: formatCurrency(stats.todaysRevenue), icon: CalendarDays, iconBg: 'bg-emerald-100', iconColor: 'text-emerald-600' },
-        { label: 'Monthly Revenue', value: formatCurrency(stats.monthlyRevenue), icon: TrendingUp, iconBg: 'bg-emerald-100', iconColor: 'text-emerald-600' },
-        { label: 'Outstanding Amount', value: formatCurrency(stats.outstandingAmount), icon: Wallet, iconBg: 'bg-amber-100', iconColor: 'text-amber-600' },
-        { label: 'Collections Today', value: formatCurrency(stats.collectionsToday), icon: IndianRupee, iconBg: 'bg-primary-100', iconColor: 'text-primary-600' },
-        { label: 'Refunds Pending', value: stats.refundsPending, icon: RotateCcw, iconBg: 'bg-red-100', iconColor: 'text-red-600' },
+        { label: "Today's Revenue", value: formatCurrency(stats.todaysRevenue), icon: CalendarDays, iconBg: 'bg-emerald-100', iconColor: 'text-emerald-600', onClick: () => navigate('/admin/finance/reports') },
+        { label: 'Monthly Revenue', value: formatCurrency(stats.monthlyRevenue), icon: TrendingUp, iconBg: 'bg-emerald-100', iconColor: 'text-emerald-600', onClick: () => navigate('/admin/finance/reports') },
+        { label: 'Outstanding Amount', value: formatCurrency(stats.outstandingAmount), icon: Wallet, iconBg: 'bg-amber-100', iconColor: 'text-amber-600', onClick: () => navigate('/admin/finance/pending') },
+        { label: 'Collections Today', value: formatCurrency(stats.collectionsToday), icon: IndianRupee, iconBg: 'bg-primary-100', iconColor: 'text-primary-600', onClick: () => navigate('/admin/finance/reports') },
+        { label: 'Refunds Pending', value: stats.refundsPending, icon: RotateCcw, iconBg: 'bg-red-100', iconColor: 'text-red-600', onClick: () => navigate('/admin/finance/refunds') },
       ]
     : [];
 
   const opsCards = stats
     ? [
-        { label: 'Upcoming Departures', value: stats.upcomingDepartures, icon: CalendarClock, iconBg: 'bg-primary-100', iconColor: 'text-primary-600' },
-        { label: 'Trips In Progress', value: stats.tripsInProgress, icon: PlaneTakeoff, iconBg: 'bg-primary-100', iconColor: 'text-primary-600' },
-        { label: 'Active Bookings', value: stats.activeBookings, icon: BookOpen, iconBg: 'bg-primary-100', iconColor: 'text-primary-600' },
-        { label: 'Pending Payments', value: stats.pendingPayments, icon: CheckSquare, iconBg: 'bg-amber-100', iconColor: 'text-amber-600' },
-        { label: 'Pending Traveller Verification', value: stats.pendingTravelerVerification, icon: UserCheck, iconBg: 'bg-amber-100', iconColor: 'text-amber-600' },
-        { label: 'Pending Hotel Confirmation', value: stats.pendingHotelConfirmation, icon: Building2, iconBg: 'bg-amber-100', iconColor: 'text-amber-600' },
-        { label: 'Pending Vehicle Confirmation', value: stats.pendingVehicleConfirmation, icon: Truck, iconBg: 'bg-amber-100', iconColor: 'text-amber-600' },
+        { label: 'Upcoming Departures', value: stats.upcomingDepartures, icon: CalendarClock, iconBg: 'bg-primary-100', iconColor: 'text-primary-600', onClick: () => navigate('/admin/operations/departures?status=UPCOMING') },
+        { label: 'Trips In Progress', value: stats.tripsInProgress, icon: PlaneTakeoff, iconBg: 'bg-primary-100', iconColor: 'text-primary-600', onClick: () => navigate('/admin/operations/departures?status=ACTIVE') },
+        { label: 'Active Bookings', value: stats.activeBookings, icon: BookOpen, iconBg: 'bg-primary-100', iconColor: 'text-primary-600', onClick: () => navigate('/admin/bookings') },
+        { label: 'Pending Payments', value: stats.pendingPayments, icon: CheckSquare, iconBg: 'bg-amber-100', iconColor: 'text-amber-600', onClick: () => navigate('/admin/finance/verification') },
+        { label: 'Pending Traveller Verification', value: stats.pendingTravelerVerification, icon: UserCheck, iconBg: 'bg-amber-100', iconColor: 'text-amber-600', onClick: () => navigate('/admin/operations/departures') },
+        { label: 'Pending Hotel Confirmation', value: stats.pendingHotelConfirmation, icon: Building2, iconBg: 'bg-amber-100', iconColor: 'text-amber-600', onClick: () => navigate('/admin/operations/departures') },
+        { label: 'Pending Vehicle Confirmation', value: stats.pendingVehicleConfirmation, icon: Truck, iconBg: 'bg-amber-100', iconColor: 'text-amber-600', onClick: () => navigate('/admin/operations/departures') },
       ]
     : [];
 
   const customerCards = stats
     ? [
-        { label: 'Total Customers', value: stats.totalCustomers, icon: Users, iconBg: 'bg-slate-100', iconColor: 'text-slate-600' },
-        { label: 'New Customers This Month', value: stats.newCustomersThisMonth, icon: UserPlus, iconBg: 'bg-slate-100', iconColor: 'text-slate-600' },
-        { label: 'Customer Retention', value: `${stats.customerRetentionPct}%`, icon: Repeat, iconBg: 'bg-slate-100', iconColor: 'text-slate-600' },
-        { label: 'Conversion Rate', value: `${stats.conversionRatePct}%`, icon: Percent, iconBg: 'bg-slate-100', iconColor: 'text-slate-600' },
+        { label: 'Total Customers', value: stats.totalCustomers, icon: Users, iconBg: 'bg-slate-100', iconColor: 'text-slate-600', onClick: () => navigate('/admin/customers') },
+        { label: 'New Customers This Month', value: stats.newCustomersThisMonth, icon: UserPlus, iconBg: 'bg-slate-100', iconColor: 'text-slate-600', onClick: () => navigate('/admin/customers') },
+        { label: 'Customer Retention', value: `${stats.customerRetentionPct}%`, icon: Repeat, iconBg: 'bg-slate-100', iconColor: 'text-slate-600', onClick: () => navigate('/admin/customers') },
+        { label: 'Conversion Rate', value: `${stats.conversionRatePct}%`, icon: Percent, iconBg: 'bg-slate-100', iconColor: 'text-slate-600', onClick: () => navigate('/admin/leads') },
       ]
     : [];
 
@@ -107,14 +109,14 @@ export default function ExecutiveDashboardPage() {
           <div>
             <h3 className="text-sm font-semibold text-slate-600 mb-3">Finance</h3>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
-              {financeCards.map((c) => <StatsCard key={c.label} label={c.label} value={c.value} icon={c.icon} iconBg={c.iconBg} iconColor={c.iconColor} />)}
+              {financeCards.map((c) => <StatsCard key={c.label} label={c.label} value={c.value} icon={c.icon} iconBg={c.iconBg} iconColor={c.iconColor} onClick={c.onClick} />)}
             </div>
           </div>
 
           <div>
             <h3 className="text-sm font-semibold text-slate-600 mb-3">Operations</h3>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-              {opsCards.map((c) => <StatsCard key={c.label} label={c.label} value={c.value} icon={c.icon} iconBg={c.iconBg} iconColor={c.iconColor} />)}
+              {opsCards.map((c) => <StatsCard key={c.label} label={c.label} value={c.value} icon={c.icon} iconBg={c.iconBg} iconColor={c.iconColor} onClick={c.onClick} />)}
             </div>
           </div>
 
@@ -131,7 +133,7 @@ export default function ExecutiveDashboardPage() {
           <div>
             <h3 className="text-sm font-semibold text-slate-600 mb-3">Customers</h3>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              {customerCards.map((c) => <StatsCard key={c.label} label={c.label} value={c.value} icon={c.icon} iconBg={c.iconBg} iconColor={c.iconColor} />)}
+              {customerCards.map((c) => <StatsCard key={c.label} label={c.label} value={c.value} icon={c.icon} iconBg={c.iconBg} iconColor={c.iconColor} onClick={c.onClick} />)}
             </div>
           </div>
         </>

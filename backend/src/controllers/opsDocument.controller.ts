@@ -1,10 +1,9 @@
 import { Response } from 'express';
 import fs from 'fs';
-import path from 'path';
 import prisma from '../lib/prisma.js';
 import { AuthenticatedRequest } from '../types/index.js';
 import { emitOperationsUpdated } from '../services/notification.service.js';
-import { UPLOAD_DIR_PATH } from '../middleware/upload.js';
+import { buildUploadUrl, filePathFromUploadUrl } from '../middleware/upload.js';
 
 const orgId = (req: AuthenticatedRequest) => req.user?.organizationId ?? null;
 
@@ -26,7 +25,7 @@ export const uploadDocument = async (req: AuthenticatedRequest, res: Response): 
         departureId,
         name: file.originalname,
         type: type || 'OTHER',
-        fileUrl: `/api/uploads/${file.filename}`,
+        fileUrl: buildUploadUrl(file),
         fileSize: file.size,
         mimeType: file.mimetype,
         uploadedById: req.user!.id,
@@ -54,8 +53,7 @@ export const deleteDocument = async (req: AuthenticatedRequest, res: Response): 
 
     await prisma.operationsDocument.delete({ where: { id } });
 
-    const filename = path.basename(existing.fileUrl);
-    const filePath = path.join(UPLOAD_DIR_PATH, filename);
+    const filePath = filePathFromUploadUrl(existing.fileUrl);
     fs.unlink(filePath, () => {});
 
     emitOperationsUpdated(existing.departureId);

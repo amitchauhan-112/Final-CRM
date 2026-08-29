@@ -19,6 +19,7 @@ export const getLeads = async (req: AuthenticatedRequest, res: Response): Promis
       status, source, campaignId, assignedToId, priority, tagId,
       search, page = 1, limit = 20,
       sortBy = 'createdAt', sortOrder = 'desc',
+      dateFrom, dateTo,
     } = req.query;
 
     const skip = (Number(page) - 1) * Number(limit);
@@ -35,6 +36,12 @@ export const getLeads = async (req: AuthenticatedRequest, res: Response): Promis
     if (priority) where.priority = priority;
     if (tagId) where.tags = { some: { tagId } };
     if (assignedToId && req.user?.role === 'ADMIN') where.assignedToId = assignedToId;
+    if (dateFrom || dateTo) {
+      const createdAt: Record<string, Date> = {};
+      if (dateFrom) createdAt.gte = new Date(`${dateFrom}T00:00:00.000Z`);
+      if (dateTo) createdAt.lte = new Date(`${dateTo}T23:59:59.999Z`);
+      where.createdAt = createdAt;
+    }
 
     if (search) {
       where.OR = [
@@ -142,6 +149,10 @@ export const createLeadManual = async (req: AuthenticatedRequest, res: Response)
 
     if (!name?.trim() || !phone?.trim()) {
       res.status(400).json({ success: false, error: 'Name and phone are required' });
+      return;
+    }
+    if (followUpDate && new Date(followUpDate) <= new Date()) {
+      res.status(400).json({ success: false, error: 'Follow-up date must be in the future' });
       return;
     }
 
@@ -253,6 +264,13 @@ export const updateLead = async (req: AuthenticatedRequest, res: Response): Prom
       const parsed = followUpDate ? new Date(followUpDate) : null;
       if (parsed && parsed < existing.createdAt) {
         res.status(400).json({ success: false, error: 'Follow-up date cannot be before the lead creation date' });
+        return;
+      }
+      // Only enforced when the date is actually changing — re-saving a lead
+      // whose follow-up has since lapsed (without touching the date itself)
+      // must not be blocked by it.
+      if (parsed && parsed <= new Date() && parsed.getTime() !== existing.followUpDate?.getTime()) {
+        res.status(400).json({ success: false, error: 'Follow-up date must be in the future' });
         return;
       }
       updateData.followUpDate = parsed;

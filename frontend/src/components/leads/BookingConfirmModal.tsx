@@ -16,8 +16,6 @@ interface BookingForm {
   aadharNumber: string;
   foodPreference: string;
   roomSharing: string;
-  departureLocation: string;
-  departurePackage: string;
   tourType: string;
   specialRequest: string;
   bookingNotes: string;
@@ -62,8 +60,6 @@ export default function BookingConfirmModal({ open, onClose, lead, existingBooki
       aadharNumber: existingBooking?.aadharNumber ?? '',
       foodPreference: existingBooking?.foodPreference ?? 'NO_PREFERENCE',
       roomSharing: existingBooking?.roomSharing ?? 'DOUBLE',
-      departureLocation: existingBooking?.departureLocation ?? lead.destination ?? '',
-      departurePackage: existingBooking?.departurePackage ?? '',
       tourType: existingBooking?.tourType ?? 'GIT',
       specialRequest: existingBooking?.specialRequest ?? '',
       bookingNotes: existingBooking?.bookingNotes ?? '',
@@ -107,11 +103,6 @@ export default function BookingConfirmModal({ open, onClose, lead, existingBooki
   const { data: selectedPkgData } = usePackage(watchedPackageId || null);
   const selectedPkg = selectedPkgData?.data ?? null;
 
-  // Auto-fill destination from package
-  useEffect(() => {
-    if (selectedPkg?.destination?.name) setValue('departureLocation', selectedPkg.destination.name);
-  }, [selectedPkg, setValue]);
-
   // Auto-fill price and return date when package or departure date changes
   useEffect(() => {
     if (!selectedPkg) return;
@@ -135,8 +126,6 @@ export default function BookingConfirmModal({ open, onClose, lead, existingBooki
       setValue('aadharNumber', existingBooking?.aadharNumber ?? '');
       setValue('foodPreference', existingBooking?.foodPreference ?? 'NO_PREFERENCE');
       setValue('roomSharing', existingBooking?.roomSharing ?? 'DOUBLE');
-      setValue('departureLocation', existingBooking?.departureLocation ?? lead.destination ?? '');
-      setValue('departurePackage', existingBooking?.departurePackage ?? '');
       setValue('tourType', existingBooking?.tourType ?? 'GIT');
       setValue('specialRequest', existingBooking?.specialRequest ?? '');
       setValue('bookingNotes', existingBooking?.bookingNotes ?? '');
@@ -161,8 +150,6 @@ export default function BookingConfirmModal({ open, onClose, lead, existingBooki
       aadharNumber: data.aadharNumber || undefined,
       foodPreference: data.foodPreference as FoodPreference,
       roomSharing: data.roomSharing as RoomSharing,
-      departureLocation: data.departureLocation || undefined,
-      departurePackage: data.departurePackage || undefined,
       tourType: data.tourType as TourType,
       specialRequest: data.specialRequest || undefined,
       bookingNotes: data.bookingNotes || undefined,
@@ -327,7 +314,20 @@ export default function BookingConfirmModal({ open, onClose, lead, existingBooki
             {/* Departure + Return dates */}
             <div>
               <label className="label">Departure Date</label>
-              <input type="date" {...register('departureDate')} className="input" />
+              <input
+                type="date"
+                {...register('departureDate', {
+                  validate: (v) => {
+                    if (!v) return true;
+                    const existingDate = existingBooking?.departureDate?.split('T')[0];
+                    if (existingDate === v) return true; // unchanged — don't block an already-past trip
+                    return v >= todayDate || 'Departure date cannot be in the past';
+                  },
+                })}
+                min={todayDate}
+                className="input"
+              />
+              {errors.departureDate && <p className="text-red-500 text-xs mt-1">{errors.departureDate.message}</p>}
             </div>
             <div>
               <label className="label">Return Date {selectedPkg ? '(Auto)' : ''}</label>
@@ -398,14 +398,6 @@ export default function BookingConfirmModal({ open, onClose, lead, existingBooki
           <SectionHeader icon={MapPin} label="Trip Details" />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="label">Departure Location</label>
-              <input {...register('departureLocation')} className="input" placeholder="e.g. Delhi, Mumbai" />
-            </div>
-            <div>
-              <label className="label">Departure Package</label>
-              <input {...register('departurePackage')} className="input" placeholder="e.g. Ex-Delhi 6N7D" />
-            </div>
-            <div>
               <label className="label">Special Request</label>
               <input {...register('specialRequest')} className="input" placeholder="Any special requirement…" />
             </div>
@@ -433,17 +425,21 @@ export default function BookingConfirmModal({ open, onClose, lead, existingBooki
               {errors.finalPrice && <p className="text-red-500 text-xs mt-1">{errors.finalPrice.message}</p>}
             </div>
             <div>
-              <label className="label">Amount Paid (₹)</label>
+              <label className="label">Amount Paid (₹){!isEdit && <span className="text-red-500"> *</span>}</label>
               <input
-                type="number" min={0} step="0.01"
+                type="number" min={isEdit ? 0 : 0.01} step="0.01"
                 {...register('amountPaid', {
                   valueAsNumber: true,
-                  min: { value: 0, message: 'Must be ≥ 0' },
+                  required: isEdit ? false : 'An advance payment is required to confirm a booking',
+                  min: isEdit ? { value: 0, message: 'Must be ≥ 0' } : { value: 0.01, message: 'An advance payment is required to confirm a booking' },
                   validate: (v, formValues) => !(v > Number(formValues.finalPrice || 0)) || 'Amount paid cannot exceed the final price',
                 })}
                 className="input"
               />
               {errors.amountPaid && <p className="text-red-500 text-xs mt-1">{errors.amountPaid.message}</p>}
+              {!isEdit && !errors.amountPaid && (
+                <p className="text-[10px] text-slate-400 mt-0.5">An advance must be recorded to confirm this booking.</p>
+              )}
             </div>
           </div>
 
@@ -534,10 +530,16 @@ export default function BookingConfirmModal({ open, onClose, lead, existingBooki
               <input
                 type="date"
                 {...register('balanceDueDate', {
-                  validate: (val) => !val || val >= todayDate || 'Balance due date cannot be in the past',
+                  validate: (val, formValues) => {
+                    if (!val) return true;
+                    if (val < todayDate) return 'Balance due date cannot be in the past';
+                    if (formValues.departureDate && val > formValues.departureDate) return 'Balance due date must be before the departure date';
+                    return true;
+                  },
                 })}
                 className="input"
                 min={todayDate}
+                max={watchedDepartureDate || undefined}
               />
               {errors.balanceDueDate && <p className="text-red-500 text-xs mt-1">{errors.balanceDueDate.message}</p>}
             </div>

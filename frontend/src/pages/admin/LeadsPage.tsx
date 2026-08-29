@@ -22,6 +22,7 @@ import toast from 'react-hot-toast';
 const STATUSES: { value: string; label: string }[] = [
   { value: '', label: 'All Statuses' },
   { value: 'NEW', label: 'New' },
+  { value: 'NOT_CONTACTED', label: 'Not Contacted' },
   { value: 'CONTACTED', label: 'Contacted' },
   { value: 'INTERESTED', label: 'Interested' },
   { value: 'FOLLOW_UP_SCHEDULED', label: 'Follow-up Scheduled' },

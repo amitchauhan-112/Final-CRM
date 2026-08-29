@@ -74,7 +74,7 @@ export default function Table<T extends { id?: string }>({
                 key={(row as any).id ?? index}
                 onClick={() => onRowClick?.(row)}
                 className={cn(
-                  'border-b border-slate-100 transition-colors',
+                  'border-b border-slate-100 transition-colors duration-150 ease-enterprise',
                   onRowClick && 'cursor-pointer hover:bg-slate-50',
                   rowClassName?.(row)
                 )}

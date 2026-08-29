@@ -1,9 +1,8 @@
 import { Response } from 'express';
 import fs from 'fs';
-import path from 'path';
 import prisma from '../lib/prisma.js';
 import { AuthenticatedRequest } from '../types/index.js';
-import { UPLOAD_DIR_PATH } from '../middleware/upload.js';
+import { buildUploadUrl, filePathFromUploadUrl } from '../middleware/upload.js';
 
 const orgId = (req: AuthenticatedRequest) => req.user?.organizationId ?? null;
 const orgFilter = (req: AuthenticatedRequest) => (orgId(req) ? { organizationId: orgId(req) } : {});
@@ -26,7 +25,7 @@ export const listVendors = async (req: AuthenticatedRequest, res: Response): Pro
 
 export const createVendor = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
-    const { name, type, contact, notes, status } = req.body;
+    const { name, type, contact, contactPerson, rate, notes, status } = req.body;
     if (!name?.trim()) { res.status(400).json({ success: false, error: 'Vendor name is required' }); return; }
 
     const vendor = await prisma.vendor.create({
@@ -35,6 +34,8 @@ export const createVendor = async (req: AuthenticatedRequest, res: Response): Pr
         name: name.trim(),
         type: type || 'OTHER',
         contact: contact?.trim() || null,
+        contactPerson: contactPerson?.trim() || null,
+        rate: rate !== undefined && rate !== '' && rate !== null ? Number(rate) : null,
         notes: notes?.trim() || null,
         status: status || 'ACTIVE',
       },
@@ -64,6 +65,8 @@ export const updateVendor = async (req: AuthenticatedRequest, res: Response): Pr
         name: b.name !== undefined ? String(b.name).trim() : existing.name,
         type: b.type ?? existing.type,
         contact: b.contact !== undefined ? b.contact?.trim() || null : existing.contact,
+        contactPerson: b.contactPerson !== undefined ? b.contactPerson?.trim() || null : existing.contactPerson,
+        rate: b.rate !== undefined ? (b.rate === '' || b.rate === null ? null : Number(b.rate)) : existing.rate,
         notes: b.notes !== undefined ? b.notes?.trim() || null : existing.notes,
         status: b.status ?? existing.status,
       },
@@ -155,7 +158,7 @@ export const uploadVendorDocument = async (req: AuthenticatedRequest, res: Respo
         vendorId,
         name: req.file.originalname,
         type: type || 'OTHER',
-        fileUrl: `/api/uploads/${req.file.filename}`,
+        fileUrl: buildUploadUrl(req.file),
         fileSize: req.file.size,
         mimeType: req.file.mimetype,
         uploadedById: req.user!.id,
@@ -182,8 +185,7 @@ export const deleteVendorDocument = async (req: AuthenticatedRequest, res: Respo
 
     await prisma.vendorDocument.delete({ where: { id } });
 
-    const filename = path.basename(existing.fileUrl);
-    fs.unlink(path.join(UPLOAD_DIR_PATH, filename), () => {});
+    fs.unlink(filePathFromUploadUrl(existing.fileUrl), () => {});
 
     res.json({ success: true, data: { id } });
   } catch (e) {

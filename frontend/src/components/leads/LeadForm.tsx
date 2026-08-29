@@ -13,7 +13,7 @@ import TagInput from '../ui/TagInput';
 import api from '../../services/api';
 import { cn } from '../../utils/helpers';
 
-const STATUS_ORDER: LeadStatus[] = ['NEW', 'CONTACTED', 'INTERESTED', 'FOLLOW_UP_SCHEDULED', 'CONFIRMED', 'LOST'];
+const STATUS_ORDER: LeadStatus[] = ['NEW', 'NOT_CONTACTED', 'CONTACTED', 'INTERESTED', 'FOLLOW_UP_SCHEDULED', 'CONFIRMED', 'LOST'];
 
 interface LeadFormData {
   name: string;
@@ -313,6 +313,7 @@ export default function LeadForm({ defaultValues, onSubmit, isLoading, onCancel 
               {statusOptions.map((s) => (
                 <option key={s} value={s}>
                   {s === 'NEW' ? 'New'
+                    : s === 'NOT_CONTACTED' ? 'Not Contacted'
                     : s === 'CONTACTED' ? 'Contacted'
                     : s === 'INTERESTED' ? 'Interested'
                     : s === 'FOLLOW_UP_SCHEDULED' ? 'Follow-up Scheduled'

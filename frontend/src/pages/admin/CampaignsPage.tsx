@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Plus, Target, CheckCircle, Megaphone, FileText, Users, MapPin, Calendar, TrendingUp, StickyNote, Paperclip, Archive, ChevronDown, ChevronUp, Download, Link2 } from 'lucide-react';
 import { useCampaigns, useCampaign, useCampaignStats, useCreateCampaign, useUpdateCampaign, useDeleteCampaign } from '../../hooks/useCampaigns';
 import { useArchivedCampaigns, useArchiveDownload } from '../../hooks/useMetaConnection';
@@ -221,6 +222,7 @@ function CampaignDetailModal({
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function AdminCampaignsPage() {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<CampaignStatus | 'ALL'>('ALL');
   const [createOpen, setCreateOpen] = useState(false);
   const [editCampaign, setEditCampaign] = useState<Campaign | null>(null);
@@ -278,9 +280,9 @@ export default function AdminCampaignsPage() {
 
       {/* Summary stats */}
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
-        <StatsCard label="Active Campaigns" value={activeCampaigns} icon={Megaphone} iconBg="bg-mountain-100" iconColor="text-mountain-600" />
-        <StatsCard label="Total Leads" value={totalLeads} icon={Target} iconBg="bg-primary-100" iconColor="text-primary-600" />
-        <StatsCard label="Confirmed" value={totalConfirmed} icon={CheckCircle} iconBg="bg-green-100" iconColor="text-green-600" />
+        <StatsCard label="Active Campaigns" value={activeCampaigns} icon={Megaphone} iconBg="bg-mountain-100" iconColor="text-mountain-600" onClick={() => setActiveTab('ACTIVE')} />
+        <StatsCard label="Total Leads" value={totalLeads} icon={Target} iconBg="bg-primary-100" iconColor="text-primary-600" onClick={() => navigate('/admin/leads')} />
+        <StatsCard label="Confirmed" value={totalConfirmed} icon={CheckCircle} iconBg="bg-green-100" iconColor="text-green-600" onClick={() => navigate('/admin/leads?status=CONFIRMED')} />
         <StatsCard label="Avg. Conversion" value={`${avgConversion}%`} icon={FileText} iconBg="bg-orange-100" iconColor="text-orange-600" />
       </div>
 

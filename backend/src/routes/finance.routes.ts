@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import { authenticate, requireFinanceOrAdmin } from '../middleware/auth.js';
-import { upload } from '../middleware/upload.js';
+import { createUpload } from '../middleware/upload.js';
+const uploadVendorPaymentProof = createUpload('vendor-payment-proofs');
+const uploadExpenseBill = createUpload('expense-bills');
 import { getDashboardStats } from '../controllers/financeDashboard.controller.js';
 import { listPaymentsForVerification, approvePayment, rejectPayment, requestCorrection } from '../controllers/payment.controller.js';
 import { getCustomerLedger, getPendingTracker } from '../controllers/ledger.controller.js';
@@ -63,7 +65,7 @@ router.get('/vendor-payments', listVendorPayments);
 router.post('/vendor-payments', createVendorPayment);
 router.put('/vendor-payments/:id', updateVendorPayment);
 router.delete('/vendor-payments/:id', deleteVendorPayment);
-router.post('/vendor-payments/:id/upload', upload.single('file'), uploadVendorPaymentFile);
+router.post('/vendor-payments/:id/upload', uploadVendorPaymentProof.single('file'), uploadVendorPaymentFile);
 
 // Read-only access to Departures/Packages (owned by Operations/Sales) — Finance
 // needs them to tag an expense to a trip/package.
@@ -72,7 +74,7 @@ router.get('/packages', getPackages);
 
 // Expenses
 router.get('/expenses', listExpenses);
-router.post('/expenses', upload.single('bill'), createExpense);
+router.post('/expenses', uploadExpenseBill.single('bill'), createExpense);
 router.put('/expenses/:id/approve', approveExpense);
 router.put('/expenses/:id/reject', rejectExpense);
 router.delete('/expenses/:id', deleteExpense);

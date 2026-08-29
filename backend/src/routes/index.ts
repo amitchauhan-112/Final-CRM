@@ -30,6 +30,7 @@ import businessRuleRoutes from './businessRule.routes.js';
 import automationRuleRoutes from './automationRule.routes.js';
 import systemHealthRoutes from './systemHealth.routes.js';
 import searchRoutes from './search.routes.js';
+import hrRoutes from './hr.routes.js';
 
 const router = Router();
 
@@ -66,5 +67,6 @@ router.use('/business-rules', businessRuleRoutes);
 router.use('/automation-rules', automationRuleRoutes);
 router.use('/system', systemHealthRoutes);
 router.use('/search', searchRoutes);
+router.use('/hr', hrRoutes);
 
 export default router;

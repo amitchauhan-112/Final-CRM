@@ -13,7 +13,7 @@ export const createVehicle = async (req: AuthenticatedRequest, res: Response): P
     });
     if (!departure) { res.status(404).json({ success: false, error: 'Departure not found' }); return; }
 
-    const { vehicleType, vehicleNumber, driverName, driverMobile, pickupTime, pickupLocation, vendorName, vendorContact, status } = req.body;
+    const { vehicleType, vehicleNumber, driverName, driverMobile, pickupTime, pickupLocation, vendorName, vendorContact, contactPerson, rate, vendorId, status } = req.body;
 
     const vehicle = await prisma.vehicle.create({
       data: {
@@ -26,6 +26,9 @@ export const createVehicle = async (req: AuthenticatedRequest, res: Response): P
         pickupLocation: pickupLocation?.trim() || null,
         vendorName: vendorName?.trim() || null,
         vendorContact: vendorContact?.trim() || null,
+        contactPerson: contactPerson?.trim() || null,
+        rate: rate !== undefined && rate !== '' && rate !== null ? Number(rate) : null,
+        vendorId: vendorId?.trim() || null,
         status: status || 'PENDING',
       },
     });
@@ -62,6 +65,9 @@ export const updateVehicle = async (req: AuthenticatedRequest, res: Response): P
         pickupLocation: b.pickupLocation !== undefined ? b.pickupLocation?.trim() || null : existing.pickupLocation,
         vendorName: b.vendorName !== undefined ? b.vendorName?.trim() || null : existing.vendorName,
         vendorContact: b.vendorContact !== undefined ? b.vendorContact?.trim() || null : existing.vendorContact,
+        contactPerson: b.contactPerson !== undefined ? b.contactPerson?.trim() || null : existing.contactPerson,
+        rate: b.rate !== undefined ? (b.rate === '' || b.rate === null ? null : Number(b.rate)) : existing.rate,
+        vendorId: b.vendorId !== undefined ? b.vendorId?.trim() || null : existing.vendorId,
         status: b.status ?? existing.status,
       },
     });

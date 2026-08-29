@@ -97,6 +97,16 @@ model User {
   modifiedPackages     Package[]           @relation("PackageLastModifiedBy")
   packageAuditLogs     PackageAuditLog[]   @relation("PackageAuditUser")
 
+  // Sales targets, salary, and incentive payouts
+  salesTargets         SalesTarget[]         @relation("SalesTargetUser")
+  setSalesTargets      SalesTarget[]         @relation("SalesTargetSetBy")
+  salaryConfig         EmployeeSalaryConfig? @relation("SalaryConfigUser")
+  updatedSalaryConfigs EmployeeSalaryConfig[] @relation("SalaryConfigUpdatedBy")
+  payouts              EmployeePayout[]      @relation("PayoutUser")
+  processedPayouts     EmployeePayout[]      @relation("PayoutPaidBy")
+  financeSalaryAccess  FinanceSalaryAccess?  @relation("FinanceSalaryAccessUser")
+  grantedSalaryAccess  FinanceSalaryAccess[] @relation("FinanceSalaryAccessGrantedBy")
+
   @@index([organizationId])
   @@index([departmentId])
   @@index([designationId])
@@ -462,6 +472,12 @@ model MetaConnection {
   isActive        Boolean  @default(true)
   lastSyncAt      DateTime?
   lastSyncError   String?
+
+  // Historical lead backfill (one-off, admin-triggered — separate from the
+  // recurring 15-min campaign sync above)
+  lastLeadBackfillAt     DateTime?
+  lastLeadBackfillResult String?    // JSON: { formsScanned, leadsFound, leadsCreated, duplicatesSkipped, errors }
+
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
@@ -1002,6 +1018,8 @@ model Hotel {
   roomAllocation     String?                      // free-text summary, e.g. "5 Double, 2 Triple"
   vendorName         String?                      // legacy free-text — kept for backward compatibility
   vendorContact      String?
+  contactPerson      String?                      // snapshot of the vendor's contact person at allocation time
+  rate               Float?                       // negotiated rate for this booking — pre-filled from vendor.rate, editable
   vendorId           String?                      // optional FK to the Vendor master list (Vendor Workspace)
   vendor             Vendor? @relation("VendorHotels", fields: [vendorId], references: [id], onDelete: SetNull)
   confirmationNumber String?
@@ -1029,6 +1047,8 @@ model Vehicle {
   pickupLocation String?
   vendorName     String?                          // legacy free-text — kept for backward compatibility
   vendorContact  String?
+  contactPerson  String?                          // snapshot of the vendor's contact person at allocation time
+  rate           Float?                           // negotiated rate for this booking — pre-filled from vendor.rate, editable
   vendorId       String?                          // optional FK to the Vendor master list (Vendor Workspace)
   vendor         Vendor? @relation("VendorVehicles", fields: [vendorId], references: [id], onDelete: SetNull)
   status         String  @default("PENDING")      // PENDING | CONFIRMED | CANCELLED
@@ -1046,11 +1066,13 @@ model Vendor {
   organizationId String?
   organization   Organization? @relation(fields: [organizationId], references: [id])
 
-  name    String
-  type    String  @default("OTHER")  // HOTEL | VEHICLE | LOCAL_GUIDE | LOCAL_VENDOR | OTHER
-  contact String?
-  notes   String?
-  status  String  @default("ACTIVE") // ACTIVE | INACTIVE
+  name          String
+  type          String  @default("OTHER")  // HOTEL | VEHICLE | LOCAL_GUIDE | LOCAL_VENDOR | OTHER
+  contact       String?                    // phone number
+  contactPerson String?                    // name of the point of contact
+  rate          Float?                     // default/base rate — pre-fills Hotel/Vehicle allocation forms
+  notes         String?
+  status        String  @default("ACTIVE") // ACTIVE | INACTIVE
   rating      Float?
   ratingCount Int    @default(0)
 
@@ -1408,4 +1430,115 @@ model Expense {
   @@index([category])
   @@index([status])
   @@map("expenses")
+}
+
+// ─── Sales Targets, Salary & Incentives ───────────────────────────────────────
+// Achievement is always computed live from Booking (salesExecutiveId + finalPrice
+// + createdAt within the target's month) — never stored, so it's always
+// current. Only the target itself (and the admin-entered incentive %) is
+// persisted per employee per month.
+
+model SalesTarget {
+  id             String  @id @default(uuid())
+  organizationId String?
+
+  userId String
+  user   User   @relation("SalesTargetUser", fields: [userId], references: [id])
+
+  month Int // 1-12
+  year  Int
+
+  targetRevenue  Float? // ₹ target for the month
+  targetBookings Int?   // booking-count target for the month
+
+  // Admin-entered each month; incentive = incentivePercent% of (achievedRevenue
+  // - targetRevenue), only once achievedRevenue exceeds targetRevenue.
+  incentivePercent Float?
+
+  setById String
+  setBy   User   @relation("SalesTargetSetBy", fields: [setById], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, month, year])
+  @@index([organizationId])
+  @@index([userId])
+  @@map("sales_targets")
+}
+
+// One row per employee — the current base salary. History of what was
+// actually paid each month lives in EmployeePayout, not here.
+model EmployeeSalaryConfig {
+  id             String  @id @default(uuid())
+  organizationId String?
+
+  userId      String @unique
+  user        User   @relation("SalaryConfigUser", fields: [userId], references: [id])
+  baseSalary  Float
+
+  updatedById String
+  updatedBy   User   @relation("SalaryConfigUpdatedBy", fields: [updatedById], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId])
+  @@map("employee_salary_configs")
+}
+
+// One row per employee per month per type (SALARY or INCENTIVE) — created
+// when Admin/authorized Finance reviews the month, then updated as amounts
+// are actually released.
+model EmployeePayout {
+  id             String  @id @default(uuid())
+  organizationId String?
+
+  userId String
+  user   User   @relation("PayoutUser", fields: [userId], references: [id])
+
+  type  String // SALARY | INCENTIVE
+  month Int
+  year  Int
+
+  amountDue  Float
+  amountPaid Float  @default(0)
+  status     String @default("PENDING") // PENDING | PARTIAL | PAID
+
+  paidAt   DateTime?
+  paidById String?
+  paidBy   User?     @relation("PayoutPaidBy", fields: [paidById], references: [id])
+  notes    String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, type, month, year])
+  @@index([organizationId])
+  @@index([userId])
+  @@map("employee_payouts")
+}
+
+// Time-boxed delegation letting one Finance employee view salary/incentive
+// data (normally Admin-only). One active grant per user; Admin can revoke
+// (isActive = false) at any time regardless of expiresAt.
+model FinanceSalaryAccess {
+  id             String  @id @default(uuid())
+  organizationId String?
+
+  userId String @unique
+  user   User   @relation("FinanceSalaryAccessUser", fields: [userId], references: [id])
+
+  isActive  Boolean  @default(true)
+  expiresAt DateTime
+
+  grantedById String
+  grantedBy   User     @relation("FinanceSalaryAccessGrantedBy", fields: [grantedById], references: [id])
+  grantedAt   DateTime @default(now())
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId])
+  @@map("finance_salary_access")
 }

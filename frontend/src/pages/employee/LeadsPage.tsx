@@ -15,10 +15,25 @@ import Badge from '../../components/ui/Badge';
 import PriorityBadge from '../../components/ui/PriorityBadge';
 import TagChip from '../../components/ui/TagChip';
 import { formatDate, isOverdue, cn } from '../../utils/helpers';
+import DateRangeFilter from '../../components/ui/DateRangeFilter';
+import { rangeForDays, RangePreset, DateRange } from '../../utils/dateRange';
+
+// If the incoming dateFrom/dateTo exactly matches one of the presets (as it
+// will when arriving from a dashboard stat card), select that pill instead
+// of falling back to "Custom" — keeps the two screens visually consistent.
+function presetFromParams(dateFrom: string | null, dateTo: string | null): { preset: RangePreset; custom: DateRange } {
+  if (!dateFrom || !dateTo) return { preset: '30', custom: rangeForDays(30) };
+  for (const days of [30, 60, 90] as const) {
+    const r = rangeForDays(days);
+    if (r.from === dateFrom && r.to === dateTo) return { preset: String(days) as RangePreset, custom: r };
+  }
+  return { preset: 'custom', custom: { from: dateFrom, to: dateTo } };
+}
 
 const STATUSES = [
   { value: '', label: 'All Statuses' },
   { value: 'NEW', label: 'New' },
+  { value: 'NOT_CONTACTED', label: 'Not Contacted' },
   { value: 'CONTACTED', label: 'Contacted' },
   { value: 'INTERESTED', label: 'Interested' },
   { value: 'FOLLOW_UP_SCHEDULED', label: 'Follow-up Sched.' },
@@ -32,10 +47,17 @@ export default function EmployeeLeadsPage() {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState(searchParams.get('status') || '');
+  const initialRange = presetFromParams(searchParams.get('dateFrom'), searchParams.get('dateTo'));
+  const [rangePreset, setRangePreset] = useState<RangePreset>(initialRange.preset);
+  const [customRange, setCustomRange] = useState<DateRange>(initialRange.custom);
+  const dateRange = rangePreset === 'custom' ? customRange : rangeForDays(Number(rangePreset));
 
   useEffect(() => {
     const s = searchParams.get('status') || '';
     setStatus(s);
+    const r = presetFromParams(searchParams.get('dateFrom'), searchParams.get('dateTo'));
+    setRangePreset(r.preset);
+    setCustomRange(r.custom);
     setPage(1);
   }, [searchParams]);
   const [createOpen, setCreateOpen] = useState(false);
@@ -55,6 +77,8 @@ export default function EmployeeLeadsPage() {
     assignedToId: user?.id,
     search: search || undefined,
     status: status || undefined,
+    dateFrom: dateRange.from,
+    dateTo: dateRange.to,
   };
 
   const { data, isLoading, refetch } = useLeads(filters);
@@ -234,6 +258,14 @@ export default function EmployeeLeadsPage() {
               <option key={s.value} value={s.value}>{s.label}</option>
             ))}
           </select>
+        </div>
+        <div className="mt-3 pt-3 border-t border-slate-100">
+          <DateRangeFilter
+            preset={rangePreset}
+            onPresetChange={(p) => { setRangePreset(p); setPage(1); }}
+            customRange={customRange}
+            onCustomRangeChange={(r) => { setCustomRange(r); setPage(1); }}
+          />
         </div>
       </div>
 

@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../services/api';
-import { Booking, ApiResponse } from '../types/index';
+import { Booking, ApiResponse, FinanceDocument } from '../types/index';
 import toast from 'react-hot-toast';
 
 export function useBookingByLead(leadId: string | null) {
@@ -12,6 +12,14 @@ export function useBookingByLead(leadId: string | null) {
     },
     enabled: !!leadId,
     retry: false,
+  });
+}
+
+export function useBookingDocuments(bookingId: string | undefined) {
+  return useQuery<ApiResponse<FinanceDocument[]>>({
+    queryKey: ['booking', bookingId, 'documents'],
+    queryFn: async () => (await api.get(`/bookings/${bookingId}/documents`)).data,
+    enabled: !!bookingId,
   });
 }
 

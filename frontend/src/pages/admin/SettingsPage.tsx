@@ -13,6 +13,7 @@ import { useSettings, useUpdateSettings } from '../../hooks/useSettings';
 import { useTags, useCreateTag, useUpdateTag, useDeleteTag } from '../../hooks/useTags';
 import {
   useMetaConnection, useSaveMetaConnection, useDeleteMetaConnection, useTriggerMetaSync,
+  useTriggerLeadBackfill,
   MetaConnectionInput,
 } from '../../hooks/useMetaConnection';
 import { cn } from '../../utils/helpers';
@@ -504,6 +505,7 @@ function MetaIntegrationsSection() {
   const saveConnection = useSaveMetaConnection();
   const deleteConnection = useDeleteMetaConnection();
   const triggerSync = useTriggerMetaSync();
+  const triggerBackfill = useTriggerLeadBackfill();
   const [showToken, setShowToken] = useState(false);
   const [confirmDisconnect, setConfirmDisconnect] = useState(false);
 
@@ -537,6 +539,19 @@ function MetaIntegrationsSection() {
       toast.error(err?.response?.data?.error || 'Sync failed');
     }
   };
+
+  const onBackfill = async () => {
+    try {
+      await triggerBackfill.mutateAsync();
+      toast.success('Historical lead import started — this can take a few minutes for large accounts. Check back below for results.');
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error || 'Backfill failed to start');
+    }
+  };
+
+  const backfillResult = connection?.lastLeadBackfillResult
+    ? (JSON.parse(connection.lastLeadBackfillResult) as { formsScanned: number; leadsFound: number; leadsCreated: number; duplicatesSkipped: number; errors: string[] })
+    : null;
 
   if (isLoading) return <div className="card p-6 animate-pulse h-48" />;
 
@@ -609,6 +624,15 @@ function MetaIntegrationsSection() {
               {triggerSync.isPending ? 'Starting...' : 'Sync Now'}
             </button>
             <button
+              onClick={onBackfill}
+              disabled={triggerBackfill.isPending}
+              className="btn-secondary flex items-center gap-2 text-sm py-2"
+              title="Pull existing Lead Ad form submissions from before this connection was set up — separate from the ongoing per-minute campaign sync"
+            >
+              <RefreshCw className={cn('w-4 h-4', triggerBackfill.isPending && 'animate-spin')} />
+              {triggerBackfill.isPending ? 'Starting...' : 'Import Historical Leads'}
+            </button>
+            <button
               onClick={() => setConfirmDisconnect(true)}
               className="btn-secondary flex items-center gap-2 text-sm py-2 text-red-600 hover:bg-red-50 hover:border-red-200"
             >
@@ -616,6 +640,23 @@ function MetaIntegrationsSection() {
               Disconnect
             </button>
           </div>
+
+          {backfillResult && (
+            <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs space-y-1">
+              <p className="font-medium text-slate-700">
+                Last historical import {connection.lastLeadBackfillAt ? `(${new Date(connection.lastLeadBackfillAt).toLocaleString('en-IN')})` : ''}:
+              </p>
+              <p className="text-slate-600">
+                {backfillResult.formsScanned} form(s) scanned · {backfillResult.leadsFound} lead(s) found · {backfillResult.leadsCreated} created · {backfillResult.duplicatesSkipped} already existed
+              </p>
+              {backfillResult.errors.length > 0 && (
+                <div className="text-red-600 mt-1">
+                  {backfillResult.errors.slice(0, 5).map((e, i) => <p key={i}>⚠ {e}</p>)}
+                  {backfillResult.errors.length > 5 && <p>+{backfillResult.errors.length - 5} more</p>}
+                </div>
+              )}
+            </div>
+          )}
 
           {confirmDisconnect && (
             <div className="p-4 bg-red-50 border border-red-200 rounded-xl">
@@ -641,7 +682,7 @@ function MetaIntegrationsSection() {
         /* ── Connection form when no connection exists ── */
         <div className="card p-5">
           <p className="text-xs text-slate-500 mb-5">
-            Enter your Meta Business credentials to start syncing campaigns and leads automatically every 15 minutes.
+            Enter your Meta Business credentials to start syncing campaigns and leads automatically every minute.
           </p>
           <form onSubmit={handleSubmit(onSave)} className="space-y-4 max-w-md">
             <div>
@@ -692,7 +733,7 @@ function MetaIntegrationsSection() {
       <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-xl border border-slate-200">
         <Clock className="w-4 h-4 text-slate-400 flex-shrink-0" />
         <p className="text-xs text-slate-500">
-          Campaigns sync every 15 minutes. Deleted Meta campaigns are automatically archived to S3 with full lead history.
+          Campaigns sync every minute. Deleted Meta campaigns are automatically archived to S3 with full lead history.
         </p>
       </div>
     </div>

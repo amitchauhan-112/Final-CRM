@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import prisma from '../lib/prisma.js';
 import { AuthenticatedRequest } from '../types/index.js';
-import { UPLOAD_DIR_PATH } from '../middleware/upload.js';
+import { buildUploadUrl, filePathFromUploadUrl } from '../middleware/upload.js';
 
 // keywords is stored as JSON string in DB; parse before sending to client
 function parseCampaign(c: any) {
@@ -339,7 +339,7 @@ export const uploadCampaignAttachment = async (req: AuthenticatedRequest, res: R
     const file = (req as any).file;
     if (!file) { res.status(400).json({ success: false, error: 'No file uploaded' }); return; }
 
-    const fileUrl = `/api/uploads/${file.filename}`;
+    const fileUrl = buildUploadUrl(file);
     const attachment = await prisma.campaignAttachment.create({
       data: {
         name: file.originalname,
@@ -389,8 +389,7 @@ export const deleteCampaignAttachment = async (req: AuthenticatedRequest, res: R
     if (!attachment) { res.status(404).json({ success: false, error: 'Attachment not found' }); return; }
 
     // Delete file from disk
-    const filename = path.basename(attachment.fileUrl);
-    const filePath = path.join(UPLOAD_DIR_PATH, filename);
+    const filePath = filePathFromUploadUrl(attachment.fileUrl);
     if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
 
     await prisma.campaignAttachment.delete({ where: { id: attachmentId } });

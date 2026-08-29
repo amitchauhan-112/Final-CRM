@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Truck, Plus, Pencil, Trash2, Phone, Star } from 'lucide-react';
+import { Truck, Plus, Pencil, Trash2, Phone, User, IndianRupee, Star } from 'lucide-react';
 import { useVendors, useCreateVendor, useUpdateVendor, useDeleteVendor } from '../../hooks/useOperations';
 import { Vendor, VendorType } from '../../types/index';
 import Modal from '../../components/ui/Modal';
@@ -16,7 +16,7 @@ const TYPE_LABELS: Record<VendorType, string> = {
   OTHER: 'Other',
 };
 
-interface VendorForm { name: string; type: VendorType; contact?: string; notes?: string; status: 'ACTIVE' | 'INACTIVE'; }
+interface VendorForm { name: string; type: VendorType; contact?: string; contactPerson?: string; rate?: number; notes?: string; status: 'ACTIVE' | 'INACTIVE'; }
 
 function VendorFormModal({ open, onClose, defaultValues, onSubmit, isLoading }: {
   open: boolean; onClose: () => void; defaultValues?: Partial<Vendor>;
@@ -27,6 +27,8 @@ function VendorFormModal({ open, onClose, defaultValues, onSubmit, isLoading }: 
       name: defaultValues?.name ?? '',
       type: defaultValues?.type ?? 'HOTEL',
       contact: defaultValues?.contact ?? '',
+      contactPerson: defaultValues?.contactPerson ?? '',
+      rate: defaultValues?.rate,
       notes: defaultValues?.notes ?? '',
       status: defaultValues?.status ?? 'ACTIVE',
     },
@@ -65,13 +67,23 @@ function VendorFormModal({ open, onClose, defaultValues, onSubmit, isLoading }: 
             </select>
           </div>
         </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="label">Contact Person</label>
+            <input {...register('contactPerson')} className="input" placeholder="Point of contact" />
+          </div>
+          <div>
+            <label className="label">Contact Number</label>
+            <input
+              {...register('contact', { validate: (v) => !v || /^[0-9+\-\s()]{7,15}$/.test(v) || 'Enter a valid contact number' })}
+              className="input"
+            />
+            {errors.contact && <p className="text-red-500 text-xs mt-1">{errors.contact.message}</p>}
+          </div>
+        </div>
         <div>
-          <label className="label">Contact Number</label>
-          <input
-            {...register('contact', { validate: (v) => !v || /^[0-9+\-\s()]{7,15}$/.test(v) || 'Enter a valid contact number' })}
-            className="input"
-          />
-          {errors.contact && <p className="text-red-500 text-xs mt-1">{errors.contact.message}</p>}
+          <label className="label">Default Rate (₹)</label>
+          <input type="number" step="0.01" {...register('rate')} className="input" placeholder="Per-night (hotel) or per-trip (vehicle) rate" />
         </div>
         <div>
           <label className="label">Notes</label>
@@ -143,7 +155,9 @@ export default function VendorsPage() {
                 </div>
                 <span className={cn('badge', v.status === 'ACTIVE' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500')}>{v.status}</span>
               </div>
+              {v.contactPerson && <p className="text-xs text-slate-500 flex items-center gap-1"><User className="w-3 h-3" />{v.contactPerson}</p>}
               {v.contact && <p className="text-xs text-slate-500 flex items-center gap-1"><Phone className="w-3 h-3" />{v.contact}</p>}
+              {v.rate != null && <p className="text-xs text-slate-500 flex items-center gap-1"><IndianRupee className="w-3 h-3" />{v.rate.toLocaleString('en-IN')}</p>}
               {v.rating != null && (
                 <p className="text-xs text-slate-500 flex items-center gap-1"><Star className="w-3 h-3 text-amber-400 fill-amber-400" />{v.rating.toFixed(1)} ({v.ratingCount})</p>
               )}

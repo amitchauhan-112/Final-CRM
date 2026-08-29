@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback } from 'react';
 import {
-  Users, Calendar, CheckCircle, AlertCircle, Star, Clock,
-  TrendingUp, XCircle, Eye, ChevronRight, Bell,
+  Users, Calendar, CalendarClock, CheckCircle, AlertCircle, Star, Clock,
+  TrendingUp, XCircle, Eye, ChevronRight, Bell, Sparkles, PhoneOff,
 } from 'lucide-react';
 import { PieChart, Pie, Cell, Legend, Tooltip, ResponsiveContainer } from 'recharts';
 import { useNavigate } from 'react-router-dom';
@@ -11,16 +11,19 @@ import { useStarredLeads } from '../../hooks/useStarredLeads';
 import { useRecentViews } from '../../hooks/useRecentViews';
 import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
 import StatsCard from '../ui/StatsCard';
+import DateRangeFilter from '../ui/DateRangeFilter';
 import LeadCard from '../leads/LeadCard';
 import LeadDetail from '../leads/LeadDetail';
 import Avatar from '../ui/Avatar';
 import Badge from '../ui/Badge';
 import { SkeletonDashboard } from '../ui/Skeleton';
 import { formatDate, formatRelativeTime, isOverdue, leadStatusConfig, cn } from '../../utils/helpers';
+import { rangeForDays, RangePreset } from '../../utils/dateRange';
 import { Lead, LeadStatus } from '../../types/index';
 
 const STATUS_COLORS: Record<LeadStatus, string> = {
   NEW: '#0ea5e9',
+  NOT_CONTACTED: '#64748b',
   CONTACTED: '#eab308',
   INTERESTED: '#8b5cf6',
   FOLLOW_UP_SCHEDULED: '#f97316',
@@ -214,14 +217,26 @@ export default function EmployeeDashboard() {
   const navigate = useNavigate();
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [quickStatusLead, setQuickStatusLead] = useState<Lead | null>(null);
+  // Never persisted — a page refresh always lands back on 30 Days, even
+  // after picking a custom range.
+  const [rangePreset, setRangePreset] = useState<RangePreset>('30');
+  const [customRange, setCustomRange] = useState(() => rangeForDays(30));
   const today = new Date().toISOString().slice(0, 10);
+  const dateRange = rangePreset === 'custom' ? customRange : rangeForDays(Number(rangePreset));
+  // Carried into every stat card's navigation so the Leads list opens
+  // scoped to the same window instead of resetting to "all time".
+  const dateQuery = `dateFrom=${dateRange.from}&dateTo=${dateRange.to}`;
 
   const { data: myLeadsData, isLoading } = useLeads({ assignedToId: user?.id, limit: 200 });
+  const { data: statsLeadsData } = useLeads({
+    assignedToId: user?.id, limit: 200, dateFrom: dateRange.from, dateTo: dateRange.to,
+  });
   const { data: overdueData } = useOverdueFollowUps();
   const { starred, isStarred, toggle: toggleStar } = useStarredLeads();
   const { recentViewIds, trackView } = useRecentViews();
 
   const leads = myLeadsData?.data ?? [];
+  const statsLeads = statsLeadsData?.data ?? [];
   const overdue = (overdueData?.data ?? []).filter((l) => l.assignedToId === user?.id);
 
   const openLead = useCallback((id: string) => {
@@ -242,6 +257,10 @@ export default function EmployeeDashboard() {
     const confirmed = leads.filter((l) => l.status === 'CONFIRMED');
     const lost = leads.filter((l) => l.status === 'LOST');
     const pending = leads.filter((l) => !['CONFIRMED', 'LOST'].includes(l.status));
+    // Fresh = completely untouched leads (still at their default status).
+    // A subset of "pending", shown separately so it's obvious which leads
+    // no one has even opened yet vs. ones already in progress.
+    const fresh = leads.filter((l) => l.status === 'NEW');
 
     // Next upcoming follow-up (closest future one)
     const upcoming = leads
@@ -249,8 +268,26 @@ export default function EmployeeDashboard() {
       .sort((a, b) => new Date(a.followUpDate!).getTime() - new Date(b.followUpDate!).getTime());
     const nextFollowUp = upcoming[0] ?? null;
 
-    return { todayFollowUps, confirmed, lost, pending, nextFollowUp };
+    return { todayFollowUps, confirmed, lost, pending, fresh, nextFollowUp };
   }, [leads, today]);
+
+  // Drives the top KPI row only — scoped to the selected date range (leads
+  // created within it), independent of the always-unfiltered `stats` above
+  // which still powers the follow-up/confirmed work-lists further down.
+  const cardStats = useMemo(() => {
+    const fresh = statsLeads.filter((l) => l.status === 'NEW');
+    const interested = statsLeads.filter((l) => l.status === 'INTERESTED');
+    const notContactable = statsLeads.filter((l) => l.status === 'NOT_CONTACTED');
+    const lost = statsLeads.filter((l) => l.status === 'LOST');
+    const confirmed = statsLeads.filter((l) => l.status === 'CONFIRMED');
+    const todayFollowUps = statsLeads.filter(
+      (l) => l.followUpDate && l.followUpDate.startsWith(today) && !l.followUpDone && !isOverdue(l.followUpDate)
+    );
+    const overdueFollowUps = statsLeads.filter(
+      (l) => l.followUpDate && !l.followUpDone && isOverdue(l.followUpDate)
+    );
+    return { total: statsLeads.length, fresh, interested, notContactable, lost, confirmed, todayFollowUps, overdueFollowUps };
+  }, [statsLeads, today]);
 
   const pieData = useMemo(() =>
     Object.entries(
@@ -279,61 +316,85 @@ export default function EmployeeDashboard() {
           {user?.name?.split(' ')[0]} 👋
         </h2>
         <p className="text-sm text-slate-500 mt-0.5">
-          You have <strong>{stats.pending.length}</strong> active leads and{' '}
+          You have <strong>{leads.length}</strong> active leads and{' '}
           <strong>{stats.todayFollowUps.length}</strong> follow-ups today.
           <span className="ml-2 text-xs text-slate-400">Press <kbd className="px-1.5 py-0.5 bg-slate-100 rounded text-xs font-mono">N</kbd> for leads, <kbd className="px-1.5 py-0.5 bg-slate-100 rounded text-xs font-mono">F</kbd> for follow-ups</span>
         </p>
       </div>
 
-      {/* Row 1 — KPI Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3">
+      {/* Row 1 — KPI Stats, scoped to a date range (defaults to last 30 days,
+          resets on every page load — never persisted). Carried into every
+          card's onClick so the Leads list it opens stays in the same window. */}
+      <DateRangeFilter
+        preset={rangePreset}
+        onPresetChange={setRangePreset}
+        customRange={customRange}
+        onCustomRangeChange={setCustomRange}
+      />
+      <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-3">
         <StatsCard
-          label="My Leads"
-          value={leads.length}
+          label="Total Leads"
+          value={cardStats.total}
           icon={Users}
           iconBg="bg-primary-100"
           iconColor="text-primary-600"
-          onClick={() => navigate('/employee/leads')}
+          onClick={() => navigate(`/employee/leads?${dateQuery}`)}
+        />
+        <StatsCard
+          label="Fresh Leads"
+          value={cardStats.fresh.length}
+          icon={Sparkles}
+          iconBg="bg-sky-100"
+          iconColor="text-sky-600"
+          onClick={() => navigate(`/employee/leads?status=NEW&${dateQuery}`)}
         />
         <StatsCard
           label="Today's Follow-ups"
-          value={stats.todayFollowUps.length}
+          value={cardStats.todayFollowUps.length}
           icon={Calendar}
           iconBg="bg-orange-100"
           iconColor="text-orange-600"
           onClick={() => navigate('/employee/follow-ups')}
         />
         <StatsCard
-          label="Pending"
-          value={stats.pending.length}
-          icon={Clock}
-          iconBg="bg-purple-100"
-          iconColor="text-purple-600"
-          onClick={() => navigate('/employee/leads')}
-        />
-        <StatsCard
-          label="Confirmed"
-          value={stats.confirmed.length}
-          icon={CheckCircle}
-          iconBg="bg-green-100"
-          iconColor="text-green-600"
-          onClick={() => navigate('/employee/leads?status=CONFIRMED')}
-        />
-        <StatsCard
-          label="Lost"
-          value={stats.lost.length}
-          icon={XCircle}
-          iconBg="bg-slate-100"
-          iconColor="text-slate-500"
-          onClick={() => navigate('/employee/leads?status=LOST')}
-        />
-        <StatsCard
-          label="Overdue"
-          value={overdue.length}
-          icon={AlertCircle}
+          label="Overdue Follow-ups"
+          value={cardStats.overdueFollowUps.length}
+          icon={CalendarClock}
           iconBg="bg-red-100"
           iconColor="text-red-600"
           onClick={() => navigate('/employee/follow-ups')}
+        />
+        <StatsCard
+          label="Interested"
+          value={cardStats.interested.length}
+          icon={TrendingUp}
+          iconBg="bg-violet-100"
+          iconColor="text-violet-600"
+          onClick={() => navigate(`/employee/leads?status=INTERESTED&${dateQuery}`)}
+        />
+        <StatsCard
+          label="Not Contactable"
+          value={cardStats.notContactable.length}
+          icon={PhoneOff}
+          iconBg="bg-slate-100"
+          iconColor="text-slate-500"
+          onClick={() => navigate(`/employee/leads?status=NOT_CONTACTED&${dateQuery}`)}
+        />
+        <StatsCard
+          label="Lost"
+          value={cardStats.lost.length}
+          icon={XCircle}
+          iconBg="bg-red-100"
+          iconColor="text-red-500"
+          onClick={() => navigate(`/employee/leads?status=LOST&${dateQuery}`)}
+        />
+        <StatsCard
+          label="Confirmed"
+          value={cardStats.confirmed.length}
+          icon={CheckCircle}
+          iconBg="bg-green-100"
+          iconColor="text-green-600"
+          onClick={() => navigate(`/employee/leads?status=CONFIRMED&${dateQuery}`)}
         />
       </div>
 

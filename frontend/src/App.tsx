@@ -36,6 +36,7 @@ import OperationsDashboardPage from './pages/operations/DashboardPage';
 import DeparturesPage from './pages/operations/DeparturesPage';
 import DepartureDetailPage from './pages/operations/DepartureDetailPage';
 import StayPlanningPage from './pages/operations/StayPlanningPage';
+import RoomsRequiredPage from './pages/operations/RoomsRequiredPage';
 import VendorsPage from './pages/operations/VendorsPage';
 import VendorDetailPage from './pages/operations/VendorDetailPage';
 import FinanceDashboardPage from './pages/finance/DashboardPage';
@@ -47,6 +48,9 @@ import VendorPaymentsPage from './pages/finance/VendorPaymentsPage';
 import VendorLedgerPage from './pages/finance/VendorLedgerPage';
 import ExpensesPage from './pages/finance/ExpensesPage';
 import FinanceReportsPage from './pages/finance/ReportsPage';
+import AdminPayrollPage from './pages/admin/PayrollPage';
+import FinancePayrollPage from './pages/finance/PayrollPage';
+import MyTargetsPage from './pages/employee/MyTargetsPage';
 
 function RoleRedirect() {
   const { user, isAuthenticated } = useAuthStore();
@@ -105,6 +109,7 @@ export default function App() {
         <Route path="operations/departures" element={<DeparturesPage />} />
         <Route path="operations/departures/:id" element={<DepartureDetailPage />} />
         <Route path="operations/stay-plan" element={<StayPlanningPage />} />
+        <Route path="operations/rooms-required" element={<RoomsRequiredPage />} />
         <Route path="operations/vendors" element={<VendorsPage />} />
         <Route path="operations/vendors/:id" element={<VendorDetailPage />} />
         <Route path="finance" element={<Navigate to="/admin/finance/dashboard" replace />} />
@@ -117,6 +122,7 @@ export default function App() {
         <Route path="finance/vendor-ledger" element={<VendorLedgerPage />} />
         <Route path="finance/expenses" element={<ExpensesPage />} />
         <Route path="finance/reports" element={<FinanceReportsPage />} />
+        <Route path="payroll" element={<AdminPayrollPage />} />
       </Route>
 
       <Route
@@ -132,6 +138,7 @@ export default function App() {
         <Route path="departures" element={<DeparturesPage />} />
         <Route path="departures/:id" element={<DepartureDetailPage />} />
         <Route path="stay-plan" element={<StayPlanningPage />} />
+        <Route path="rooms-required" element={<RoomsRequiredPage />} />
         <Route path="vendors" element={<VendorsPage />} />
         <Route path="vendors/:id" element={<VendorDetailPage />} />
         <Route path="settings" element={<EmployeeSettingsPage />} />
@@ -155,6 +162,7 @@ export default function App() {
         <Route path="vendor-ledger" element={<VendorLedgerPage />} />
         <Route path="expenses" element={<ExpensesPage />} />
         <Route path="reports" element={<FinanceReportsPage />} />
+        <Route path="payroll" element={<FinancePayrollPage />} />
         <Route path="settings" element={<EmployeeSettingsPage />} />
       </Route>
 
@@ -173,6 +181,7 @@ export default function App() {
         <Route path="packages" element={<PackageCatalogPage />} />
         <Route path="customers" element={<MyCustomersPage />} />
         <Route path="tasks" element={<TasksPage />} />
+        <Route path="targets" element={<MyTargetsPage />} />
         <Route path="settings" element={<EmployeeSettingsPage />} />
       </Route>
 

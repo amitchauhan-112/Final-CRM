@@ -5,6 +5,7 @@ import prisma from '../lib/prisma.js';
 import { AuthenticatedRequest } from '../types/index.js';
 import { encrypt, decrypt } from '../utils/encryption.js';
 import { runMetaSync } from '../services/metaSync.service.js';
+import { backfillLeadsForOrg } from '../services/metaLeadBackfill.service.js';
 import logger from '../utils/logger.js';
 
 const s3 = new S3Client({ region: process.env.AWS_REGION || 'ap-south-1' });
@@ -44,6 +45,8 @@ export const getMetaConnection = async (req: AuthenticatedRequest, res: Response
         isActive: conn.isActive,
         lastSyncAt: conn.lastSyncAt,
         lastSyncError: conn.lastSyncError,
+        lastLeadBackfillAt: conn.lastLeadBackfillAt,
+        lastLeadBackfillResult: conn.lastLeadBackfillResult,
       },
     });
   } catch {
@@ -128,7 +131,25 @@ export const triggerSync = async (req: AuthenticatedRequest, res: Response): Pro
     // Respond immediately; run sync in background
     res.json({ success: true, message: 'Sync started' });
     runMetaSync().catch((err) => {
-      logger.error('[metaSync] Manual trigger failed', err);
+      logger.error(`[metaSync] Manual trigger failed: ${err?.response?.data?.error?.message || err?.message || 'Unknown error'}`);
+    });
+  } catch {
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+};
+
+// ── Historical lead backfill (one-off, separate from the per-minute campaign sync) ─
+
+export const backfillLeads = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const orgId = req.user?.organizationId;
+    if (!orgId) { res.status(400).json({ success: false, error: 'No organization attached to user' }); return; }
+
+    // Runs can take a while for large accounts (many forms x paginated leads),
+    // so respond immediately and let the frontend poll GET / for the result.
+    res.json({ success: true, message: 'Lead backfill started — check back in a minute for results' });
+    backfillLeadsForOrg(orgId).catch((err) => {
+      logger.error(`[metaLeadBackfill] Trigger failed for org ${orgId}: ${err?.response?.data?.error?.message || err?.message || 'Unknown error'}`);
     });
   } catch {
     res.status(500).json({ success: false, error: 'Internal server error' });

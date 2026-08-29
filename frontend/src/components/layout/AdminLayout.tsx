@@ -5,7 +5,7 @@ import {
   LogOut, ChevronDown, Menu, X, UserCircle, Megaphone,
   MessageSquarePlus, Activity, BarChart2, Building2,
   UserCheck, Database, ChevronRight, Package, BookOpen,
-  Contact, Wallet, Map, Home, Gauge, LineChart, FolderKanban, Settings2, Zap, HeartPulse,
+  Contact, Wallet, Map, Home, Gauge, LineChart, FolderKanban, Settings2, Zap, HeartPulse, IndianRupee,
 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import { useNotifications, useMarkAllAsRead, useMarkAsRead } from '../../hooks/useNotifications';
@@ -54,6 +54,7 @@ const NAV: NavEntry[] = [
       { to: '/admin/masters',    label: 'Masters',    icon: Database },
     ],
   },
+  { type: 'item', to: '/admin/payroll', label: 'Payroll & Incentives', icon: IndianRupee },
 
   { type: 'divider', label: 'SYSTEM' },
   { type: 'item', to: '/admin/report-center', label: 'Report Center', icon: FolderKanban },

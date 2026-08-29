@@ -1,8 +1,10 @@
 import { Router } from 'express';
 import { authenticate, requireOperationsOrAdmin } from '../middleware/auth.js';
-import { upload } from '../middleware/upload.js';
+import { createUpload } from '../middleware/upload.js';
+const uploadVendorDoc = createUpload('vendor-documents');
+const uploadOperationsDoc = createUpload('operations-documents');
 import {
-  getDashboardStats, getStayPlan, listDepartures, getDepartureDetail, updateDeparture,
+  getDashboardStats, getStayPlan, getRoomsRequired, listDepartures, getDepartureDetail, updateDeparture,
   createTraveler, updateTraveler, deleteTraveler,
   approveTraveler, rejectTraveler, requestTravelerCorrection, regenerateTravelerPortalLink,
   updateChecklist, suggestRoomAllocation, getTravelCalendar, getDepartureActivity,
@@ -24,6 +26,7 @@ router.use(authenticate, requireOperationsOrAdmin);
 router.get('/dashboard', getDashboardStats);
 router.get('/calendar', getTravelCalendar);
 router.get('/stay-plan', getStayPlan);
+router.get('/rooms-required', getRoomsRequired);
 
 // Departures
 router.get('/departures', listDepartures);
@@ -60,7 +63,7 @@ router.post('/vendors', createVendor);
 router.get('/vendors/:id', getVendorDetail);
 router.put('/vendors/:id', updateVendor);
 router.delete('/vendors/:id', deleteVendor);
-router.post('/vendors/:vendorId/documents', upload.single('file'), uploadVendorDocument);
+router.post('/vendors/:vendorId/documents', uploadVendorDoc.single('file'), uploadVendorDocument);
 router.delete('/vendor-documents/:id', deleteVendorDocument);
 
 // Day-wise timeline tasks
@@ -68,7 +71,7 @@ router.post('/departures/:departureId/tasks', createTask);
 router.put('/tasks/:id', updateTaskStatus);
 
 // Documents
-router.post('/departures/:departureId/documents', upload.single('file'), uploadDocument);
+router.post('/departures/:departureId/documents', uploadOperationsDoc.single('file'), uploadDocument);
 router.delete('/documents/:id', deleteDocument);
 
 // Internal notes

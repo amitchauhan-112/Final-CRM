@@ -3,7 +3,7 @@ import {
   CalendarDays, CalendarClock, Plane, CheckCircle2, Users, Building2,
   Truck, BedDouble, UserCog, LogIn, LogOut, ArrowRightLeft, ListChecks,
   Users2, Truck as TruckIcon, ArrowRight, ShieldCheck, ClipboardCheck, PartyPopper,
-  Map, CheckSquare, XSquare,
+  Map, CheckSquare,
 } from 'lucide-react';
 import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { useOpsDashboard } from '../../hooks/useOperations';
@@ -65,13 +65,10 @@ export default function OperationsDashboardPage() {
       ]
     : [];
 
-  const captainRoomCards = stats
+  const captainCards = stats
     ? [
         { label: 'Trip Captains Assigned', value: stats.assignedTripCaptains, icon: CheckSquare, iconBg: 'bg-emerald-100', iconColor: 'text-emerald-600', onClick: () => navigate(`${base}/departures`) },
         { label: 'Trip Captains Pending', value: stats.pendingTripCaptainAssignment, icon: UserCog, iconBg: 'bg-amber-100', iconColor: 'text-amber-600', onClick: () => navigate(`${base}/departures`) },
-        { label: 'Rooms Required', value: stats.roomsRequired, icon: BedDouble, iconBg: 'bg-primary-100', iconColor: 'text-primary-600', onClick: () => navigate(`${base}/stay-plan`) },
-        { label: 'Rooms Booked', value: stats.roomsBooked, icon: CheckSquare, iconBg: 'bg-emerald-100', iconColor: 'text-emerald-600', onClick: () => navigate(`${base}/stay-plan`) },
-        { label: 'Rooms Pending', value: stats.roomsPending, icon: XSquare, iconBg: 'bg-red-100', iconColor: 'text-red-600', onClick: () => navigate(`${base}/stay-plan`) },
       ]
     : [];
 
@@ -147,9 +144,9 @@ export default function OperationsDashboardPage() {
           </div>
 
           <div>
-            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Trip Captains & Rooms</h3>
+            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Trip Captains</h3>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              {captainRoomCards.map((c) => (
+              {captainCards.map((c) => (
                 <StatsCard key={c.label} label={c.label} value={c.value} icon={c.icon} iconBg={c.iconBg} iconColor={c.iconColor} onClick={c.onClick} />
               ))}
             </div>

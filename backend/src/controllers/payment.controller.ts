@@ -4,6 +4,7 @@ import { AuthenticatedRequest } from '../types/index.js';
 import { notifyFinanceTeam, emitFinanceUpdated, createNotification } from '../services/notification.service.js';
 import { allocatePaymentToSchedule } from './paymentSchedule.controller.js';
 import { generateFinanceDocument } from './financeDocument.controller.js';
+import { buildUploadUrl } from '../middleware/upload.js';
 
 const orgId = (req: AuthenticatedRequest) => req.user?.organizationId ?? null;
 
@@ -61,7 +62,7 @@ export const recordPayment = async (req: AuthenticatedRequest, res: Response): P
     }
 
     const paymentAmount = Number(amount);
-    const proofUrl = req.file ? `/api/uploads/${req.file.filename}` : null;
+    const proofUrl = req.file ? buildUploadUrl(req.file) : null;
 
     const payment = await prisma.payment.create({
       data: {
@@ -283,7 +284,7 @@ export const resubmitPayment = async (req: AuthenticatedRequest, res: Response):
     }
 
     const { amount, method, reference, notes, receiptNo } = req.body;
-    const proofUrl = req.file ? `/api/uploads/${req.file.filename}` : payment.proofUrl;
+    const proofUrl = req.file ? buildUploadUrl(req.file) : payment.proofUrl;
 
     const updated = await prisma.payment.update({
       where: { id },

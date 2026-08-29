@@ -1,6 +1,6 @@
 /**
  * In-memory singleton mapping Meta adId → CRM campaign data.
- * Populated on each Meta sync run (every 15 min + on-demand).
+ * Populated on each Meta sync run (every minute + on-demand).
  * Empty after process restart until first sync — webhook falls back gracefully.
  */
 

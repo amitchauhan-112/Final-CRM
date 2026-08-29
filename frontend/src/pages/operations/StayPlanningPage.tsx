@@ -59,7 +59,7 @@ function VehicleSummary({ vehicles }: { vehicles: StayPlanEntry['vehicles'] }) {
 
 // ─── Destination Card (single dest on a date) ─────────────────────────────────
 
-function DestinationCard({ entry, onNavigate }: { entry: StayPlanEntry; onNavigate: (id: string) => void }) {
+function DestinationCard({ date, entry, onNavigate }: { date: string; entry: StayPlanEntry; onNavigate: (id: string) => void }) {
   const [expanded, setExpanded] = useState(false);
   return (
     <div className="card p-4">
@@ -68,6 +68,11 @@ function DestinationCard({ entry, onNavigate }: { entry: StayPlanEntry; onNaviga
           <div className="flex items-center gap-2 mb-1">
             <Map className="w-3.5 h-3.5 text-primary-500 flex-shrink-0" />
             <span className="font-semibold text-slate-800 text-sm">{entry.destination}</span>
+            {entry.nights > 1 && (
+              <span className="text-[10px] font-bold bg-primary-50 text-primary-600 px-1.5 py-0.5 rounded-full flex-shrink-0">
+                {entry.nights} nights · {formatDate(date)} → {formatDate(entry.checkOutDate)}
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-4 text-xs text-slate-500">
             <span className="flex items-center gap-1"><Users className="w-3 h-3" />{entry.guestCount} guests</span>
@@ -87,17 +92,26 @@ function DestinationCard({ entry, onNavigate }: { entry: StayPlanEntry; onNaviga
         </button>
       </div>
 
-      {expanded && entry.packageNames.length > 0 && (
+      {expanded && entry.breakdown.length > 0 && (
         <div className="mt-3 pt-3 border-t border-slate-100 space-y-1">
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Packages on this date</p>
-          {entry.packageNames.map((name, i) => (
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">
+            Rooms needed, by package (highest first)
+          </p>
+          {entry.breakdown.map((pkg, i) => (
             <button
-              key={i}
-              onClick={() => onNavigate(entry.departureIds[i])}
-              className="w-full text-left flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-slate-50 transition-colors text-xs"
+              key={pkg.packageId || i}
+              onClick={() => pkg.departureIds[0] && onNavigate(pkg.departureIds[0])}
+              className="w-full text-left flex items-center justify-between gap-2 px-2 py-1.5 rounded-lg hover:bg-slate-50 transition-colors text-xs"
             >
-              <Package className="w-3 h-3 text-slate-400 flex-shrink-0" />
-              <span className="text-slate-700 font-medium">{name}</span>
+              <span className="flex items-center gap-2 min-w-0">
+                <Package className="w-3 h-3 text-slate-400 flex-shrink-0" />
+                <span className="text-slate-700 font-medium truncate">{pkg.packageName}</span>
+              </span>
+              <span className="flex-shrink-0 font-semibold text-slate-600">
+                {pkg.nights > 1 && <span className="text-slate-400 font-normal mr-1">{pkg.nights}N ·</span>}
+                {pkg.rooms.total} room{pkg.rooms.total !== 1 ? 's' : ''}
+                <span className="text-slate-400 font-normal"> · {pkg.guestCount} guests</span>
+              </span>
             </button>
           ))}
         </div>
@@ -154,6 +168,7 @@ function DateWiseView() {
               {entries.map((entry) => (
                 <DestinationCard
                   key={entry.destination}
+                  date={date}
                   entry={entry}
                   onNavigate={(id) => navigate(`${base}/departures/${id}`)}
                 />

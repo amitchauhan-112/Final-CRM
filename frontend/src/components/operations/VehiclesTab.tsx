@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { Truck, Plus, Pencil, Trash2, MapPin, Phone, User, Info } from 'lucide-react';
+import { Truck, Plus, Pencil, Trash2, MapPin, Phone, User, IndianRupee, Info } from 'lucide-react';
 import { useCreateVehicle, useUpdateVehicle, useDeleteVehicle } from '../../hooks/useOperations';
+import { useVendorAllocation } from '../../hooks/useVendorAllocation';
+import { VendorAllocationFields, VendorDivergenceConfirm } from './VendorAllocationFields';
 import { Vehicle } from '../../types/index';
 import Modal from '../ui/Modal';
 import { cn } from '../../utils/helpers';
@@ -66,12 +68,14 @@ function VehicleRequirements({ totalTravelers }: { totalTravelers: number }) {
 
 interface VehicleForm {
   vehicleType?: string; vehicleNumber?: string; driverName?: string; driverMobile?: string;
-  pickupTime?: string; pickupLocation?: string; vendorName?: string; vendorContact?: string; status: string;
+  pickupTime?: string; pickupLocation?: string; status: string;
 }
+
+type VehicleSubmitData = VehicleForm & { vendorId?: string; vendorName?: string; vendorContact?: string; contactPerson?: string; rate?: number };
 
 function VehicleFormModal({ open, onClose, defaultValues, onSubmit, isLoading }: {
   open: boolean; onClose: () => void; defaultValues?: Partial<Vehicle>;
-  onSubmit: (data: VehicleForm) => void; isLoading: boolean;
+  onSubmit: (data: VehicleSubmitData) => void; isLoading: boolean;
 }) {
   const { register, handleSubmit } = useForm<VehicleForm>({
     defaultValues: {
@@ -81,11 +85,33 @@ function VehicleFormModal({ open, onClose, defaultValues, onSubmit, isLoading }:
       driverMobile: defaultValues?.driverMobile ?? '',
       pickupTime: defaultValues?.pickupTime ? defaultValues.pickupTime.slice(0, 16) : '',
       pickupLocation: defaultValues?.pickupLocation ?? '',
-      vendorName: defaultValues?.vendorName ?? '',
-      vendorContact: defaultValues?.vendorContact ?? '',
       status: defaultValues?.status ?? 'PENDING',
     },
   });
+
+  const alloc = useVendorAllocation('VEHICLE', {
+    vendorId: defaultValues?.vendorId,
+    vendorName: defaultValues?.vendorName,
+    vendorContact: defaultValues?.vendorContact,
+    contactPerson: defaultValues?.contactPerson,
+    rate: defaultValues?.rate,
+  });
+  const [pendingData, setPendingData] = useState<VehicleForm | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+
+  async function finalizeSubmit(data: VehicleForm) {
+    const vendorFields = await alloc.resolve();
+    onSubmit({ ...data, ...vendorFields });
+  }
+
+  function handleFormSubmit(data: VehicleForm) {
+    if (alloc.hasDiverged()) {
+      setPendingData(data);
+      setConfirmOpen(true);
+      return;
+    }
+    finalizeSubmit(data);
+  }
 
   return (
     <Modal
@@ -95,7 +121,7 @@ function VehicleFormModal({ open, onClose, defaultValues, onSubmit, isLoading }:
         <button form="vehicle-form" type="submit" disabled={isLoading} className="btn-primary">{isLoading ? 'Saving…' : defaultValues ? 'Update' : 'Add Vehicle'}</button>
       </>}
     >
-      <form id="vehicle-form" onSubmit={handleSubmit(onSubmit)} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <form id="vehicle-form" onSubmit={handleSubmit(handleFormSubmit)} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <label className="label">Vehicle Type</label>
           <input {...register('vehicleType')} className="input" placeholder="e.g. Tempo Traveller" />
@@ -128,15 +154,17 @@ function VehicleFormModal({ open, onClose, defaultValues, onSubmit, isLoading }:
           <label className="label">Pickup Location</label>
           <input {...register('pickupLocation')} className="input" />
         </div>
-        <div>
-          <label className="label">Vendor Name</label>
-          <input {...register('vendorName')} className="input" />
-        </div>
-        <div>
-          <label className="label">Vendor Contact</label>
-          <input {...register('vendorContact')} className="input" />
-        </div>
+
+        <VendorAllocationFields alloc={alloc} />
       </form>
+
+      <VendorDivergenceConfirm
+        open={confirmOpen}
+        vendorName={alloc.values.vendorName}
+        isLoading={isLoading}
+        onCancel={() => { setConfirmOpen(false); setPendingData(null); }}
+        onConfirm={() => { if (pendingData) finalizeSubmit(pendingData); setConfirmOpen(false); }}
+      />
     </Modal>
   );
 }
@@ -187,6 +215,8 @@ export default function VehiclesTab({
                 {v.pickupLocation && <p className="flex items-center gap-1"><MapPin className="w-3 h-3" />{v.pickupLocation}</p>}
                 {v.pickupTime && <p>Pickup: {new Date(v.pickupTime).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</p>}
                 {v.vendorName && <p className="flex items-center gap-1"><Phone className="w-3 h-3" />{v.vendorName} {v.vendorContact && `· ${v.vendorContact}`}</p>}
+                {v.contactPerson && <p className="flex items-center gap-1"><User className="w-3 h-3" />{v.contactPerson}</p>}
+                {v.rate != null && <p className="flex items-center gap-1"><IndianRupee className="w-3 h-3" />{v.rate.toLocaleString('en-IN')}</p>}
               </div>
               <div className="flex items-center gap-2 pt-1">
                 <button onClick={() => setEditVehicle(v)} className="text-xs font-medium text-primary-600 hover:text-primary-700 flex items-center gap-1">

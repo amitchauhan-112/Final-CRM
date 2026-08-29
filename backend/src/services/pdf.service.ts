@@ -3,6 +3,9 @@ import path from 'path';
 import PDFDocument from 'pdfkit';
 import { UPLOAD_DIR_PATH } from '../middleware/upload.js';
 
+const FINANCE_DOCS_DIR = path.join(UPLOAD_DIR_PATH, 'finance-generated-documents');
+if (!fs.existsSync(FINANCE_DOCS_DIR)) fs.mkdirSync(FINANCE_DOCS_DIR, { recursive: true });
+
 // Same static letterhead already used by the browser-print convention
 // (frontend/src/components/finance/ReceiptView.tsx) — no company-profile/
 // settings model exists in this codebase, so this mirrors that exact text
@@ -42,7 +45,7 @@ export async function renderFinanceDocumentPdf(
   snapshot: FinanceDocumentSnapshot
 ): Promise<string> {
   const filename = `${documentNumber.replace(/\//g, '-')}.pdf`;
-  const filePath = path.join(UPLOAD_DIR_PATH, filename);
+  const filePath = path.join(FINANCE_DOCS_DIR, filename);
 
   await new Promise<void>((resolve, reject) => {
     const doc = new PDFDocument({ size: 'A4', margin: 50 });
@@ -131,5 +134,5 @@ export async function renderFinanceDocumentPdf(
     stream.on('error', reject);
   });
 
-  return `/api/uploads/${filename}`;
+  return `/api/uploads/finance-generated-documents/${filename}`;
 }

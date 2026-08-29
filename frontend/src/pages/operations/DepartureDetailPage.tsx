@@ -97,6 +97,10 @@ export default function DepartureDetailPage() {
   const base = location.pathname.startsWith('/admin') ? '/admin/operations' : '/operations';
   const [tab, setTab] = useUrlTab<Tab>(TABS, 'overview');
   const [captainModalOpen, setCaptainModalOpen] = useState(false);
+  const searchParams = new URLSearchParams(location.search);
+  const prefillCheckIn = searchParams.get('checkIn') ?? undefined;
+  const prefillCheckOut = searchParams.get('checkOut') ?? undefined;
+  const prefillLocation = searchParams.get('location') ?? undefined;
 
   const { data, isLoading } = useDeparture(id);
   const departure = data?.data;
@@ -192,6 +196,10 @@ export default function DepartureDetailPage() {
           const cap = ({ SINGLE: 1, DOUBLE: 2, TRIPLE: 3, QUAD: 4 } as Record<string, number>)[b.roomSharing] ?? 2;
           return sum + Math.ceil(b.numberOfTravelers / cap);
         }, 0)}
+        defaultCheckIn={prefillCheckIn}
+        defaultCheckOut={prefillCheckOut}
+        defaultLocation={prefillLocation}
+        autoOpenAdd={!!prefillCheckIn}
       />}
       {tab === 'vehicles' && <VehiclesTab departureId={departure.id} vehicles={departure.vehicles} totalTravelers={departure.groupSummary?.totalTravelers ?? 0} />}
       {tab === 'timeline' && <TimelineTab departureId={departure.id} timeline={departure.timeline} departureDate={departure.departureDate} />}

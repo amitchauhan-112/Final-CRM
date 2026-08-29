@@ -18,6 +18,8 @@ export interface LeadFilters {
   source?: string;
   campaignId?: string;
   assignedToId?: string;
+  dateFrom?: string;
+  dateTo?: string;
 }
 
 export function useLeads(filters: LeadFilters = {}) {

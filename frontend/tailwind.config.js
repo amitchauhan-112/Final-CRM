@@ -34,6 +34,15 @@ export default {
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],
       },
+      transitionTimingFunction: {
+        // Fast start, gentle settle — the "premium SaaS" hover feel
+        // (Linear/Vercel-style) without the bounce of a spring easing.
+        enterprise: 'cubic-bezier(0.16, 1, 0.3, 1)',
+      },
+      boxShadow: {
+        elevate: '0 1px 2px rgba(15,23,42,0.04), 0 8px 24px -4px rgba(15,23,42,0.12)',
+        'elevate-lg': '0 4px 8px rgba(15,23,42,0.06), 0 16px 40px -8px rgba(15,23,42,0.18)',
+      },
     },
   },
   plugins: [],

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { authenticate } from '../middleware/auth.js';
-import { upload } from '../middleware/upload.js';
+import { createUpload } from '../middleware/upload.js';
+const upload = createUpload('payment-proofs');
 import {
   getBookingPayments,
   recordPayment,

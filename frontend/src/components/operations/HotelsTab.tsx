@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { Building2, Plus, Pencil, Trash2, MapPin, Phone, FileCheck, Wand2, BedDouble, Info } from 'lucide-react';
+import { Building2, Plus, Pencil, Trash2, MapPin, Phone, User, IndianRupee, FileCheck, Wand2, BedDouble, Info } from 'lucide-react';
 import { useCreateHotel, useUpdateHotel, useDeleteHotel, useRoomAllocationSuggestion } from '../../hooks/useOperations';
+import { useVendorAllocation } from '../../hooks/useVendorAllocation';
+import { VendorAllocationFields, VendorDivergenceConfirm } from './VendorAllocationFields';
 import { Hotel } from '../../types/index';
 import Modal from '../ui/Modal';
 import { formatDate, cn } from '../../utils/helpers';
@@ -14,13 +16,15 @@ const STATUS_BADGE: Record<string, string> = {
 
 interface HotelForm {
   name: string; location?: string; checkInDate?: string; checkOutDate?: string;
-  numberOfRooms?: number; roomAllocation?: string; vendorName?: string; vendorContact?: string;
+  numberOfRooms?: number; roomAllocation?: string;
   confirmationNumber?: string; status: string;
 }
 
+type HotelSubmitData = HotelForm & { vendorId?: string; vendorName?: string; vendorContact?: string; contactPerson?: string; rate?: number };
+
 function HotelFormModal({ open, onClose, defaultValues, onSubmit, isLoading }: {
   open: boolean; onClose: () => void; defaultValues?: Partial<Hotel>;
-  onSubmit: (data: HotelForm) => void; isLoading: boolean;
+  onSubmit: (data: HotelSubmitData) => void; isLoading: boolean;
 }) {
   const { register, handleSubmit } = useForm<HotelForm>({
     defaultValues: {
@@ -30,12 +34,34 @@ function HotelFormModal({ open, onClose, defaultValues, onSubmit, isLoading }: {
       checkOutDate: defaultValues?.checkOutDate?.slice(0, 10) ?? '',
       numberOfRooms: defaultValues?.numberOfRooms,
       roomAllocation: defaultValues?.roomAllocation ?? '',
-      vendorName: defaultValues?.vendorName ?? '',
-      vendorContact: defaultValues?.vendorContact ?? '',
       confirmationNumber: defaultValues?.confirmationNumber ?? '',
       status: defaultValues?.status ?? 'PENDING',
     },
   });
+
+  const alloc = useVendorAllocation('HOTEL', {
+    vendorId: defaultValues?.vendorId,
+    vendorName: defaultValues?.vendorName,
+    vendorContact: defaultValues?.vendorContact,
+    contactPerson: defaultValues?.contactPerson,
+    rate: defaultValues?.rate,
+  });
+  const [pendingData, setPendingData] = useState<HotelForm | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+
+  async function finalizeSubmit(data: HotelForm) {
+    const vendorFields = await alloc.resolve();
+    onSubmit({ ...data, ...vendorFields });
+  }
+
+  function handleFormSubmit(data: HotelForm) {
+    if (alloc.hasDiverged()) {
+      setPendingData(data);
+      setConfirmOpen(true);
+      return;
+    }
+    finalizeSubmit(data);
+  }
 
   return (
     <Modal
@@ -45,7 +71,7 @@ function HotelFormModal({ open, onClose, defaultValues, onSubmit, isLoading }: {
         <button form="hotel-form" type="submit" disabled={isLoading} className="btn-primary">{isLoading ? 'Saving…' : defaultValues ? 'Update' : 'Add Hotel'}</button>
       </>}
     >
-      <form id="hotel-form" onSubmit={handleSubmit(onSubmit)} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <form id="hotel-form" onSubmit={handleSubmit(handleFormSubmit)} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="sm:col-span-2">
           <label className="label">Hotel Name *</label>
           <input {...register('name', { required: true })} className="input" placeholder="Hotel name" />
@@ -82,15 +108,17 @@ function HotelFormModal({ open, onClose, defaultValues, onSubmit, isLoading }: {
           <label className="label">Room Allocation</label>
           <input {...register('roomAllocation')} className="input" placeholder="e.g. 5 Double, 2 Triple" />
         </div>
-        <div>
-          <label className="label">Vendor Name</label>
-          <input {...register('vendorName')} className="input" />
-        </div>
-        <div>
-          <label className="label">Vendor Contact</label>
-          <input {...register('vendorContact')} className="input" />
-        </div>
+
+        <VendorAllocationFields alloc={alloc} />
       </form>
+
+      <VendorDivergenceConfirm
+        open={confirmOpen}
+        vendorName={alloc.values.vendorName}
+        isLoading={isLoading}
+        onCancel={() => { setConfirmOpen(false); setPendingData(null); }}
+        onConfirm={() => { if (pendingData) finalizeSubmit(pendingData); setConfirmOpen(false); }}
+      />
     </Modal>
   );
 }
@@ -203,10 +231,14 @@ function RoomRequirements({ roomsRequired, hotels }: RoomReqProps) {
   );
 }
 
-export default function HotelsTab({ departureId, hotels, roomsRequired = 0 }: {
+export default function HotelsTab({ departureId, hotels, roomsRequired = 0, defaultCheckIn, defaultCheckOut, defaultLocation, autoOpenAdd }: {
   departureId: string;
   hotels: Hotel[];
   roomsRequired?: number;
+  defaultCheckIn?: string;
+  defaultCheckOut?: string;
+  defaultLocation?: string;
+  autoOpenAdd?: boolean;
 }) {
   const [addOpen, setAddOpen] = useState(false);
   const [editHotel, setEditHotel] = useState<Hotel | null>(null);
@@ -216,6 +248,18 @@ export default function HotelsTab({ departureId, hotels, roomsRequired = 0 }: {
   const createHotel = useCreateHotel(departureId);
   const updateHotel = useUpdateHotel(departureId);
   const deleteHotel = useDeleteHotel(departureId);
+
+  // Arriving here from Rooms Required with a specific stay already picked —
+  // jump straight into a pre-filled Add Hotel form instead of making the
+  // operator retype the location and dates that are already known.
+  useEffect(() => {
+    if (autoOpenAdd) setAddOpen(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoOpenAdd]);
+
+  const addDefaults: Partial<Hotel> | undefined = (defaultCheckIn || defaultLocation)
+    ? { location: defaultLocation, checkInDate: defaultCheckIn, checkOutDate: defaultCheckOut }
+    : undefined;
 
   return (
     <div className="space-y-4">
@@ -252,6 +296,8 @@ export default function HotelsTab({ departureId, hotels, roomsRequired = 0 }: {
                 {h.numberOfRooms && <p>{h.numberOfRooms} room(s){h.roomAllocation ? ` — ${h.roomAllocation}` : ''}</p>}
                 {h.confirmationNumber && <p className="flex items-center gap-1"><FileCheck className="w-3 h-3" />{h.confirmationNumber}</p>}
                 {h.vendorName && <p className="flex items-center gap-1"><Phone className="w-3 h-3" />{h.vendorName} {h.vendorContact && `· ${h.vendorContact}`}</p>}
+                {h.contactPerson && <p className="flex items-center gap-1"><User className="w-3 h-3" />{h.contactPerson}</p>}
+                {h.rate != null && <p className="flex items-center gap-1"><IndianRupee className="w-3 h-3" />{h.rate.toLocaleString('en-IN')}</p>}
               </div>
               <div className="flex items-center gap-2 pt-1">
                 <button onClick={() => setEditHotel(h)} className="text-xs font-medium text-primary-600 hover:text-primary-700 flex items-center gap-1">
@@ -268,6 +314,7 @@ export default function HotelsTab({ departureId, hotels, roomsRequired = 0 }: {
 
       <HotelFormModal
         open={addOpen} onClose={() => setAddOpen(false)} isLoading={createHotel.isPending}
+        defaultValues={addDefaults}
         onSubmit={(data) => createHotel.mutate(data as any, { onSuccess: () => setAddOpen(false) })}
       />
       <HotelFormModal

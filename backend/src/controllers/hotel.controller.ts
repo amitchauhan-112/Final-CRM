@@ -12,14 +12,46 @@ async function assertDepartureAccess(req: AuthenticatedRequest, departureId: str
   return departure;
 }
 
+const ROOM_CAP: Record<string, number> = { SINGLE: 1, DOUBLE: 2, TRIPLE: 3, QUAD: 4 };
+
+// Confirmed hotel rooms must never exceed what the departure's bookings
+// actually require — PENDING entries (still shopping around for a rate) are
+// exempt, since they're not a commitment yet.
+async function roomsRequiredForDeparture(departureId: string): Promise<number> {
+  const bookings = await prisma.booking.findMany({
+    where: { departureId, status: { not: 'CANCELLED' } },
+    select: { numberOfTravelers: true, roomSharing: true },
+  });
+  return bookings.reduce((sum, b) => {
+    const cap = ROOM_CAP[b.roomSharing] ?? 2;
+    return sum + Math.ceil(b.numberOfTravelers / cap);
+  }, 0);
+}
+
 export const createHotel = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const { departureId } = req.params;
     const departure = await assertDepartureAccess(req, departureId);
     if (!departure) { res.status(404).json({ success: false, error: 'Departure not found' }); return; }
 
-    const { name, location, checkInDate, checkOutDate, numberOfRooms, roomAllocation, vendorName, vendorContact, confirmationNumber, status } = req.body;
+    const { name, location, checkInDate, checkOutDate, numberOfRooms, roomAllocation, vendorName, vendorContact, contactPerson, rate, vendorId, confirmationNumber, status } = req.body;
     if (!name?.trim()) { res.status(400).json({ success: false, error: 'Hotel name is required' }); return; }
+
+    const resolvedStatus = status || 'PENDING';
+    if (resolvedStatus === 'CONFIRMED' && numberOfRooms) {
+      const [required, confirmedElsewhere] = await Promise.all([
+        roomsRequiredForDeparture(departureId),
+        prisma.hotel.aggregate({ where: { departureId, status: 'CONFIRMED' }, _sum: { numberOfRooms: true } }),
+      ]);
+      const alreadyConfirmed = confirmedElsewhere._sum.numberOfRooms ?? 0;
+      if (alreadyConfirmed + Number(numberOfRooms) > required) {
+        res.status(400).json({
+          success: false,
+          error: `Confirmed rooms would exceed what's required (${required} required, ${alreadyConfirmed} already confirmed).`,
+        });
+        return;
+      }
+    }
 
     const hotel = await prisma.hotel.create({
       data: {
@@ -32,6 +64,9 @@ export const createHotel = async (req: AuthenticatedRequest, res: Response): Pro
         roomAllocation: roomAllocation?.trim() || null,
         vendorName: vendorName?.trim() || null,
         vendorContact: vendorContact?.trim() || null,
+        contactPerson: contactPerson?.trim() || null,
+        rate: rate !== undefined && rate !== '' && rate !== null ? Number(rate) : null,
+        vendorId: vendorId?.trim() || null,
         confirmationNumber: confirmationNumber?.trim() || null,
         status: status || 'PENDING',
       },
@@ -58,6 +93,29 @@ export const updateHotel = async (req: AuthenticatedRequest, res: Response): Pro
 
     const b = req.body;
     const wasPending = existing.status === 'PENDING';
+
+    const resolvedStatus = b.status ?? existing.status;
+    const resolvedRooms = b.numberOfRooms !== undefined
+      ? (b.numberOfRooms === '' || b.numberOfRooms === null ? null : Number(b.numberOfRooms))
+      : existing.numberOfRooms;
+    if (resolvedStatus === 'CONFIRMED' && resolvedRooms) {
+      const [required, confirmedElsewhere] = await Promise.all([
+        roomsRequiredForDeparture(existing.departureId),
+        prisma.hotel.aggregate({
+          where: { departureId: existing.departureId, status: 'CONFIRMED', id: { not: id } },
+          _sum: { numberOfRooms: true },
+        }),
+      ]);
+      const alreadyConfirmed = confirmedElsewhere._sum.numberOfRooms ?? 0;
+      if (alreadyConfirmed + resolvedRooms > required) {
+        res.status(400).json({
+          success: false,
+          error: `Confirmed rooms would exceed what's required (${required} required, ${alreadyConfirmed} already confirmed elsewhere).`,
+        });
+        return;
+      }
+    }
+
     const hotel = await prisma.hotel.update({
       where: { id },
       data: {
@@ -69,6 +127,9 @@ export const updateHotel = async (req: AuthenticatedRequest, res: Response): Pro
         roomAllocation: b.roomAllocation !== undefined ? b.roomAllocation?.trim() || null : existing.roomAllocation,
         vendorName: b.vendorName !== undefined ? b.vendorName?.trim() || null : existing.vendorName,
         vendorContact: b.vendorContact !== undefined ? b.vendorContact?.trim() || null : existing.vendorContact,
+        contactPerson: b.contactPerson !== undefined ? b.contactPerson?.trim() || null : existing.contactPerson,
+        rate: b.rate !== undefined ? (b.rate === '' || b.rate === null ? null : Number(b.rate)) : existing.rate,
+        vendorId: b.vendorId !== undefined ? b.vendorId?.trim() || null : existing.vendorId,
         confirmationNumber: b.confirmationNumber !== undefined ? b.confirmationNumber?.trim() || null : existing.confirmationNumber,
         status: b.status ?? existing.status,
         voucherUrl: b.voucherUrl !== undefined ? b.voucherUrl : existing.voucherUrl,

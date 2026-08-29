@@ -2,6 +2,7 @@ import { Response } from 'express';
 import prisma from '../lib/prisma.js';
 import { AuthenticatedRequest } from '../types/index.js';
 import { emitFinanceUpdated } from '../services/notification.service.js';
+import { buildUploadUrl } from '../middleware/upload.js';
 
 const orgId = (req: AuthenticatedRequest) => req.user?.organizationId ?? null;
 const orgFilter = (req: AuthenticatedRequest) => (orgId(req) ? { organizationId: orgId(req) } : {});
@@ -173,7 +174,7 @@ export const uploadVendorPaymentFile = async (req: AuthenticatedRequest, res: Re
     if (!existing) { res.status(404).json({ success: false, error: 'Vendor payment not found' }); return; }
     if (!req.file) { res.status(400).json({ success: false, error: 'File is required' }); return; }
 
-    const fileUrl = `/api/uploads/${req.file.filename}`;
+    const fileUrl = buildUploadUrl(req.file);
     const updated = await prisma.vendorPayment.update({
       where: { id },
       data: fileType === 'proof' ? { paymentProofUrl: fileUrl } : { invoiceUrl: fileUrl },

@@ -25,6 +25,7 @@ import toast from 'react-hot-toast';
 
 const STATUS_COLORS: Record<LeadStatus, string> = {
   NEW: '#0ea5e9',
+  NOT_CONTACTED: '#64748b',
   CONTACTED: '#eab308',
   INTERESTED: '#8b5cf6',
   FOLLOW_UP_SCHEDULED: '#f97316',

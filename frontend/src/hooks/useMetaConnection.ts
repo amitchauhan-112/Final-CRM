@@ -9,6 +9,16 @@ export interface MetaConnectionStatus {
   isActive: boolean;
   lastSyncAt: string | null;
   lastSyncError: string | null;
+  lastLeadBackfillAt: string | null;
+  lastLeadBackfillResult: string | null;
+}
+
+export interface LeadBackfillResult {
+  formsScanned: number;
+  leadsFound: number;
+  leadsCreated: number;
+  duplicatesSkipped: number;
+  errors: string[];
 }
 
 export interface MetaConnectionInput {
@@ -63,6 +73,21 @@ export function useTriggerMetaSync() {
       // Re-fetch connection status after a short delay so lastSyncAt updates
       setTimeout(() => qc.invalidateQueries({ queryKey: QK }), 3000);
       qc.invalidateQueries({ queryKey: ['campaigns'] });
+    },
+  });
+}
+
+export function useTriggerLeadBackfill() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.post('/settings/meta-connection/backfill-leads').then((r) => r.data),
+    onSuccess: () => {
+      // Backfill runs in the background — poll connection status (which
+      // carries the result) a few times over the next stretch.
+      [15_000, 30_000, 60_000, 120_000].forEach((delay) =>
+        setTimeout(() => qc.invalidateQueries({ queryKey: QK }), delay)
+      );
+      setTimeout(() => qc.invalidateQueries({ queryKey: ['leads'] }), 30_000);
     },
   });
 }

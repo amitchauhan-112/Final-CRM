@@ -144,11 +144,11 @@ export default function FeedbackPage() {
       {/* Stats */}
       {stats && (
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-          <StatsCard label="Total" value={stats.total} icon={MessageCircle} iconBg="bg-blue-100" iconColor="text-blue-600" />
-          <StatsCard label="Open" value={stats.open} icon={AlertCircle} iconBg="bg-yellow-100" iconColor="text-yellow-600" />
-          <StatsCard label="In Progress" value={stats.inProgress} icon={Clock} iconBg="bg-purple-100" iconColor="text-purple-600" />
-          <StatsCard label="Bug Reports" value={stats.bugs} icon={Bug} iconBg="bg-red-100" iconColor="text-red-600" />
-          <StatsCard label="Suggestions" value={stats.suggestions} icon={Lightbulb} iconBg="bg-green-100" iconColor="text-green-600" />
+          <StatsCard label="Total" value={stats.total} icon={MessageCircle} iconBg="bg-blue-100" iconColor="text-blue-600" onClick={() => setFilters({})} />
+          <StatsCard label="Open" value={stats.open} icon={AlertCircle} iconBg="bg-yellow-100" iconColor="text-yellow-600" onClick={() => handleFilter('status', 'OPEN')} />
+          <StatsCard label="In Progress" value={stats.inProgress} icon={Clock} iconBg="bg-purple-100" iconColor="text-purple-600" onClick={() => handleFilter('status', 'IN_PROGRESS')} />
+          <StatsCard label="Bug Reports" value={stats.bugs} icon={Bug} iconBg="bg-red-100" iconColor="text-red-600" onClick={() => handleFilter('type', 'BUG')} />
+          <StatsCard label="Suggestions" value={stats.suggestions} icon={Lightbulb} iconBg="bg-green-100" iconColor="text-green-600" onClick={() => handleFilter('type', 'SUGGESTION')} />
         </div>
       )}
 
@@ -159,6 +159,7 @@ export default function FeedbackPage() {
 
           <select
             className="input w-auto text-sm"
+            value={filters.type ?? ''}
             onChange={(e) => handleFilter('type', e.target.value)}
           >
             <option value="">All Types</option>
@@ -169,6 +170,7 @@ export default function FeedbackPage() {
 
           <select
             className="input w-auto text-sm"
+            value={filters.status ?? ''}
             onChange={(e) => handleFilter('status', e.target.value)}
           >
             <option value="">All Statuses</option>
@@ -179,6 +181,7 @@ export default function FeedbackPage() {
 
           <select
             className="input w-auto text-sm"
+            value={filters.priority ?? ''}
             onChange={(e) => handleFilter('priority', e.target.value)}
           >
             <option value="">All Priorities</option>

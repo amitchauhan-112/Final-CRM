@@ -23,6 +23,8 @@ export interface CreateLeadInput {
   organizationId?: string | null;
   /** Direct campaign ID override — skips matchCampaign() when set */
   campaignId?: string;
+  /** Backdate createdAt for historical imports (e.g. Meta lead backfill) — omit for real-time leads */
+  createdAt?: Date;
 }
 
 export const matchCampaign = async (input: {

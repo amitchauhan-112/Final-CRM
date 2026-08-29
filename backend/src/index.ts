@@ -27,15 +27,29 @@ const httpServer = createServer(app);
 // Trust Railway / Vercel reverse proxy so rate limiting and IPs work correctly
 app.set('trust proxy', 1);
 
+// FRONTEND_URL can be a comma-separated list (e.g. the production domain
+// plus a Vercel deployment) — any *.vercel.app origin (including Vercel's
+// per-branch preview URLs) is additionally allowed automatically so preview
+// deployments work without an env var update on every push.
 const allowedOrigins = [
-  process.env.FRONTEND_URL,
+  ...(process.env.FRONTEND_URL?.split(',').map((s) => s.trim()).filter(Boolean) ?? []),
   'http://localhost:5173',
   'http://localhost:4173',
-].filter(Boolean) as string[];
+];
+
+function isOriginAllowed(origin: string | undefined): boolean {
+  if (!origin) return true; // non-browser requests (curl, server-to-server, mobile apps)
+  if (allowedOrigins.includes(origin)) return true;
+  try {
+    return new URL(origin).hostname.endsWith('.vercel.app');
+  } catch {
+    return false;
+  }
+}
 
 const io = new Server(httpServer, {
   cors: {
-    origin: allowedOrigins,
+    origin: (origin, callback) => callback(null, isOriginAllowed(origin)),
     methods: ['GET', 'POST'],
     credentials: true,
   },
@@ -53,7 +67,7 @@ app.use(helmet({
   },
 }));
 app.use(cors({
-  origin: allowedOrigins,
+  origin: (origin, callback) => callback(null, isOriginAllowed(origin)),
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
@@ -147,7 +161,7 @@ cron.schedule('*/30 * * * *', async () => {
   await runTrackedJob('finance-reminders', sendFinanceReminders);
 });
 
-cron.schedule('*/15 * * * *', async () => {
+cron.schedule('* * * * *', async () => {
   logger.info('Running Meta campaign sync...');
   await runTrackedJob('meta-campaign-sync', runMetaSync);
 });

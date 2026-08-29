@@ -1,5 +1,6 @@
 import { Router } from 'express';
-import { upload } from '../middleware/upload.js';
+import { createUpload } from '../middleware/upload.js';
+const upload = createUpload('traveler-documents');
 import { getPortalBooking, submitTravelerDetails, uploadTravelerDocument } from '../controllers/travelerPortal.controller.js';
 
 // Deliberately NOT behind `authenticate` — this is the customer-facing,

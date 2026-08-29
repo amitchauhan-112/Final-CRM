@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
   Mountain, LayoutDashboard, CheckSquare, BookOpen, Clock, RotateCcw,
-  Truck, FileBarChart, Bell, LogOut, ChevronDown, Menu, X, Settings, UserCircle, Receipt, ClipboardList,
+  Truck, FileBarChart, Bell, LogOut, ChevronDown, Menu, X, Settings, UserCircle, Receipt, ClipboardList, IndianRupee,
 } from 'lucide-react';
 import BookingLookup from './BookingLookup';
 import { useAuthStore } from '../../store/authStore';
@@ -23,6 +23,7 @@ const navLinks = [
   { to: '/finance/vendor-ledger', label: 'Vendor Ledger', icon: ClipboardList },
   { to: '/finance/expenses', label: 'Expenses', icon: Receipt },
   { to: '/finance/reports', label: 'Reports', icon: FileBarChart },
+  { to: '/finance/payroll', label: 'Payroll', icon: IndianRupee },
   { to: '/finance/settings', label: 'Settings', icon: Settings },
 ];
 

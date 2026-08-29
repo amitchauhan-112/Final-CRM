@@ -2,6 +2,7 @@ import { Response } from 'express';
 import prisma from '../lib/prisma.js';
 import { AuthenticatedRequest } from '../types/index.js';
 import { emitFinanceUpdated, createNotification, notifyFinanceTeam } from '../services/notification.service.js';
+import { buildUploadUrl } from '../middleware/upload.js';
 
 const orgId = (req: AuthenticatedRequest) => req.user?.organizationId ?? null;
 const orgFilter = (req: AuthenticatedRequest) => (orgId(req) ? { organizationId: orgId(req) } : {});
@@ -44,7 +45,7 @@ export const createExpense = async (req: AuthenticatedRequest, res: Response): P
       res.status(400).json({ success: false, error: 'Valid amount is required' }); return;
     }
 
-    const billUrl = req.file ? `/api/uploads/${req.file.filename}` : null;
+    const billUrl = req.file ? buildUploadUrl(req.file) : null;
 
     const expense = await prisma.expense.create({
       data: {

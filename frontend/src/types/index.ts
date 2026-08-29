@@ -1,6 +1,6 @@
 export type Role = 'ADMIN' | 'EMPLOYEE' | 'OPERATIONS' | 'FINANCE';
 export type LeadSource = 'WHATSAPP' | 'INSTAGRAM' | 'MANUAL' | 'WEBSITE' | 'META_ADS';
-export type LeadStatus = 'NEW' | 'CONTACTED' | 'INTERESTED' | 'FOLLOW_UP_SCHEDULED' | 'CONFIRMED' | 'LOST';
+export type LeadStatus = 'NEW' | 'NOT_CONTACTED' | 'CONTACTED' | 'INTERESTED' | 'FOLLOW_UP_SCHEDULED' | 'CONFIRMED' | 'LOST';
 export type LeadPriority = 'HIGH' | 'MEDIUM' | 'LOW';
 export type CampaignStatus = 'ACTIVE' | 'PAUSED' | 'COMPLETED' | 'DRAFT' | 'ENDED';
 export type NotificationType = 'FOLLOW_UP_DUE' | 'FOLLOW_UP_OVERDUE' | 'NEW_LEAD_ASSIGNED' | 'LEAD_STATUS_CHANGED' | 'CAMPAIGN_UPDATE' | 'SYSTEM';
@@ -664,6 +664,8 @@ export interface Hotel {
   roomAllocation?: string;
   vendorName?: string;
   vendorContact?: string;
+  contactPerson?: string;
+  rate?: number;
   vendorId?: string;
   confirmationNumber?: string;
   status: OpsBookingStatus;
@@ -683,6 +685,8 @@ export interface Vehicle {
   pickupLocation?: string;
   vendorName?: string;
   vendorContact?: string;
+  contactPerson?: string;
+  rate?: number;
   vendorId?: string;
   status: OpsBookingStatus;
   createdAt: string;
@@ -695,6 +699,8 @@ export interface Vendor {
   name: string;
   type: VendorType;
   contact?: string;
+  contactPerson?: string;
+  rate?: number;
   notes?: string;
   status: 'ACTIVE' | 'INACTIVE';
   rating?: number;
@@ -919,6 +925,28 @@ export interface OpsDashboardStats {
   checklistProgressAvg: number;
 }
 
+export interface StayPlanBookingInfo {
+  bookingId: string;
+  bookingNumber: string | null;
+  travelerName: string;
+  numberOfTravelers: number;
+  roomSharing: string;
+  specialRequest: string | null;
+  salesExecutive: { id: string; name: string } | null;
+}
+
+export interface StayPlanPackageBreakdown {
+  packageId: string;
+  packageName: string;
+  packageType: 'GIT' | 'FIT' | null;
+  guestCount: number;
+  rooms: { SINGLE: number; DOUBLE: number; TRIPLE: number; QUAD: number; total: number };
+  departureIds: string[];
+  checkOutDate: string;
+  nights: number;
+  bookings: StayPlanBookingInfo[];
+}
+
 export interface StayPlanEntry {
   destination: string;
   guestCount: number;
@@ -926,6 +954,9 @@ export interface StayPlanEntry {
   vehicles: { type: string; count: number; seats: number }[];
   departureIds: string[];
   packageNames: string[];
+  checkOutDate: string;
+  nights: number;
+  breakdown: StayPlanPackageBreakdown[];
 }
 
 export interface StayPlanDateItem {
@@ -937,6 +968,23 @@ export interface StayPlanPackageItem {
   packageId: string;
   packageName: string;
   dates: { date: string; destination: string; guestCount: number }[];
+}
+
+export type RoomRequirementStatus = 'PENDING' | 'PARTIALLY_BOOKED' | 'FULLY_BOOKED' | 'OVERBOOKED';
+
+export interface RoomsRequiredEntry extends StayPlanEntry {
+  roomsBooked: number;
+  roomsPending: number;
+  status: RoomRequirementStatus;
+}
+
+export interface RoomsRequiredDateItem {
+  date: string;
+  entries: RoomsRequiredEntry[];
+}
+
+export interface RoomsRequired {
+  dateWise: RoomsRequiredDateItem[];
 }
 
 export interface StayPlan {

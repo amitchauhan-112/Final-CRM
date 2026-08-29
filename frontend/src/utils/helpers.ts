@@ -8,6 +8,7 @@ export function cn(...inputs: ClassValue[]) {
 
 export const leadStatusConfig: Record<LeadStatus, { label: string; color: string; bg: string }> = {
   NEW:                  { label: 'New',               color: 'text-blue-700',   bg: 'bg-blue-100' },
+  NOT_CONTACTED:        { label: 'Not Contacted',      color: 'text-slate-700',  bg: 'bg-slate-200' },
   CONTACTED:            { label: 'Contacted',          color: 'text-yellow-700', bg: 'bg-yellow-100' },
   INTERESTED:           { label: 'Interested',         color: 'text-purple-700', bg: 'bg-purple-100' },
   FOLLOW_UP_SCHEDULED:  { label: 'Follow-up Sched.',   color: 'text-orange-700', bg: 'bg-orange-100' },

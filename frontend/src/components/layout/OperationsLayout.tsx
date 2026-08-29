@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
   Mountain, LayoutDashboard, CalendarRange, Truck, Bell,
-  LogOut, ChevronDown, Menu, X, Settings, UserCircle, Map,
+  LogOut, ChevronDown, Menu, X, Settings, UserCircle, Map, BedDouble,
 } from 'lucide-react';
 import BookingLookup from './BookingLookup';
 import { useAuthStore } from '../../store/authStore';
@@ -17,6 +17,7 @@ const navLinks = [
   { to: '/operations/dashboard',  label: 'Dashboard',     icon: LayoutDashboard },
   { to: '/operations/departures', label: 'Departures',    icon: CalendarRange },
   { to: '/operations/stay-plan',  label: 'Stay Planning', icon: Map },
+  { to: '/operations/rooms-required', label: 'Rooms Required', icon: BedDouble },
   { to: '/operations/vendors',    label: 'Vendors',       icon: Truck },
   { to: '/operations/settings',   label: 'Settings',      icon: Settings },
 ];

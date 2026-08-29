@@ -4,17 +4,24 @@ import prisma from '../lib/prisma.js';
 import { AuthenticatedRequest } from '../types/index.js';
 import { UPLOAD_DIR_PATH } from '../middleware/upload.js';
 
+// Uploads now live under per-category subfolders (vendor-documents,
+// payment-proofs, ...) rather than one flat folder, so this walks one level
+// of subfolders deep rather than just reading UPLOAD_DIR_PATH directly.
 async function getUploadsDirSize(): Promise<number> {
-  try {
-    const files = await fs.readdir(UPLOAD_DIR_PATH);
+  async function dirSize(dir: string): Promise<number> {
     let total = 0;
-    for (const file of files) {
+    const entries = await fs.readdir(dir, { withFileTypes: true });
+    for (const entry of entries) {
       try {
-        const stat = await fs.stat(`${UPLOAD_DIR_PATH}/${file}`);
-        if (stat.isFile()) total += stat.size;
+        const full = `${dir}/${entry.name}`;
+        if (entry.isDirectory()) total += await dirSize(full);
+        else if (entry.isFile()) total += (await fs.stat(full)).size;
       } catch { /* file may have been removed mid-scan — skip */ }
     }
     return total;
+  }
+  try {
+    return await dirSize(UPLOAD_DIR_PATH);
   } catch {
     return 0;
   }

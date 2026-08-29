@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import prisma from '../lib/prisma.js';
 import { notifyOperationsTeam } from '../services/notification.service.js';
 import { validateTravelerInput } from '../utils/travelerValidation.js';
+import { buildUploadUrl } from '../middleware/upload.js';
 
 // ─── Traveler Portal (public, token-gated — no authenticate middleware) ─────
 // The only surface in the app a customer can reach without logging in. Every
@@ -162,7 +163,7 @@ export const uploadTravelerDocument = async (req: Request, res: Response): Promi
     }
     if (!req.file) { res.status(400).json({ success: false, error: 'A document file is required.' }); return; }
 
-    const govIdDocumentUrl = `/api/uploads/${req.file.filename}`;
+    const govIdDocumentUrl = buildUploadUrl(req.file);
     const updated = await prisma.traveler.update({ where: { id: traveler.id }, data: { govIdDocumentUrl } });
 
     res.json({ success: true, data: updated });

@@ -30,14 +30,18 @@ export default function StatsCard({
     <div
       className={cn(
         'card p-5 flex flex-col gap-4 ring-card',
-        onClick && 'cursor-pointer hover:shadow-md hover:-translate-y-px transition-all duration-200',
+        onClick && 'group cursor-pointer hover:shadow-elevate-lg hover:-translate-y-1 hover:scale-[1.02] hover:border-primary-100 transition-all duration-200 ease-enterprise',
         className
       )}
       onClick={onClick}
     >
       {/* Top row: icon + trend */}
       <div className="flex items-start justify-between">
-        <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0', iconBg)}>
+        <div className={cn(
+          'w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-transform duration-200 ease-enterprise',
+          onClick && 'group-hover:scale-110',
+          iconBg
+        )}>
           <Icon className={cn('w-5 h-5', iconColor)} />
         </div>
         {trend !== undefined && (

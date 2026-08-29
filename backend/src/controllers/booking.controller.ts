@@ -35,6 +35,28 @@ export const getBookingByLead = async (req: AuthenticatedRequest, res: Response)
   }
 };
 
+// ─── Get generated documents (receipts/invoices) for a booking ────────────────
+// Read-only, org-scoped — lets Sales/Admin download a customer's receipt PDF
+// straight from the Lead detail view, without needing Finance-role access.
+
+export const getBookingDocuments = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const booking = await prisma.booking.findFirst({
+      where: { id: req.params.id, ...(orgId(req) ? { organizationId: orgId(req) } : {}) },
+      select: { id: true },
+    });
+    if (!booking) { res.status(404).json({ success: false, error: 'Booking not found' }); return; }
+
+    const documents = await prisma.financeDocument.findMany({
+      where: { bookingId: booking.id },
+      orderBy: { generatedAt: 'desc' },
+    });
+    res.json({ success: true, data: documents });
+  } catch {
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+};
+
 // ─── Create booking ───────────────────────────────────────────────────────────
 
 export const createBooking = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
@@ -59,6 +81,25 @@ export const createBooking = async (req: AuthenticatedRequest, res: Response): P
     }
     if (departureDate && returnDate && new Date(returnDate) < new Date(departureDate)) {
       res.status(400).json({ success: false, error: 'Return date cannot be before departure date' }); return;
+    }
+    if (departureDate && balanceDueDate && new Date(balanceDueDate) > new Date(departureDate)) {
+      res.status(400).json({ success: false, error: 'Balance due date must be before the departure date' }); return;
+    }
+    if (departureDate) {
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      if (new Date(departureDate) < todayStart) {
+        res.status(400).json({ success: false, error: 'Departure date cannot be in the past' }); return;
+      }
+    }
+
+    // Amount paid is mandatory when a booking is FIRST confirmed (an advance
+    // must be collected to lock in a booking) — but not on later edits to an
+    // already-confirmed booking, where amountPaid is intentionally not
+    // resubmitted (see the upsert below).
+    const existingBookingForLead = await prisma.booking.findUnique({ where: { leadId }, select: { id: true } });
+    if (!existingBookingForLead && (amountPaid === undefined || Number(amountPaid) <= 0)) {
+      res.status(400).json({ success: false, error: 'Amount paid is required to confirm a booking — enter the advance received.' }); return;
     }
 
     // amountPaid is never credited directly — it only increases once Finance
@@ -259,8 +300,25 @@ export const updateBooking = async (req: AuthenticatedRequest, res: Response): P
     }
     const effectiveDepartureDate = departureDate !== undefined ? departureDate : existing.departureDate;
     const effectiveReturnDate = returnDate !== undefined ? returnDate : existing.returnDate;
+    const effectiveBalanceDueDate = balanceDueDate !== undefined ? balanceDueDate : existing.balanceDueDate;
     if (effectiveDepartureDate && effectiveReturnDate && new Date(effectiveReturnDate) < new Date(effectiveDepartureDate)) {
       res.status(400).json({ success: false, error: 'Return date cannot be before departure date' }); return;
+    }
+    if (effectiveDepartureDate && effectiveBalanceDueDate && new Date(effectiveBalanceDueDate) > new Date(effectiveDepartureDate)) {
+      res.status(400).json({ success: false, error: 'Balance due date must be before the departure date' }); return;
+    }
+    // Only block a past departure date when it's actively being changed to a
+    // new value — editing other fields on a booking whose trip already
+    // happened shouldn't be blocked by its (correctly) past departure date.
+    if (departureDate) {
+      const existingDateStr = existing.departureDate ? existing.departureDate.toISOString().slice(0, 10) : null;
+      const newDateStr = new Date(departureDate).toISOString().slice(0, 10);
+      if (newDateStr !== existingDateStr) {
+        const todayStr = new Date().toISOString().slice(0, 10);
+        if (newDateStr < todayStr) {
+          res.status(400).json({ success: false, error: 'Departure date cannot be in the past' }); return;
+        }
+      }
     }
 
     // amountPaid is intentionally not accepted here — it only changes via
