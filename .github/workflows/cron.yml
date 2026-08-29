@@ -1,0 +1,52 @@
+name: Scheduled jobs
+
+# Replaces the node-cron jobs that used to run inside the backend's
+# long-running EC2 process — Vercel serverless functions can't host a
+# persistent scheduler, so this workflow calls the equivalent api/cron/*
+# routes on the same cadence instead. GitHub Actions cron timing can drift
+# a few minutes under load; that's an accepted tradeoff for staying on the
+# free tier instead of Vercel Pro.
+
+on:
+  schedule:
+    - cron: '*/30 * * * *' # follow-up / operations / finance reminders
+    - cron: '*/5 * * * *'  # meta-sync + automation-sweep
+    - cron: '*/10 * * * *' # lead-backfill
+  workflow_dispatch: {}
+
+jobs:
+  reminders-followup:
+    if: github.event.schedule == '*/30 * * * *' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - run: curl -sf -X POST -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" https://final-crm-kappa.vercel.app/api/cron/reminders-followup
+
+  reminders-operations:
+    if: github.event.schedule == '*/30 * * * *' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - run: curl -sf -X POST -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" https://final-crm-kappa.vercel.app/api/cron/reminders-operations
+
+  reminders-finance:
+    if: github.event.schedule == '*/30 * * * *' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - run: curl -sf -X POST -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" https://final-crm-kappa.vercel.app/api/cron/reminders-finance
+
+  meta-sync:
+    if: github.event.schedule == '*/5 * * * *' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - run: curl -sf -X POST -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" https://final-crm-kappa.vercel.app/api/cron/meta-sync
+
+  automation-sweep:
+    if: github.event.schedule == '*/5 * * * *' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - run: curl -sf -X POST -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" https://final-crm-kappa.vercel.app/api/cron/automation-sweep
+
+  lead-backfill:
+    if: github.event.schedule == '*/10 * * * *' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - run: curl -sf -X POST -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" https://final-crm-kappa.vercel.app/api/cron/lead-backfill
