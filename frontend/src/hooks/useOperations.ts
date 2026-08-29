@@ -14,6 +14,8 @@ export function useOpsDashboard() {
     queryKey: ['operations', 'dashboard'],
     queryFn: async () => (await api.get('/operations/dashboard')).data,
     staleTime: 60 * 1000,
+    // Replaces the old 'operations_updated' Socket.IO event.
+    refetchInterval: 20000,
   });
 }
 
@@ -66,6 +68,8 @@ export function useDepartures(filters: DepartureFilters = {}) {
       const { data } = await api.get(`/operations/departures?${params.toString()}`);
       return data;
     },
+    // Replaces the old 'operations_updated' Socket.IO event.
+    refetchInterval: 20000,
   });
 }
 

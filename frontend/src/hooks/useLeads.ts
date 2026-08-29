@@ -33,6 +33,9 @@ export function useLeads(filters: LeadFilters = {}) {
       const { data } = await api.get(`/leads?${params}`);
       return data;
     },
+    // Replaces the old 'lead_updated' Socket.IO event — only polls while this
+    // list is actually on screen.
+    refetchInterval: 20000,
   });
 }
 
@@ -65,6 +68,7 @@ export function useLeadStats() {
       const { data } = await api.get('/leads/stats');
       return data;
     },
+    refetchInterval: 20000,
   });
 }
 
@@ -75,6 +79,7 @@ export function useOverdueFollowUps() {
       const { data } = await api.get('/leads/overdue');
       return data;
     },
+    refetchInterval: 20000,
   });
 }
 

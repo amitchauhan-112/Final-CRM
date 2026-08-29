@@ -1,9 +1,7 @@
 import { Response } from 'express';
-import fs from 'fs';
-import path from 'path';
 import prisma from '../lib/prisma.js';
 import { AuthenticatedRequest } from '../types/index.js';
-import { buildUploadUrl, filePathFromUploadUrl } from '../middleware/upload.js';
+import { buildUploadUrl, filePathFromUploadUrl, deleteUploadedFile } from '../middleware/upload.js';
 
 // keywords is stored as JSON string in DB; parse before sending to client
 function parseCampaign(c: any) {
@@ -388,9 +386,8 @@ export const deleteCampaignAttachment = async (req: AuthenticatedRequest, res: R
     const attachment = await prisma.campaignAttachment.findUnique({ where: { id: attachmentId } });
     if (!attachment) { res.status(404).json({ success: false, error: 'Attachment not found' }); return; }
 
-    // Delete file from disk
-    const filePath = filePathFromUploadUrl(attachment.fileUrl);
-    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    // Delete file from storage
+    await deleteUploadedFile(filePathFromUploadUrl(attachment.fileUrl)).catch(() => {});
 
     await prisma.campaignAttachment.delete({ where: { id: attachmentId } });
     res.json({ success: true });

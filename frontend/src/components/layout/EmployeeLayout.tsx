@@ -8,7 +8,6 @@ import {
 import BookingLookup from './BookingLookup';
 import { useAuthStore } from '../../store/authStore';
 import { useNotifications, useMarkAllAsRead, useMarkAsRead } from '../../hooks/useNotifications';
-import { useRealtimeSync } from '../../hooks/useRealtimeSync';
 import { useFollowUpNotifications } from '../../hooks/useFollowUpNotifications';
 import Avatar from '../ui/Avatar';
 import FeedbackButton from '../feedback/FeedbackButton';
@@ -40,7 +39,6 @@ export default function EmployeeLayout() {
   const { data: notifData } = useNotifications(1, 10);
   const markAllRead = useMarkAllAsRead();
   const markOneRead = useMarkAsRead();
-  useRealtimeSync();
   useFollowUpNotifications();
 
   const notifications = notifData?.data ?? [];

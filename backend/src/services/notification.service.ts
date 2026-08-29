@@ -1,11 +1,6 @@
 
-import { Server } from 'socket.io';
-
 import prisma from '../lib/prisma.js';
 import { getRuleNumber } from './businessRule.service.js';
-let io: Server | null = null;
-
-export const setSocketServer = (socketServer: Server) => { io = socketServer; };
 
 // ─── Notification taxonomy ───────────────────────────────────────────────────
 // Layered on top of the existing free-string `type` — every known type gets a
@@ -67,7 +62,6 @@ export const createNotification = async (
       category: category ?? meta.category,
     },
   });
-  if (io) io.to(`user:${userId}`).emit('notification', notification);
   return notification;
 };
 
@@ -127,15 +121,15 @@ export const sendFollowUpReminders = async () => {
   }
 };
 
-export const emitLeadUpdated = (leadId: string) => {
-  if (io) io.emit('lead_updated', { leadId });
-};
+// No-op now that Socket.IO has been removed (frontend polls via React Query
+// refetchInterval instead) — kept as a stub so the ~12 call sites elsewhere
+// don't need to change.
+export const emitLeadUpdated = (_leadId: string) => {};
 
 // ─── Operations Panel ────────────────────────────────────────────────────────
 
-export const emitOperationsUpdated = (departureId: string) => {
-  if (io) io.to('admin').to('operations').emit('operations_updated', { departureId });
-};
+// No-op now that Socket.IO has been removed — see emitLeadUpdated above.
+export const emitOperationsUpdated = (_departureId: string) => {};
 
 export const notifyOperationsTeam = async (
   organizationId: string | null,
@@ -243,9 +237,8 @@ export const updateDepartureStatuses = async () => {
 
 // ─── Finance Panel ───────────────────────────────────────────────────────────
 
-export const emitFinanceUpdated = () => {
-  if (io) io.to('admin').to('finance').emit('finance_updated', {});
-};
+// No-op now that Socket.IO has been removed — see emitLeadUpdated above.
+export const emitFinanceUpdated = () => {};
 
 export const notifyFinanceTeam = async (
   organizationId: string | null,

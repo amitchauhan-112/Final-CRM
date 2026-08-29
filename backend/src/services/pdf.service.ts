@@ -1,10 +1,7 @@
-import fs from 'fs';
-import path from 'path';
 import PDFDocument from 'pdfkit';
-import { UPLOAD_DIR_PATH } from '../middleware/upload.js';
+import { uploadGeneratedFile } from '../middleware/upload.js';
 
-const FINANCE_DOCS_DIR = path.join(UPLOAD_DIR_PATH, 'finance-generated-documents');
-if (!fs.existsSync(FINANCE_DOCS_DIR)) fs.mkdirSync(FINANCE_DOCS_DIR, { recursive: true });
+const FINANCE_DOCS_CATEGORY = 'finance-generated-documents';
 
 // Same static letterhead already used by the browser-print convention
 // (frontend/src/components/finance/ReceiptView.tsx) — no company-profile/
@@ -45,12 +42,13 @@ export async function renderFinanceDocumentPdf(
   snapshot: FinanceDocumentSnapshot
 ): Promise<string> {
   const filename = `${documentNumber.replace(/\//g, '-')}.pdf`;
-  const filePath = path.join(FINANCE_DOCS_DIR, filename);
 
-  await new Promise<void>((resolve, reject) => {
+  const pdfBuffer = await new Promise<Buffer>((resolve, reject) => {
     const doc = new PDFDocument({ size: 'A4', margin: 50 });
-    const stream = fs.createWriteStream(filePath);
-    doc.pipe(stream);
+    const chunks: Buffer[] = [];
+    doc.on('data', (chunk: Buffer) => chunks.push(chunk));
+    doc.on('end', () => resolve(Buffer.concat(chunks)));
+    doc.on('error', reject);
 
     // Letterhead
     doc.fontSize(18).font('Helvetica-Bold').text(COMPANY_NAME);
@@ -130,9 +128,7 @@ export async function renderFinanceDocumentPdf(
     doc.fontSize(8).fillColor('#999').text('Thank you for traveling with us.', 50, 760, { align: 'center', width: 495 });
 
     doc.end();
-    stream.on('finish', resolve);
-    stream.on('error', reject);
   });
 
-  return `/api/uploads/finance-generated-documents/${filename}`;
+  return uploadGeneratedFile(FINANCE_DOCS_CATEGORY, filename, pdfBuffer, 'application/pdf');
 }

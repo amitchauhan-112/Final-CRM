@@ -4,8 +4,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 // ─── Tenant / SaaS Foundation ───────────────────────────────────────────────
@@ -35,6 +36,7 @@ model Organization {
   vendorPayments VendorPayment[]
   expenses      Expense[]
   financeDocuments FinanceDocument[]
+  metaAdMaps    MetaAdMap[]
 
   @@map("organizations")
 }
@@ -169,10 +171,32 @@ model Campaign {
   employees   CampaignEmployee[]
   notes       CampaignNote[]
   attachments CampaignAttachment[]
+  metaAdMaps  MetaAdMap[]
 
   @@index([organizationId])
   @@index([status])
   @@map("campaigns")
+}
+
+// Persists the Meta adId → CRM campaign mapping produced by each Meta sync
+// run. Replaces an in-memory Map that the Instagram/leadgen webhook handler
+// used to read from — that approach doesn't survive serverless cold starts,
+// since each invocation gets a fresh, empty process.
+model MetaAdMap {
+  id             String   @id @default(uuid())
+  adId           String   @unique
+  adsetId        String
+  metaCampaignId String
+  updatedAt      DateTime @updatedAt
+
+  campaignId String
+  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@map("meta_ad_maps")
 }
 
 model CampaignEmployee {

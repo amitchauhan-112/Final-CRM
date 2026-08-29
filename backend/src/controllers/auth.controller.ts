@@ -18,16 +18,14 @@ function hashToken(token: string): string {
 }
 
 function setRefreshCookie(res: Response, token: string): void {
-  // Cross-origin deployments (e.g. a Vercel-hosted frontend calling this
-  // API) need sameSite:'none', which browsers only honor alongside
-  // secure:true (i.e. HTTPS) — both are driven by the same flag so this
-  // flips automatically once the backend is served over HTTPS, no other
-  // code change required.
-  const crossOrigin = process.env.COOKIE_SECURE === 'true';
+  // Frontend and backend share the same Vercel domain (same-origin), and
+  // Vercel always serves production over HTTPS — so a plain same-origin
+  // cookie works with no cross-origin sameSite:'none' complexity needed.
+  const isProduction = process.env.NODE_ENV === 'production';
   res.cookie(REFRESH_COOKIE, token, {
     httpOnly: true,
-    secure: crossOrigin,
-    sameSite: crossOrigin ? 'none' : 'strict',
+    secure: isProduction,
+    sameSite: 'strict',
     maxAge: REFRESH_EXPIRY_MS,
     path: '/api/auth',
   });
