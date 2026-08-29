@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Target, CheckCircle, Megaphone, FileText, Users, MapPin, Calendar, TrendingUp, StickyNote, Paperclip, Archive, ChevronDown, ChevronUp, Download, Link2 } from 'lucide-react';
+import { Plus, Target, CheckCircle, Megaphone, FileText, Users, MapPin, Calendar, TrendingUp, StickyNote, Paperclip, Archive, ChevronDown, ChevronUp, Download, Link2, FileSpreadsheet } from 'lucide-react';
 import { useCampaigns, useCampaign, useCampaignStats, useCreateCampaign, useUpdateCampaign, useDeleteCampaign } from '../../hooks/useCampaigns';
 import { useArchivedCampaigns, useArchiveDownload } from '../../hooks/useMetaConnection';
 import { Campaign, CampaignStatus, Lead } from '../../types/index';
@@ -14,6 +14,7 @@ import Badge from '../../components/ui/Badge';
 import Avatar from '../../components/ui/Avatar';
 import toast from 'react-hot-toast';
 import { cn, formatDate, formatCurrency, formatDateTime } from '../../utils/helpers';
+import { exportLeadsToExcel } from '../../utils/export';
 
 const STATUS_TABS: { value: CampaignStatus | 'ALL'; label: string }[] = [
   { value: 'ALL', label: 'All' },
@@ -100,12 +101,21 @@ function CampaignDetailModal({
                 <p className="text-sm text-slate-500 mt-2">{campaign.description}</p>
               )}
             </div>
-            <button
-              onClick={() => { onClose(); onEdit(campaign); }}
-              className="btn-secondary text-sm flex-shrink-0"
-            >
-              Edit Campaign
-            </button>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <button
+                onClick={() => exportLeadsToExcel(`?campaignId=${campaign.id}`)}
+                className="btn-secondary text-sm flex items-center gap-1.5"
+              >
+                <FileSpreadsheet className="w-3.5 h-3.5" />
+                Export Leads
+              </button>
+              <button
+                onClick={() => { onClose(); onEdit(campaign); }}
+                className="btn-secondary text-sm"
+              >
+                Edit Campaign
+              </button>
+            </div>
           </div>
 
           {/* Stats row */}
