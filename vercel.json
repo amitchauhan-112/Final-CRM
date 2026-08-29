@@ -3,6 +3,6 @@
   "installCommand": "echo 'Install handled by buildCommand'",
   "outputDirectory": "frontend/dist",
   "rewrites": [
-    { "source": "/(.*)", "destination": "/index.html" }
+    { "source": "/((?!api/).*)", "destination": "/index.html" }
   ]
 }
