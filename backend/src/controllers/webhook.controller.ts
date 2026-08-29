@@ -107,8 +107,8 @@ export const handleInstagramWebhook = async (req: Request, res: Response): Promi
       }
 
       for (const leadgen of entry.leadgen || []) {
-        // Resolve adId → campaign via in-memory map (populated by Meta sync)
-        const adEntry = leadgen.ad_id ? getAdEntry(leadgen.ad_id) : undefined;
+        // Resolve adId → campaign via the MetaAdMap table (populated by Meta sync)
+        const adEntry = leadgen.ad_id ? await getAdEntry(leadgen.ad_id) : undefined;
 
         await createLead(
           {

@@ -1,9 +1,8 @@
 import { Response } from 'express';
-import fs from 'fs';
 import prisma from '../lib/prisma.js';
 import { AuthenticatedRequest } from '../types/index.js';
 import { emitOperationsUpdated } from '../services/notification.service.js';
-import { buildUploadUrl, filePathFromUploadUrl } from '../middleware/upload.js';
+import { buildUploadUrl, filePathFromUploadUrl, deleteUploadedFile } from '../middleware/upload.js';
 
 const orgId = (req: AuthenticatedRequest) => req.user?.organizationId ?? null;
 
@@ -53,8 +52,7 @@ export const deleteDocument = async (req: AuthenticatedRequest, res: Response): 
 
     await prisma.operationsDocument.delete({ where: { id } });
 
-    const filePath = filePathFromUploadUrl(existing.fileUrl);
-    fs.unlink(filePath, () => {});
+    deleteUploadedFile(filePathFromUploadUrl(existing.fileUrl)).catch(() => {});
 
     emitOperationsUpdated(existing.departureId);
     res.json({ success: true, data: { id } });

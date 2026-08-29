@@ -232,12 +232,12 @@ export async function runMetaSync(): Promise<void> {
       }
 
       // 6. Build/refresh ad→campaign map after all upserts
-      clearOrgEntries(orgId);
+      await clearOrgEntries(orgId);
 
       for (const ad of metaAds) {
         const crmCampaignId = crmById.get(ad.campaign_id);
         if (crmCampaignId) {
-          setAdEntry(ad.id, {
+          await setAdEntry(ad.id, {
             campaignId: crmCampaignId,
             adsetId: ad.adset_id ?? '',
             metaCampaignId: ad.campaign_id,

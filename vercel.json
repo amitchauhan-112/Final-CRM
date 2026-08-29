@@ -1,8 +1,9 @@
 {
-  "buildCommand": "npm --prefix frontend install && npm --prefix frontend run build",
+  "buildCommand": "npm install && npm --prefix backend install && npm --prefix backend run db:generate && npm --prefix frontend install && npm --prefix frontend run build",
   "installCommand": "echo 'Install handled by buildCommand'",
   "outputDirectory": "frontend/dist",
   "rewrites": [
+    { "source": "/api/:path*", "destination": "/api" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }

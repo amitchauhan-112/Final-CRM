@@ -1,31 +1,7 @@
 import { Response } from 'express';
-import fs from 'fs/promises';
 import prisma from '../lib/prisma.js';
 import { AuthenticatedRequest } from '../types/index.js';
-import { UPLOAD_DIR_PATH } from '../middleware/upload.js';
-
-// Uploads now live under per-category subfolders (vendor-documents,
-// payment-proofs, ...) rather than one flat folder, so this walks one level
-// of subfolders deep rather than just reading UPLOAD_DIR_PATH directly.
-async function getUploadsDirSize(): Promise<number> {
-  async function dirSize(dir: string): Promise<number> {
-    let total = 0;
-    const entries = await fs.readdir(dir, { withFileTypes: true });
-    for (const entry of entries) {
-      try {
-        const full = `${dir}/${entry.name}`;
-        if (entry.isDirectory()) total += await dirSize(full);
-        else if (entry.isFile()) total += (await fs.stat(full)).size;
-      } catch { /* file may have been removed mid-scan — skip */ }
-    }
-    return total;
-  }
-  try {
-    return await dirSize(UPLOAD_DIR_PATH);
-  } catch {
-    return 0;
-  }
-}
+import { getStorageUsageBytes } from '../middleware/upload.js';
 
 // ─── GET /system/health ───────────────────────────────────────────────────────
 // Job history (ScheduledJobRun, tracked since the Business Rules phase),
@@ -49,7 +25,7 @@ export const getSystemHealth = async (_req: AuthenticatedRequest, res: Response)
       prisma.scheduledJobRun.findMany({ where: { createdAt: { gte: since24h } }, select: { jobName: true, status: true, startedAt: true } }),
       prisma.notification.count({ where: { isRead: false } }),
       prisma.errorLog.findMany({ orderBy: { createdAt: 'desc' }, take: 20 }),
-      getUploadsDirSize(),
+      getStorageUsageBytes().catch(() => 0),
     ]);
 
     const jobSummary: Record<string, { success: number; failed: number; running: number; lastRun: Date | null }> = {};

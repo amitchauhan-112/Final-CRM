@@ -12,6 +12,8 @@ export function useBookingByLead(leadId: string | null) {
     },
     enabled: !!leadId,
     retry: false,
+    // Replaces the old 'finance_updated' Socket.IO event.
+    refetchInterval: 20000,
   });
 }
 

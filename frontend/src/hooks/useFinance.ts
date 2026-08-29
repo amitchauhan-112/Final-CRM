@@ -13,6 +13,8 @@ export function useFinanceDashboard() {
     queryKey: ['finance', 'dashboard'],
     queryFn: async () => (await api.get('/finance/dashboard')).data,
     staleTime: 60 * 1000,
+    // Replaces the old 'finance_updated' Socket.IO event.
+    refetchInterval: 20000,
   });
 }
 
@@ -36,6 +38,8 @@ export function usePaymentsForVerification(filters: PaymentVerificationFilters =
       const { data } = await api.get(`/finance/payments?${params.toString()}`);
       return data;
     },
+    // Replaces the old 'finance_updated' Socket.IO event.
+    refetchInterval: 20000,
   });
 }
 

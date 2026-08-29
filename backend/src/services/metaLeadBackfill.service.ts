@@ -164,3 +164,24 @@ export async function backfillLeadsForOrg(orgId: string): Promise<BackfillResult
   logger.info(`[metaLeadBackfill] org=${orgId} done: ${JSON.stringify(result)}`);
   return result;
 }
+
+// ── Scheduled run — permanent fix for the sync gap ──────────────────────────
+// A real-time Meta leadgen webhook would need the backend on HTTPS, which
+// it isn't yet. Until then, this closes the gap by pulling any lead
+// submitted since the last run on a fixed schedule (see index.ts), instead
+// of relying on someone remembering to trigger the one-off backfill above.
+// Once HTTPS is in place, this can be replaced by (or kept alongside, as a
+// safety net for) a real webhook subscription.
+export async function runScheduledLeadBackfill(): Promise<void> {
+  const connections = await (prisma as any).metaConnection.findMany({ where: { isActive: true } });
+  if (connections.length === 0) return;
+
+  for (const conn of connections) {
+    try {
+      await backfillLeadsForOrg(conn.organizationId);
+    } catch (err: any) {
+      const msg = (err?.response?.data?.error?.message || err?.message || 'Unknown error').slice(0, 500);
+      logger.error(`[metaLeadBackfill] scheduled run failed for org ${conn.organizationId}: ${msg}`);
+    }
+  }
+}
