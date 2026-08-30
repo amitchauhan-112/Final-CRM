@@ -61,7 +61,7 @@ export interface BackfillResult {
   errors: string[];
 }
 
-export async function backfillLeadsForOrg(orgId: string): Promise<BackfillResult> {
+export async function backfillLeadsForOrg(orgId: string, since?: Date): Promise<BackfillResult> {
   const conn = await (prisma as any).metaConnection.findUnique({ where: { organizationId: orgId } });
   if (!conn) throw new Error('No Meta connection configured for this organization');
   if (!conn.pageId) {
@@ -93,12 +93,22 @@ export async function backfillLeadsForOrg(orgId: string): Promise<BackfillResult
   );
   result.formsScanned = forms.length;
 
+  // On scheduled runs, only ask Meta for leads created since the last run
+  // instead of re-scanning full form history every time - re-fetching
+  // everything on every run got slower as lead volume grew until it blew
+  // past Vercel's function time limit (the scheduled runs were timing out
+  // mid-execution, stuck showing "RUNNING" forever). The one-off "Import
+  // Historical Leads" button still omits `since` for a full scan.
+  const sinceFilter = since
+    ? { filtering: JSON.stringify([{ field: 'time_created', operator: 'GREATER_THAN', value: Math.floor(since.getTime() / 1000) }]) }
+    : {};
+
   for (const form of forms) {
     try {
       const metaLeads = await fetchAllPages<any>(
         `${META_BASE}/${form.id}/leads`,
         token,
-        { fields: 'id,created_time,ad_id,ad_name,campaign_id,campaign_name,adset_id,adset_name,field_data' },
+        { fields: 'id,created_time,ad_id,ad_name,campaign_id,campaign_name,adset_id,adset_name,field_data', ...sinceFilter },
       );
       result.leadsFound += metaLeads.length;
 
@@ -176,9 +186,15 @@ export async function runScheduledLeadBackfill(): Promise<void> {
   const connections = await (prisma as any).metaConnection.findMany({ where: { isActive: true } });
   if (connections.length === 0) return;
 
+  // 1-hour overlap buffer on top of the last run so a lead landing right at
+  // the boundary of two runs can never be missed - createLead's
+  // instagramLeadId duplicate check makes re-fetching that overlap harmless.
+  const OVERLAP_MS = 60 * 60 * 1000;
+
   for (const conn of connections) {
     try {
-      await backfillLeadsForOrg(conn.organizationId);
+      const since = conn.lastLeadBackfillAt ? new Date(conn.lastLeadBackfillAt.getTime() - OVERLAP_MS) : undefined;
+      await backfillLeadsForOrg(conn.organizationId, since);
     } catch (err: any) {
       const msg = (err?.response?.data?.error?.message || err?.message || 'Unknown error').slice(0, 500);
       logger.error(`[metaLeadBackfill] scheduled run failed for org ${conn.organizationId}: ${msg}`);

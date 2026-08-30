@@ -20,39 +20,39 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: |
-          curl -sf -X POST -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" https://final-crm-kappa.vercel.app/api/cron/reminders-followup
+          curl -sf --max-time 60 -X POST -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" https://final-crm-kappa.vercel.app/api/cron/reminders-followup
 
   reminders-operations:
     if: github.event.schedule == '*/30 * * * *' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - run: |
-          curl -sf -X POST -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" https://final-crm-kappa.vercel.app/api/cron/reminders-operations
+          curl -sf --max-time 60 -X POST -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" https://final-crm-kappa.vercel.app/api/cron/reminders-operations
 
   reminders-finance:
     if: github.event.schedule == '*/30 * * * *' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - run: |
-          curl -sf -X POST -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" https://final-crm-kappa.vercel.app/api/cron/reminders-finance
+          curl -sf --max-time 60 -X POST -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" https://final-crm-kappa.vercel.app/api/cron/reminders-finance
 
   meta-sync:
     if: github.event.schedule == '*/5 * * * *' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - run: |
-          curl -sf -X POST -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" https://final-crm-kappa.vercel.app/api/cron/meta-sync
+          curl -sf --max-time 60 -X POST -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" https://final-crm-kappa.vercel.app/api/cron/meta-sync
 
   automation-sweep:
     if: github.event.schedule == '*/5 * * * *' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - run: |
-          curl -sf -X POST -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" https://final-crm-kappa.vercel.app/api/cron/automation-sweep
+          curl -sf --max-time 60 -X POST -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" https://final-crm-kappa.vercel.app/api/cron/automation-sweep
 
   lead-backfill:
     if: github.event.schedule == '*/10 * * * *' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - run: |
-          curl -sf -X POST -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" https://final-crm-kappa.vercel.app/api/cron/lead-backfill
+          curl -sf --max-time 60 -X POST -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" https://final-crm-kappa.vercel.app/api/cron/lead-backfill
