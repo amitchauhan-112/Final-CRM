@@ -20,6 +20,20 @@ export interface LeadFilters {
   assignedToId?: string;
   dateFrom?: string;
   dateTo?: string;
+  preferredDate?: string;
+}
+
+export interface PreferredDateSummaryEntry {
+  preferredDate: string;
+  count: number;
+}
+
+export function usePreferredDateSummary() {
+  return useQuery<ApiResponse<PreferredDateSummaryEntry[]>>({
+    queryKey: ['leads', 'preferred-dates'],
+    queryFn: async () => (await api.get('/leads/preferred-dates')).data,
+    refetchInterval: 60000,
+  });
 }
 
 export function useLeads(filters: LeadFilters = {}) {

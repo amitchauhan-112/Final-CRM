@@ -53,6 +53,15 @@ export default function BookingConfirmModal({ open, onClose, lead, existingBooki
   const isEdit = !!existingBooking;
   const todayDate = new Date().toISOString().split('T')[0];
 
+  // Split room types — only offered when creating a booking (not editing one
+  // already confirmed, since per-traveler rows are managed by Operations
+  // from that point on via the Passenger Table).
+  const [splitEnabled, setSplitEnabled] = useState(false);
+  const [roomSplit, setRoomSplit] = useState<{ count: number; roomSharing: RoomSharing }[]>([
+    { count: 0, roomSharing: 'DOUBLE' },
+  ]);
+  const [splitError, setSplitError] = useState<string | null>(null);
+
   const { register, handleSubmit, control, setValue, formState: { errors } } = useForm<BookingForm>({
     defaultValues: {
       travelerName: existingBooking?.travelerName ?? lead.name,
@@ -82,6 +91,7 @@ export default function BookingConfirmModal({ open, onClose, lead, existingBooki
   const watchedPackageId = useWatch({ control, name: 'packageId' });
   const watchedDepartureDate = useWatch({ control, name: 'departureDate' });
   const watchedPaymentMode = useWatch({ control, name: 'paymentMode' });
+  const watchedNumberOfTravelers = useWatch({ control, name: 'numberOfTravelers' });
 
   const balanceAmount = Math.max(0, Number(finalPrice || 0) - Number(amountPaid || 0));
 
@@ -139,10 +149,23 @@ export default function BookingConfirmModal({ open, onClose, lead, existingBooki
       setValue('paymentMethod', 'UPI');
       setValue('paymentReference', '');
       setValue('handedOverTo', '');
+      setSplitEnabled(false);
+      setRoomSplit([{ count: 0, roomSharing: 'DOUBLE' }]);
+      setSplitError(null);
     }
   }, [open, existingBooking, lead]);
 
   const onSubmit = (data: BookingForm) => {
+    if (splitEnabled) {
+      const validRows = roomSplit.filter((r) => r.count > 0);
+      const sum = validRows.reduce((s, r) => s + r.count, 0);
+      if (validRows.length === 0 || sum !== Number(data.numberOfTravelers)) {
+        setSplitError(`Room split must add up to exactly ${data.numberOfTravelers} traveler${Number(data.numberOfTravelers) === 1 ? '' : 's'} (currently ${sum}).`);
+        return;
+      }
+      setSplitError(null);
+    }
+
     const payload = {
       leadId: lead.id,
       travelerName: data.travelerName,
@@ -150,6 +173,7 @@ export default function BookingConfirmModal({ open, onClose, lead, existingBooki
       aadharNumber: data.aadharNumber || undefined,
       foodPreference: data.foodPreference as FoodPreference,
       roomSharing: data.roomSharing as RoomSharing,
+      roomSplit: splitEnabled ? roomSplit.filter((r) => r.count > 0) : undefined,
       tourType: data.tourType as TourType,
       specialRequest: data.specialRequest || undefined,
       bookingNotes: data.bookingNotes || undefined,
@@ -373,23 +397,109 @@ export default function BookingConfirmModal({ open, onClose, lead, existingBooki
               {errors.aadharNumber && <p className="text-red-500 text-xs mt-1">{errors.aadharNumber.message}</p>}
             </div>
             <div>
-              <label className="label">Food Preference</label>
-              <select {...register('foodPreference')} className="input">
+              <label className="label">Food Preference *</label>
+              <select {...register('foodPreference', { required: 'Required' })} className="input">
+                <option value="">-- Select --</option>
                 <option value="NO_PREFERENCE">No Preference</option>
                 <option value="VEG">Vegetarian</option>
                 <option value="NON_VEG">Non-Vegetarian</option>
                 <option value="JAIN">Jain</option>
               </select>
+              {errors.foodPreference && <p className="text-red-500 text-xs mt-1">{errors.foodPreference.message}</p>}
             </div>
             <div>
-              <label className="label">Room Sharing</label>
-              <select {...register('roomSharing')} className="input">
+              <label className="label">Room Sharing *</label>
+              <select {...register('roomSharing', { required: 'Required' })} className="input">
+                <option value="">-- Select --</option>
                 <option value="SINGLE">Single Occupancy</option>
                 <option value="DOUBLE">Double Sharing</option>
                 <option value="TRIPLE">Triple Sharing</option>
                 <option value="QUAD">Quad Sharing</option>
               </select>
+              {errors.roomSharing && <p className="text-red-500 text-xs mt-1">{errors.roomSharing.message}</p>}
+              <p className="text-[10px] text-slate-400 mt-0.5">Used as the default for the whole group — split into different room types below if needed.</p>
             </div>
+
+            {/* Split into different room types — group bookings only, at creation time */}
+            {!isEdit && Number(watchedNumberOfTravelers) > 1 && (
+              <div className="sm:col-span-2 rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-2.5">
+                <label className="flex items-center gap-2 text-sm font-medium text-slate-700 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={splitEnabled}
+                    onChange={(e) => {
+                      setSplitEnabled(e.target.checked);
+                      setSplitError(null);
+                      if (e.target.checked) setRoomSplit([{ count: Number(watchedNumberOfTravelers), roomSharing: 'DOUBLE' }]);
+                    }}
+                    className="w-4 h-4 rounded border-slate-300"
+                  />
+                  Split this group into different room types
+                </label>
+
+                {splitEnabled && (
+                  <div className="space-y-2 pl-6">
+                    {roomSplit.map((row, idx) => (
+                      <div key={idx} className="flex items-center gap-2">
+                        <input
+                          type="number"
+                          min={1}
+                          value={row.count || ''}
+                          onChange={(e) => {
+                            const next = [...roomSplit];
+                            next[idx] = { ...row, count: Number(e.target.value) || 0 };
+                            setRoomSplit(next);
+                            setSplitError(null);
+                          }}
+                          placeholder="0"
+                          className="input w-20 text-sm"
+                        />
+                        <span className="text-xs text-slate-400 flex-shrink-0">travelers →</span>
+                        <select
+                          value={row.roomSharing}
+                          onChange={(e) => {
+                            const next = [...roomSplit];
+                            next[idx] = { ...row, roomSharing: e.target.value as RoomSharing };
+                            setRoomSplit(next);
+                          }}
+                          className="input text-sm flex-1"
+                        >
+                          <option value="SINGLE">Single Occupancy</option>
+                          <option value="DOUBLE">Double Sharing</option>
+                          <option value="TRIPLE">Triple Sharing</option>
+                          <option value="QUAD">Quad Sharing</option>
+                        </select>
+                        {roomSplit.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => setRoomSplit(roomSplit.filter((_, i) => i !== idx))}
+                            className="text-slate-400 hover:text-red-500 text-xs flex-shrink-0 px-1"
+                          >
+                            ✕
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                    <div className="flex items-center justify-between pt-1">
+                      <button
+                        type="button"
+                        onClick={() => setRoomSplit([...roomSplit, { count: 0, roomSharing: 'DOUBLE' }])}
+                        className="text-xs font-medium text-primary-600 hover:text-primary-700"
+                      >
+                        + Add another room type
+                      </button>
+                      <span className={cn(
+                        'text-xs font-medium',
+                        roomSplit.reduce((s, r) => s + r.count, 0) === Number(watchedNumberOfTravelers) ? 'text-emerald-600' : 'text-amber-600'
+                      )}>
+                        Total: {roomSplit.reduce((s, r) => s + r.count, 0)} / {watchedNumberOfTravelers} travelers
+                      </span>
+                    </div>
+                    {splitError && <p className="text-red-500 text-xs">{splitError}</p>}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
 

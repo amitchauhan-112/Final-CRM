@@ -33,25 +33,39 @@ function ageFromDob(dob: Date): number {
 export async function createPlaceholderTravelers(
   bookingId: string,
   numberOfTravelers: number,
-  primaryContact?: { name?: string | null; mobile?: string | null; email?: string | null }
+  primaryContact?: { name?: string | null; mobile?: string | null; email?: string | null },
+  // Group booking split into room-type sub-groups (e.g. 2 Double + 3 Triple)
+  // — assigned by position as travelers are created, below.
+  roomSplit?: Array<{ count: number; roomSharing: string }>
 ): Promise<void> {
   const existingCount = await prisma.traveler.count({ where: { bookingId } });
   if (existingCount >= numberOfTravelers) return;
 
   const toCreate = numberOfTravelers - existingCount;
-  await prisma.traveler.createMany({
-    data: Array.from({ length: toCreate }, (_, i) => {
-      const index = existingCount + i;
-      const isPrimary = index === 0 && !!primaryContact;
-      return {
+
+  // Flatten the split groups into a per-index lookup. Created one at a time
+  // (not createMany) specifically so each traveler's roomSharing is set
+  // correctly at creation — createMany doesn't return the inserted rows, so
+  // there'd be no reliable way to know which row is "traveler N" afterward.
+  const roomByIndex: (string | undefined)[] = [];
+  if (roomSplit && roomSplit.length > 0) {
+    for (const group of roomSplit) for (let i = 0; i < group.count; i++) roomByIndex.push(group.roomSharing);
+  }
+
+  for (let i = 0; i < toCreate; i++) {
+    const index = existingCount + i;
+    const isPrimary = index === 0 && !!primaryContact;
+    await prisma.traveler.create({
+      data: {
         bookingId,
         name: isPrimary && primaryContact?.name?.trim() ? primaryContact.name.trim() : `Traveler ${index + 1}`,
         mobile: isPrimary ? primaryContact?.mobile?.trim() || null : null,
         email: isPrimary ? primaryContact?.email?.trim() || null : null,
+        roomSharing: roomByIndex[index] ?? null,
         verificationStatus: 'PENDING',
-      };
-    }),
-  });
+      },
+    });
+  }
 }
 
 // ─── Traveler Portal token ────────────────────────────────────────────────────
@@ -320,7 +334,7 @@ export const getDashboardStats = async (req: AuthenticatedRequest, res: Response
           bookings: { select: { travelers: { select: { verificationStatus: true } } } },
         },
       }),
-      prisma.booking.findMany({ where: { departure: activeUpcomingFilter, status: { not: 'CANCELLED' } }, select: { numberOfTravelers: true, roomSharing: true } }),
+      prisma.booking.findMany({ where: { departure: activeUpcomingFilter, status: { not: 'CANCELLED' } }, select: { numberOfTravelers: true, roomSharing: true, travelers: { select: { roomSharing: true } } } }),
       prisma.hotel.aggregate({ _sum: { numberOfRooms: true }, where: { status: 'CONFIRMED', departure: activeUpcomingFilter } }),
     ]);
 
@@ -1007,12 +1021,30 @@ export const regenerateTravelerPortalLink = async (req: AuthenticatedRequest, re
 
 const ROOM_CAP: Record<string, number> = { SINGLE: 1, DOUBLE: 2, TRIPLE: 3, QUAD: 4 };
 
-function calcRoomsForBookings(bookings: { numberOfTravelers: number; roomSharing: string }[]) {
+function calcRoomsForBookings(bookings: {
+  numberOfTravelers: number;
+  roomSharing: string;
+  travelers?: { roomSharing: string | null }[];
+}[]) {
   const rooms = { SINGLE: 0, DOUBLE: 0, TRIPLE: 0, QUAD: 0 };
   for (const b of bookings) {
-    const type = (b.roomSharing || 'DOUBLE') as keyof typeof rooms;
-    const cap = ROOM_CAP[type] ?? 2;
-    rooms[type] += Math.ceil(b.numberOfTravelers / cap);
+    if (b.travelers && b.travelers.length > 0) {
+      // Split-room booking (or any booking with per-traveler overrides) —
+      // tally travelers per room type, then round each type up to whole
+      // rooms, rather than treating the whole group as one room type.
+      const perType = { SINGLE: 0, DOUBLE: 0, TRIPLE: 0, QUAD: 0 };
+      for (const t of b.travelers) {
+        const type = (t.roomSharing || b.roomSharing || 'DOUBLE') as keyof typeof perType;
+        perType[(type in perType ? type : 'DOUBLE') as keyof typeof perType]++;
+      }
+      for (const type of Object.keys(perType) as (keyof typeof perType)[]) {
+        if (perType[type] > 0) rooms[type] += Math.ceil(perType[type] / (ROOM_CAP[type] ?? 2));
+      }
+    } else {
+      const type = (b.roomSharing || 'DOUBLE') as keyof typeof rooms;
+      const cap = ROOM_CAP[type] ?? 2;
+      rooms[type] += Math.ceil(b.numberOfTravelers / cap);
+    }
   }
   return { ...rooms, total: rooms.SINGLE + rooms.DOUBLE + rooms.TRIPLE + rooms.QUAD };
 }
@@ -1087,6 +1119,7 @@ async function buildStayDateMap(req: AuthenticatedRequest) {
         select: {
           id: true, bookingNumber: true, travelerName: true, numberOfTravelers: true,
           roomSharing: true, specialRequest: true, salesExecutiveId: true,
+          travelers: { select: { roomSharing: true } },
         },
       },
       package: {

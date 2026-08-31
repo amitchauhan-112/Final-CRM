@@ -11,6 +11,11 @@ function orgFilter(req: AuthenticatedRequest): Record<string, unknown> {
   return req.user?.organizationId ? { organizationId: req.user.organizationId } : {};
 }
 
+// Mirrors the frontend's `statusOrder` in LeadDetail.tsx — the single source
+// of truth for what "forward" means in the lead pipeline. LOST is handled as
+// a separate always-allowed exit, not part of this ordering.
+const LEAD_STATUS_ORDER: string[] = ['NEW', 'NOT_CONTACTED', 'CONTACTED', 'INTERESTED', 'FOLLOW_UP_SCHEDULED', 'CONFIRMED'];
+
 // ─── Read ─────────────────────────────────────────────────────────────────────
 
 export const getLeads = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
@@ -19,7 +24,7 @@ export const getLeads = async (req: AuthenticatedRequest, res: Response): Promis
       status, source, campaignId, assignedToId, priority, tagId,
       search, page = 1, limit = 20,
       sortBy = 'createdAt', sortOrder = 'desc',
-      dateFrom, dateTo,
+      dateFrom, dateTo, preferredDate,
     } = req.query;
 
     const skip = (Number(page) - 1) * Number(limit);
@@ -36,6 +41,9 @@ export const getLeads = async (req: AuthenticatedRequest, res: Response): Promis
     if (priority) where.priority = priority;
     if (tagId) where.tags = { some: { tagId } };
     if (assignedToId && req.user?.role === 'ADMIN') where.assignedToId = assignedToId;
+    // Exact match — preferredDate is already stored as a plain YYYY-MM-DD
+    // string (same shape the `<input type="date">` in LeadForm submits).
+    if (preferredDate) where.preferredDate = preferredDate;
     if (dateFrom || dateTo) {
       const createdAt: Record<string, Date> = {};
       if (dateFrom) createdAt.gte = new Date(`${dateFrom}T00:00:00.000Z`);
@@ -75,6 +83,37 @@ export const getLeads = async (req: AuthenticatedRequest, res: Response): Promis
     });
   } catch (e) {
     console.error('[leads] getLeads error:', e);
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+};
+
+// Groups active leads by their preferred/interested departure date, upcoming
+// dates only — lets Sales/Admin spot a cluster (e.g. "15 people want Sept 3")
+// and filter straight to it, instead of scrolling the whole list looking for
+// matching dates. Same role/org scoping as getLeads.
+export const getPreferredDateSummary = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const where: Record<string, unknown> = {
+      ...orgFilter(req),
+      deletedAt: null,
+      preferredDate: { not: null, gte: todayStr },
+    };
+    if (req.user?.role === 'EMPLOYEE') where.assignedToId = req.user.id;
+
+    const grouped = await prisma.lead.groupBy({
+      by: ['preferredDate'],
+      where,
+      _count: true,
+      orderBy: { preferredDate: 'asc' },
+    });
+
+    res.json({
+      success: true,
+      data: grouped.map((g) => ({ preferredDate: g.preferredDate, count: g._count })),
+    });
+  } catch (e) {
+    console.error('[leads] getPreferredDateSummary error:', e);
     res.status(500).json({ success: false, error: 'Internal server error' });
   }
 };
@@ -233,9 +272,13 @@ export const updateLead = async (req: AuthenticatedRequest, res: Response): Prom
     const updateData: Record<string, unknown> = { ...rest };
 
     if (status !== undefined) {
-      // Once CONFIRMED, a lead can only move to LOST — never backward
-      if (existing.status === 'CONFIRMED' && status !== 'CONFIRMED' && status !== 'LOST') {
-        res.status(400).json({ success: false, error: 'A confirmed booking cannot be reverted to a previous status' });
+      // Forward-only pipeline, enforced for every role (including ADMIN) and
+      // any direct API caller — LOST is always reachable as an exit, but no
+      // status may ever move backward through the pipeline once advanced.
+      const fromIdx = LEAD_STATUS_ORDER.indexOf(existing.status);
+      const toIdx = LEAD_STATUS_ORDER.indexOf(status as string);
+      if (status !== existing.status && status !== 'LOST' && fromIdx !== -1 && toIdx !== -1 && toIdx < fromIdx) {
+        res.status(400).json({ success: false, error: `A lead cannot move backward from ${existing.status} to ${status}` });
         return;
       }
       updateData.status = status;
@@ -292,7 +335,20 @@ export const updateLead = async (req: AuthenticatedRequest, res: Response): Prom
     });
 
     const changes: string[] = [];
-    if (status && status !== existing.status) changes.push(`Status: ${existing.status} → ${status}`);
+    if (status && status !== existing.status) {
+      changes.push(`Status: ${existing.status} → ${status}`);
+      // Auto-posted into the same merged Notes/Comments feed everyone already
+      // reads — so a status change made today is visible with its own date,
+      // right alongside any manual notes, without anyone needing to type the
+      // date themselves or go dig through the separate Activity tab.
+      await prisma.leadComment.create({
+        data: {
+          leadId: id,
+          authorId: req.user!.id,
+          content: `🔄 Status changed: ${existing.status.replace(/_/g, ' ')} → ${status.replace(/_/g, ' ')}`,
+        },
+      });
+    }
     if (priority && priority !== existing.priority) changes.push(`Priority: ${existing.priority} → ${priority}`);
     if (assignedToId && assignedToId !== existing.assignedToId) {
       changes.push('Reassigned');

@@ -29,6 +29,7 @@ import {
   formatDate, formatDateTime, formatRelativeTime, formatCurrency, isOverdue, cn, leadStatusConfig, buildWhatsAppLink,
 } from '../../utils/helpers';
 import { useAuthStore } from '../../store/authStore';
+import toast from 'react-hot-toast';
 
 interface LeadDetailProps {
   leadId: string | null;
@@ -38,7 +39,7 @@ interface LeadDetailProps {
   onToggleStar?: () => void;
 }
 
-type WorkspaceTab = 'overview' | 'notes' | 'activity' | 'comments' | 'payments' | 'tasks' | 'whatsapp';
+type WorkspaceTab = 'overview' | 'activity' | 'comments' | 'payments' | 'tasks' | 'whatsapp';
 
 const statusOrder: LeadStatus[] = ['NEW', 'NOT_CONTACTED', 'CONTACTED', 'INTERESTED', 'FOLLOW_UP_SCHEDULED', 'CONFIRMED', 'LOST'];
 
@@ -110,13 +111,12 @@ function StatusBar({ current, pending, onUpdate, disabled, isEmployee }: {
         const isPending = pending === s && !isCurrent;
         // Once confirmed: only CONFIRMED (current) and LOST are valid
         const isLocked = current === 'CONFIRMED' && s !== 'CONFIRMED' && s !== 'LOST';
-        // Employees cannot set CONFIRMED directly (booking flow handles it) or go backward
-        const isHiddenForEmployee = isEmployee && (
-          s === 'CONFIRMED' && !isCurrent ||   // hide CONFIRMED button (use booking flow)
-          (current === 'CONFIRMED' && isLocked)  // hide backward options on confirmed leads
-        );
-        // For employees: backward statuses are also locked (forward-only workflow)
-        const isBackward = isEmployee && idx < currentIdx && s !== 'LOST';
+        // Employees cannot set CONFIRMED directly (booking flow handles it)
+        const isHiddenForEmployee = isEmployee && s === 'CONFIRMED' && !isCurrent;
+        // Forward-only workflow, enforced for everyone (server-enforced too —
+        // see updateLead in lead.controller.ts): backward moves are always
+        // locked, only LOST is ever reachable as an exit.
+        const isBackward = idx < currentIdx && s !== 'LOST';
 
         if (isHiddenForEmployee) return null;
 
@@ -142,83 +142,6 @@ function StatusBar({ current, pending, onUpdate, disabled, isEmployee }: {
           </button>
         );
       })}
-    </div>
-  );
-}
-
-// ─── Notes Section ────────────────────────────────────────────────────────────
-
-function NotesSection({ lead }: { lead: Lead }) {
-  const updateLead = useUpdateLead();
-  const draftKey = `note_draft_${lead.id}`;
-  const [draft, setDraft] = useState(() => localStorage.getItem(draftKey) ?? lead.notes ?? '');
-  const [hasUnsaved, setHasUnsaved] = useState(false);
-  const [lastSaved, setLastSaved] = useState<Date | null>(null);
-  const autoSaveRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    const saved = lead.notes ?? '';
-    const stored = localStorage.getItem(draftKey) ?? '';
-    if (stored && stored !== saved) { setDraft(stored); setHasUnsaved(true); }
-    else { setDraft(saved); setHasUnsaved(false); }
-  }, [lead.id, lead.notes]);
-
-  const handleChange = (val: string) => {
-    setDraft(val);
-    setHasUnsaved(val !== (lead.notes ?? ''));
-    localStorage.setItem(draftKey, val);
-    if (autoSaveRef.current) clearTimeout(autoSaveRef.current);
-    autoSaveRef.current = setTimeout(() => {
-      if (val !== lead.notes) {
-        updateLead.mutate({ id: lead.id, notes: val }, {
-          onSuccess: () => { localStorage.removeItem(draftKey); setHasUnsaved(false); setLastSaved(new Date()); },
-        });
-      }
-    }, 3000);
-  };
-
-  const handleSave = () => {
-    if (autoSaveRef.current) clearTimeout(autoSaveRef.current);
-    updateLead.mutate({ id: lead.id, notes: draft }, {
-      onSuccess: () => { localStorage.removeItem(draftKey); setHasUnsaved(false); setLastSaved(new Date()); },
-    });
-  };
-
-  return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <FileText className="w-4 h-4 text-slate-400" />
-          <p className="text-sm font-semibold text-slate-700">Internal Notes</p>
-        </div>
-        <div className="flex items-center gap-2">
-          {updateLead.isPending && <span className="text-xs text-slate-400">Saving…</span>}
-          {hasUnsaved && !updateLead.isPending && (
-            <span className="text-xs text-amber-600 font-medium animate-pulse">Unsaved</span>
-          )}
-          {lastSaved && !hasUnsaved && !updateLead.isPending && (
-            <span className="text-xs text-emerald-600">Saved {formatRelativeTime(lastSaved)}</span>
-          )}
-          {hasUnsaved && (
-            <button
-              onClick={handleSave}
-              disabled={updateLead.isPending}
-              className="btn-primary py-1 px-2.5 text-xs gap-1.5"
-            >
-              <Save className="w-3 h-3" />
-              Save
-            </button>
-          )}
-        </div>
-      </div>
-      <textarea
-        value={draft}
-        onChange={(e) => handleChange(e.target.value)}
-        rows={10}
-        className="input resize-none text-sm leading-relaxed"
-        placeholder="Add internal notes about this lead… (auto-saves after 3 seconds)"
-      />
-      <p className="text-xs text-slate-400">Notes are visible only to your team.</p>
     </div>
   );
 }
@@ -977,6 +900,17 @@ export default function LeadDetail({ leadId, open, onClose, isStarred, onToggleS
     updateLead.mutate({ id: lead.id, status: pendingStatus }, { onSuccess: () => setPendingStatus(null) });
   };
 
+  // Closing (X button, Escape key, or backdrop click) is blocked while a
+  // status change is picked but not yet saved — the employee must explicitly
+  // Save or Discard first, so a status change is never lost silently.
+  const handleCloseAttempt = () => {
+    if (pendingStatus) {
+      toast.error('Save or discard your status change before closing.');
+      return;
+    }
+    onClose();
+  };
+
   const handleConfirmFollowUp = (followUpDate: string, followUpNotes?: string) => {
     if (!lead) return;
     updateLead.mutate(
@@ -1013,9 +947,8 @@ export default function LeadDetail({ leadId, open, onClose, isStarred, onToggleS
   const hasBooking = !!booking;
   const TABS: { key: WorkspaceTab; label: string; icon: React.ElementType }[] = [
     { key: 'overview', label: 'Overview', icon: User },
-    { key: 'notes', label: 'Notes', icon: FileText },
     { key: 'activity', label: 'Activity', icon: Activity },
-    { key: 'comments', label: 'Comments', icon: MessageSquare },
+    { key: 'comments', label: 'Notes', icon: MessageSquare },
     ...(whatsappConversation ? [{ key: 'whatsapp' as WorkspaceTab, label: 'WhatsApp', icon: MessageCircle }] : []),
     ...(hasBooking ? [{ key: 'tasks' as WorkspaceTab, label: 'Tasks', icon: CheckSquare }] : []),
     ...(hasBooking ? [{ key: 'payments' as WorkspaceTab, label: 'Payments', icon: CreditCard }] : []),
@@ -1023,7 +956,7 @@ export default function LeadDetail({ leadId, open, onClose, isStarred, onToggleS
 
   return (
     <>
-      <Modal open={open} onClose={onClose} size="3xl" noPadding>
+      <Modal open={open} onClose={handleCloseAttempt} size="3xl" noPadding>
         {isLoading || !lead ? (
           <WorkspaceSkeleton />
         ) : (
@@ -1117,7 +1050,7 @@ export default function LeadDetail({ leadId, open, onClose, isStarred, onToggleS
                     </>
                   )}
                   <button
-                    onClick={onClose}
+                    onClick={handleCloseAttempt}
                     className="btn-ghost p-2 text-slate-400 hover:text-slate-600"
                   >
                     <X className="w-4 h-4" />
@@ -1185,13 +1118,6 @@ export default function LeadDetail({ leadId, open, onClose, isStarred, onToggleS
                   lead={lead} canAct={canAct} onUpdateLead={(data) => updateLead.mutate(data)}
                   booking={booking} onEditBooking={() => setBookingOpen(true)}
                 />
-              )}
-              {activeTab === 'notes' && (
-                canAct
-                  ? <NotesSection lead={lead} />
-                  : lead.notes
-                    ? <p className="text-sm text-slate-600 bg-yellow-50 rounded-xl p-4 border border-yellow-100 whitespace-pre-wrap leading-relaxed">{lead.notes}</p>
-                    : <div className="empty-state"><FileText className="empty-state-icon" /><p className="empty-state-title">No notes</p></div>
               )}
               {activeTab === 'activity' && (
                 <ActivityTimeline logs={lead.activityLogs ?? []} />

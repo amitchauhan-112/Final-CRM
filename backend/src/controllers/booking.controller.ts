@@ -9,6 +9,9 @@ import { fireEvent } from '../services/automationEngine.service.js';
 
 const orgId = (req: AuthenticatedRequest) => req.user?.organizationId ?? null;
 
+const FOOD_PREFERENCES = ['NO_PREFERENCE', 'VEG', 'NON_VEG', 'JAIN'];
+const ROOM_SHARINGS = ['SINGLE', 'DOUBLE', 'TRIPLE', 'QUAD'];
+
 // ─── Get booking by lead ──────────────────────────────────────────────────────
 
 export const getBookingByLead = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
@@ -63,7 +66,7 @@ export const createBooking = async (req: AuthenticatedRequest, res: Response): P
   try {
     const {
       leadId, travelerName, numberOfTravelers, aadharNumber,
-      foodPreference, roomSharing, departureLocation, departurePackage,
+      foodPreference, roomSharing, roomSplit, departureLocation, departurePackage,
       tourType, specialRequest, finalPrice, amountPaid, balanceDueDate,
       packageId, departureDate, returnDate, bookingNotes,
       paymentMode, paymentMethod, paymentReference, handedOverTo,
@@ -73,6 +76,23 @@ export const createBooking = async (req: AuthenticatedRequest, res: Response): P
     if (!travelerName?.trim()) { res.status(400).json({ success: false, error: 'Traveler name is required' }); return; }
     if (!numberOfTravelers || isNaN(Number(numberOfTravelers))) { res.status(400).json({ success: false, error: 'Number of travelers is required' }); return; }
     if (finalPrice === undefined || isNaN(Number(finalPrice))) { res.status(400).json({ success: false, error: 'Final price is required' }); return; }
+    if (!foodPreference || !FOOD_PREFERENCES.includes(foodPreference)) {
+      res.status(400).json({ success: false, error: 'A valid food preference is required' }); return;
+    }
+    if (!roomSharing || !ROOM_SHARINGS.includes(roomSharing)) {
+      res.status(400).json({ success: false, error: 'A valid room sharing type is required' }); return;
+    }
+    if (roomSplit !== undefined) {
+      if (!Array.isArray(roomSplit) || roomSplit.length === 0) {
+        res.status(400).json({ success: false, error: 'roomSplit must be a non-empty array' }); return;
+      }
+      const invalidRow = roomSplit.find((r: any) => !ROOM_SHARINGS.includes(r?.roomSharing) || !Number.isInteger(r?.count) || r.count < 1);
+      if (invalidRow) { res.status(400).json({ success: false, error: 'Each room split entry needs a valid count and room type' }); return; }
+      const sum = roomSplit.reduce((s: number, r: any) => s + r.count, 0);
+      if (sum !== Number(numberOfTravelers)) {
+        res.status(400).json({ success: false, error: `Room split must add up to ${numberOfTravelers} travelers (got ${sum})` }); return;
+      }
+    }
     if (aadharNumber && !/^\d{12}$/.test(String(aadharNumber).replace(/\s/g, ''))) {
       res.status(400).json({ success: false, error: 'Aadhar number must be 12 digits' }); return;
     }
@@ -242,9 +262,11 @@ export const createBooking = async (req: AuthenticatedRequest, res: Response): P
     // that's who almost always ends up being the first traveler — and issue a
     // Traveler Portal link (only if this booking doesn't already have one) so
     // the customer can submit the rest of their own details.
-    await createPlaceholderTravelers(booking.id, Number(numberOfTravelers), {
-      name: travelerName, mobile: lead?.phone, email: lead?.email,
-    }).catch(console.error);
+    await createPlaceholderTravelers(
+      booking.id, Number(numberOfTravelers),
+      { name: travelerName, mobile: lead?.phone, email: lead?.email },
+      Array.isArray(roomSplit) && roomSplit.length > 0 ? roomSplit : undefined,
+    ).catch(console.error);
     await generatePaymentSchedule(booking.id, price, depDate).catch(console.error);
     let travelerPortalToken: string | null = null;
     if (!booking.travelerPortalTokenHash) {
@@ -297,6 +319,12 @@ export const updateBooking = async (req: AuthenticatedRequest, res: Response): P
 
     if (aadharNumber && !/^\d{12}$/.test(String(aadharNumber).replace(/\s/g, ''))) {
       res.status(400).json({ success: false, error: 'Aadhar number must be 12 digits' }); return;
+    }
+    if (foodPreference !== undefined && !FOOD_PREFERENCES.includes(foodPreference)) {
+      res.status(400).json({ success: false, error: 'A valid food preference is required' }); return;
+    }
+    if (roomSharing !== undefined && !ROOM_SHARINGS.includes(roomSharing)) {
+      res.status(400).json({ success: false, error: 'A valid room sharing type is required' }); return;
     }
     const effectiveDepartureDate = departureDate !== undefined ? departureDate : existing.departureDate;
     const effectiveReturnDate = returnDate !== undefined ? returnDate : existing.returnDate;

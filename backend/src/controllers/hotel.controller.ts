@@ -20,9 +20,20 @@ const ROOM_CAP: Record<string, number> = { SINGLE: 1, DOUBLE: 2, TRIPLE: 3, QUAD
 async function roomsRequiredForDeparture(departureId: string): Promise<number> {
   const bookings = await prisma.booking.findMany({
     where: { departureId, status: { not: 'CANCELLED' } },
-    select: { numberOfTravelers: true, roomSharing: true },
+    select: { numberOfTravelers: true, roomSharing: true, travelers: { select: { roomSharing: true } } },
   });
   return bookings.reduce((sum, b) => {
+    // Split-room booking — count each traveler's own room type (falling back
+    // to the booking's default), rounding each type up to whole rooms,
+    // instead of treating the whole group as one uniform room type.
+    if (b.travelers.length > 0) {
+      const perType: Record<string, number> = {};
+      for (const t of b.travelers) {
+        const type = t.roomSharing || b.roomSharing || 'DOUBLE';
+        perType[type] = (perType[type] ?? 0) + 1;
+      }
+      return sum + Object.entries(perType).reduce((s, [type, count]) => s + Math.ceil(count / (ROOM_CAP[type] ?? 2)), 0);
+    }
     const cap = ROOM_CAP[b.roomSharing] ?? 2;
     return sum + Math.ceil(b.numberOfTravelers / cap);
   }, 0);

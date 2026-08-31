@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Plus, Search, Trash2, Eye, Edit, RefreshCw, LayoutGrid, List } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
-import { useLeads, useCreateLead, useUpdateLead, useDeleteLead } from '../../hooks/useLeads';
+import { useLeads, useCreateLead, useUpdateLead, useDeleteLead, usePreferredDateSummary } from '../../hooks/useLeads';
 import { useCampaigns } from '../../hooks/useCampaigns';
 import { useUsers } from '../../hooks/useUsers';
 import { Lead, LeadStatus } from '../../types/index';
@@ -46,6 +46,7 @@ export default function AdminLeadsPage() {
   const [source, setSource] = useState('');
   const [priority, setPriority] = useState('');
   const [tagId, setTagId] = useState('');
+  const [preferredDate, setPreferredDate] = useState('');
   const [viewMode, setViewMode] = useState<'list' | 'kanban'>('list');
 
   useEffect(() => {
@@ -69,13 +70,14 @@ export default function AdminLeadsPage() {
   const [bulkSelected, setBulkSelected] = useState<string[]>([]);
   const [bulkStatus, setBulkStatus] = useState<LeadStatus>('CONTACTED');
 
-  const filters = { page, limit: 20, search: search || undefined, status: status || undefined, source: source || undefined, campaignId: campaignId || undefined, assignedToId: assignedToId || undefined, priority: priority || undefined, tagId: tagId || undefined };
-  const kanbanFilters = { page: 1, limit: 300, search: search || undefined, source: source || undefined, campaignId: campaignId || undefined, assignedToId: assignedToId || undefined, priority: priority || undefined, tagId: tagId || undefined };
+  const filters = { page, limit: 20, search: search || undefined, status: status || undefined, source: source || undefined, campaignId: campaignId || undefined, assignedToId: assignedToId || undefined, priority: priority || undefined, tagId: tagId || undefined, preferredDate: preferredDate || undefined };
+  const kanbanFilters = { page: 1, limit: 300, search: search || undefined, source: source || undefined, campaignId: campaignId || undefined, assignedToId: assignedToId || undefined, priority: priority || undefined, tagId: tagId || undefined, preferredDate: preferredDate || undefined };
 
   const { data, isLoading, refetch } = useLeads(viewMode === 'list' ? filters : kanbanFilters);
   const { data: campaignsData } = useCampaigns({ limit: 100 });
   const { data: usersData } = useUsers({ role: 'EMPLOYEE', limit: 100 });
   const { data: allTags = [] } = useTags();
+  const { data: preferredDateSummary } = usePreferredDateSummary();
   const createLead = useCreateLead();
   const updateLead = useUpdateLead();
   const deleteLead = useDeleteLead();
@@ -297,6 +299,28 @@ export default function AdminLeadsPage() {
         </div>
       </div>
 
+      {/* Upcoming interest — surfaces date clusters (e.g. "15 people want Sept 3")
+          so a targeted offer can be sent to just that batch instead of everyone. */}
+      {(preferredDateSummary?.data?.length ?? 0) > 0 && (
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Upcoming interest:</span>
+          {preferredDateSummary!.data.map((entry) => (
+            <button
+              key={entry.preferredDate}
+              onClick={() => { setPreferredDate(preferredDate === entry.preferredDate ? '' : entry.preferredDate); setPage(1); }}
+              className={cn(
+                'px-2.5 py-1 rounded-full text-xs font-medium border transition-colors',
+                preferredDate === entry.preferredDate
+                  ? 'bg-primary-600 text-white border-primary-600'
+                  : 'bg-white border-slate-200 text-slate-600 hover:border-primary-300 hover:text-primary-700'
+              )}
+            >
+              {formatDate(entry.preferredDate)} · {entry.count} lead{entry.count === 1 ? '' : 's'}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Filters */}
       <div className="card p-4">
         <div className="flex flex-wrap gap-3">
@@ -359,6 +383,13 @@ export default function AdminLeadsPage() {
               {allTags.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
             </select>
           )}
+          <input
+            type="date"
+            value={preferredDate}
+            onChange={(e) => { setPreferredDate(e.target.value); setPage(1); }}
+            title="Filter by interested/preferred departure date"
+            className="input py-1.5 text-sm w-auto"
+          />
         </div>
 
         {/* Bulk actions */}

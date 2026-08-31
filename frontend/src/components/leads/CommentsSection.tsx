@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { MessageSquare, Send, Edit2, Trash2, Reply, ChevronDown, ChevronUp } from 'lucide-react';
 import { useLeadComments, useCreateComment, useUpdateComment, useDeleteComment } from '../../hooks/useComments';
 import { useAuthStore } from '../../store/authStore';
@@ -162,13 +162,27 @@ export default function CommentsSection({ leadId }: Props) {
   const { user } = useAuthStore();
   const { data: comments = [], isLoading } = useLeadComments(leadId);
   const createComment = useCreateComment(leadId);
-  const [text, setText] = useState('');
+  const draftKey = `comment_draft_${leadId}`;
+  const [text, setText] = useState(() => localStorage.getItem(draftKey) ?? '');
+
+  // Carried over from the old Notes autosave — recovers an in-progress
+  // comment if the tab/lead is closed or the browser crashes mid-draft.
+  useEffect(() => {
+    setText(localStorage.getItem(draftKey) ?? '');
+  }, [leadId]);
+
+  const handleChange = (val: string) => {
+    setText(val);
+    if (val) localStorage.setItem(draftKey, val);
+    else localStorage.removeItem(draftKey);
+  };
 
   const handleSubmit = async () => {
     if (!text.trim()) return;
     try {
       await createComment.mutateAsync({ content: text.trim() });
       setText('');
+      localStorage.removeItem(draftKey);
     } catch { toast.error('Failed to post comment'); }
   };
 
@@ -180,9 +194,9 @@ export default function CommentsSection({ leadId }: Props) {
         <div className="flex-1 space-y-2">
           <textarea
             value={text}
-            onChange={(e) => setText(e.target.value)}
+            onChange={(e) => handleChange(e.target.value)}
             rows={2}
-            placeholder="Add an internal comment... (visible only to staff)"
+            placeholder="Add an internal note... (visible only to staff)"
             className="input text-sm resize-none w-full"
             onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleSubmit(); }}
           />
@@ -216,7 +230,7 @@ export default function CommentsSection({ leadId }: Props) {
       ) : comments.length === 0 ? (
         <div className="text-center py-6">
           <MessageSquare className="w-8 h-8 text-slate-200 mx-auto mb-2" />
-          <p className="text-sm text-slate-400">No internal comments yet</p>
+          <p className="text-sm text-slate-400">No notes yet</p>
         </div>
       ) : (
         <div className="space-y-4">

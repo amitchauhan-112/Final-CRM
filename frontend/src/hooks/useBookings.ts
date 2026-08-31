@@ -32,6 +32,10 @@ type BookingPayload = {
   aadharNumber?: string;
   foodPreference: string;
   roomSharing: string;
+  // Group bookings only, at creation time — breaks the headcount into
+  // per-room-type sub-groups (e.g. 2 Double + 3 Triple) instead of one
+  // uniform room type for the whole party.
+  roomSplit?: { count: number; roomSharing: string }[];
   departureLocation?: string;
   departurePackage?: string;
   tourType: string;

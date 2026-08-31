@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getLeads, getLeadById, createLeadManual, updateLead, transferLead, deleteLead, getStats, getOverdueFollowUps, getRecentActivity, getDashboardStats, exportLeads, checkDuplicate } from '../controllers/lead.controller.js';
+import { getLeads, getLeadById, createLeadManual, updateLead, transferLead, deleteLead, getStats, getOverdueFollowUps, getRecentActivity, getDashboardStats, exportLeads, checkDuplicate, getPreferredDateSummary } from '../controllers/lead.controller.js';
 import { getLeadJourney } from '../controllers/journey.controller.js';
 import { authenticate, requireAdmin } from '../middleware/auth.js';
 
@@ -13,6 +13,7 @@ router.get('/dashboard-stats', requireAdmin, getDashboardStats);
 router.get('/export', requireAdmin, exportLeads);
 router.get('/overdue', getOverdueFollowUps);
 router.get('/activity', getRecentActivity);
+router.get('/preferred-dates', getPreferredDateSummary);
 router.get('/:id', getLeadById);
 router.get('/:id/journey', getLeadJourney);
 router.post('/', createLeadManual);

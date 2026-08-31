@@ -11,6 +11,7 @@
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate deploy",
     "db:seed": "tsx src/utils/seed.ts",
+    "migrate:notes-to-comments": "tsx src/utils/migrateNotesToComments.ts",
     "db:studio": "prisma studio"
   },
   "dependencies": {
