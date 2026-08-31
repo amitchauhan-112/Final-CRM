@@ -5,6 +5,7 @@ import {
   Eye, EyeOff, Send, Lock, Globe, Smartphone, Instagram,
   Tag, MapPin, AlertCircle, Plus, Trash2, Edit2, Building2,
   Check, Palette, Link2, RefreshCw, Unlink, Clock, AlertTriangle,
+  MessageCircle,
 } from 'lucide-react';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
@@ -16,6 +17,11 @@ import {
   useTriggerLeadBackfill,
   MetaConnectionInput,
 } from '../../hooks/useMetaConnection';
+import {
+  useWhatsAppAccounts, useSaveWhatsAppAccount, useDeactivateWhatsAppAccount,
+  WhatsAppAccountInput,
+} from '../../hooks/useWhatsAppAccounts';
+import { useUsers } from '../../hooks/useUsers';
 import { cn } from '../../utils/helpers';
 
 const TABS = [
@@ -740,6 +746,175 @@ function MetaIntegrationsSection() {
   );
 }
 
+// ─── WhatsApp Accounts (per-employee coexistence connections) ────────────────
+
+function WhatsAppAccountsSection() {
+  const { data: accounts = [], isLoading } = useWhatsAppAccounts();
+  const { data: usersData } = useUsers({ limit: 200, isActive: true });
+  const saveAccount = useSaveWhatsAppAccount();
+  const deactivateAccount = useDeactivateWhatsAppAccount();
+  const [formOpen, setFormOpen] = useState(false);
+  const [showToken, setShowToken] = useState(false);
+  const [confirmDeactivate, setConfirmDeactivate] = useState<string | null>(null);
+
+  const { register, handleSubmit, reset, formState: { errors } } = useForm<WhatsAppAccountInput>();
+
+  const employees = usersData?.data ?? [];
+  const connectedUserIds = new Set(accounts.filter((a) => a.isActive).map((a) => a.userId));
+  const availableEmployees = employees.filter((e) => !connectedUserIds.has(e.id));
+
+  const onSave = async (data: WhatsAppAccountInput) => {
+    try {
+      await saveAccount.mutateAsync(data);
+      toast.success('WhatsApp account connected');
+      reset();
+      setFormOpen(false);
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error || 'Failed to connect account');
+    }
+  };
+
+  const onDeactivate = async (userId: string) => {
+    try {
+      await deactivateAccount.mutateAsync(userId);
+      toast.success('WhatsApp account disconnected');
+      setConfirmDeactivate(null);
+    } catch {
+      toast.error('Failed to disconnect');
+    }
+  };
+
+  return (
+    <div className="card p-5 space-y-5">
+      <div className="flex items-center gap-3">
+        <div className="w-9 h-9 bg-green-50 rounded-xl flex items-center justify-center flex-shrink-0">
+          <MessageCircle className="w-5 h-5 text-green-600" />
+        </div>
+        <div className="flex-1">
+          <h4 className="font-semibold text-slate-800 text-sm">WhatsApp (Employee Numbers)</h4>
+          <p className="text-xs text-slate-400 mt-0.5">
+            Each employee keeps their own WhatsApp Business app on their own number — connect it here so you can monitor conversations and employees can chat from the CRM.
+          </p>
+        </div>
+        <button onClick={() => setFormOpen(!formOpen)} className="btn-secondary text-sm py-1.5 flex items-center gap-1.5 flex-shrink-0">
+          <Plus className="w-3.5 h-3.5" />
+          Connect Employee
+        </button>
+      </div>
+
+      {formOpen && (
+        <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
+          <form onSubmit={handleSubmit(onSave)} className="space-y-3 max-w-md">
+            <div>
+              <label className="label">Employee *</label>
+              <select {...register('userId', { required: 'Required' })} className="input">
+                <option value="">Select employee...</option>
+                {availableEmployees.map((e) => (
+                  <option key={e.id} value={e.id}>{e.name} ({e.email})</option>
+                ))}
+              </select>
+              {errors.userId && <p className="text-red-500 text-xs mt-1">{errors.userId.message}</p>}
+            </div>
+            <div>
+              <label className="label">Display Phone Number *</label>
+              <input {...register('displayPhoneNumber', { required: 'Required' })} className="input font-mono" placeholder="+91 98765 43210" />
+              {errors.displayPhoneNumber && <p className="text-red-500 text-xs mt-1">{errors.displayPhoneNumber.message}</p>}
+            </div>
+            <div>
+              <label className="label">Phone Number ID *</label>
+              <input {...register('phoneNumberId', { required: 'Required' })} className="input font-mono" placeholder="From Meta's WhatsApp dashboard" />
+              {errors.phoneNumberId && <p className="text-red-500 text-xs mt-1">{errors.phoneNumberId.message}</p>}
+            </div>
+            <div>
+              <label className="label">WhatsApp Business Account ID *</label>
+              <input {...register('wabaId', { required: 'Required' })} className="input font-mono" placeholder="WABA ID" />
+              {errors.wabaId && <p className="text-red-500 text-xs mt-1">{errors.wabaId.message}</p>}
+            </div>
+            <div>
+              <label className="label">Access Token *</label>
+              <div className="relative">
+                <input
+                  {...register('accessToken', { required: 'Required' })}
+                  type={showToken ? 'text' : 'password'}
+                  className="input pr-10 font-mono text-sm"
+                  placeholder="EAAxxxx..."
+                />
+                <button type="button" onClick={() => setShowToken(!showToken)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                  {showToken ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+              {errors.accessToken && <p className="text-red-500 text-xs mt-1">{errors.accessToken.message}</p>}
+            </div>
+            <div className="flex gap-2">
+              <button type="submit" disabled={saveAccount.isPending} className="btn-primary text-sm py-1.5">
+                {saveAccount.isPending ? 'Connecting...' : 'Connect'}
+              </button>
+              <button type="button" onClick={() => setFormOpen(false)} className="btn-secondary text-sm py-1.5">Cancel</button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {isLoading ? (
+        <div className="space-y-2 animate-pulse">
+          {[1, 2].map((i) => <div key={i} className="h-12 bg-slate-100 rounded-lg" />)}
+        </div>
+      ) : accounts.length === 0 ? (
+        <p className="text-sm text-slate-400 text-center py-4">No employees connected yet</p>
+      ) : (
+        <div className="overflow-x-auto rounded-xl border border-slate-200">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-slate-50 border-b border-slate-200">
+                <th className="px-4 py-2.5 text-left text-xs font-semibold text-slate-500">Employee</th>
+                <th className="px-4 py-2.5 text-left text-xs font-semibold text-slate-500">Number</th>
+                <th className="px-4 py-2.5 text-left text-xs font-semibold text-slate-500">Status</th>
+                <th className="px-4 py-2.5 text-right text-xs font-semibold text-slate-500">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {accounts.map((a) => (
+                <tr key={a.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
+                  <td className="px-4 py-2.5">
+                    <p className="font-medium text-slate-800">{a.user.name}</p>
+                    <p className="text-xs text-slate-400">{a.user.email}</p>
+                  </td>
+                  <td className="px-4 py-2.5 font-mono text-slate-600">{a.displayPhoneNumber}</td>
+                  <td className="px-4 py-2.5">
+                    {a.isActive ? (
+                      <span className="inline-flex items-center gap-1.5 text-xs font-medium text-green-600 bg-green-50 px-2 py-0.5 rounded-full border border-green-100">
+                        <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                        Connected
+                      </span>
+                    ) : (
+                      <span className="text-xs font-medium text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">Disconnected</span>
+                    )}
+                    {a.lastError && <p className="text-xs text-red-500 mt-1">{a.lastError}</p>}
+                  </td>
+                  <td className="px-4 py-2.5 text-right">
+                    {a.isActive && (
+                      confirmDeactivate === a.userId ? (
+                        <div className="flex justify-end gap-1.5">
+                          <button onClick={() => onDeactivate(a.userId)} className="btn-danger text-xs py-1 px-2.5">Confirm</button>
+                          <button onClick={() => setConfirmDeactivate(null)} className="btn-secondary text-xs py-1 px-2.5">Cancel</button>
+                        </div>
+                      ) : (
+                        <button onClick={() => setConfirmDeactivate(a.userId)} className="text-xs btn-secondary py-1 px-2.5 text-red-600 hover:bg-red-50">
+                          Disconnect
+                        </button>
+                      )
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function AdminSettingsPage() {
@@ -770,7 +945,12 @@ export default function AdminSettingsPage() {
         ))}
       </div>
 
-      {activeTab === 'integrations' && <MetaIntegrationsSection />}
+      {activeTab === 'integrations' && (
+        <div className="space-y-5">
+          <MetaIntegrationsSection />
+          <WhatsAppAccountsSection />
+        </div>
+      )}
 
       {activeTab === 'account' && (
         <div className="space-y-5">

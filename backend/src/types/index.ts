@@ -34,6 +34,15 @@ export interface WebhookWhatsAppEntry {
         text?: { body: string };
         type: string;
       }>;
+      // Delivery/read receipts for messages sent via the API — a separate
+      // `field: 'statuses'` change, sibling to the `messages` one above.
+      statuses?: Array<{
+        id: string;
+        status: string; // sent | delivered | read | failed
+        timestamp: string;
+        recipient_id: string;
+        errors?: Array<{ title: string }>;
+      }>;
     };
     field: string;
   }>;

@@ -4,6 +4,7 @@ import {
   Users, MapPin, MessageSquare, Clock, CheckCircle, Edit, ArrowRightLeft,
   Star, Save, FileText, Activity, X, Utensils, BedDouble, Package,
   IndianRupee, ChevronRight, CreditCard, Trash2, Plus, CheckSquare, AlertTriangle, Download,
+  MessageCircle,
 } from 'lucide-react';
 import { Lead, LeadStatus, Booking, Payment, BookingTask, TaskStatus, TaskType, TaskDepartment, FinanceDocumentType } from '../../types/index';
 import { useLead, useUpdateLead, useTransferLead, useLeadJourney } from '../../hooks/useLeads';
@@ -21,6 +22,8 @@ import FollowUpModal from './FollowUpModal';
 import PriorityBadge from '../ui/PriorityBadge';
 import TagChip from '../ui/TagChip';
 import CommentsSection from './CommentsSection';
+import { ThreadPanel as WhatsAppThreadPanel } from '../whatsapp/WhatsAppInboxView';
+import { useWhatsAppConversations } from '../../hooks/useWhatsAppConversations';
 import { Skeleton } from '../ui/Skeleton';
 import {
   formatDate, formatDateTime, formatRelativeTime, formatCurrency, isOverdue, cn, leadStatusConfig,
@@ -35,7 +38,7 @@ interface LeadDetailProps {
   onToggleStar?: () => void;
 }
 
-type WorkspaceTab = 'overview' | 'notes' | 'activity' | 'comments' | 'payments' | 'tasks';
+type WorkspaceTab = 'overview' | 'notes' | 'activity' | 'comments' | 'payments' | 'tasks' | 'whatsapp';
 
 const statusOrder: LeadStatus[] = ['NEW', 'NOT_CONTACTED', 'CONTACTED', 'INTERESTED', 'FOLLOW_UP_SCHEDULED', 'CONFIRMED', 'LOST'];
 
@@ -942,11 +945,13 @@ export default function LeadDetail({ leadId, open, onClose, isStarred, onToggleS
   const transferLead = useTransferLead();
   const { data: usersData } = useUsers({ limit: 100 });
   const { data: bookingData } = useBookingByLead(leadId);
+  const { data: whatsappConversations } = useWhatsAppConversations();
 
   const lead = data?.data;
   const booking = bookingData?.data ?? null;
   const employees = (usersData?.data ?? []).filter((e) => e.id !== lead?.assignedToId);
   const canAct = user?.role === 'ADMIN' || lead?.assignedToId === user?.id;
+  const whatsappConversation = (whatsappConversations ?? []).find((c) => c.leadId === lead?.id) ?? null;
 
   const handleStatusChange = (status: LeadStatus) => {
     if (!lead) return;
@@ -1010,6 +1015,7 @@ export default function LeadDetail({ leadId, open, onClose, isStarred, onToggleS
     { key: 'notes', label: 'Notes', icon: FileText },
     { key: 'activity', label: 'Activity', icon: Activity },
     { key: 'comments', label: 'Comments', icon: MessageSquare },
+    ...(whatsappConversation ? [{ key: 'whatsapp' as WorkspaceTab, label: 'WhatsApp', icon: MessageCircle }] : []),
     ...(hasBooking ? [{ key: 'tasks' as WorkspaceTab, label: 'Tasks', icon: CheckSquare }] : []),
     ...(hasBooking ? [{ key: 'payments' as WorkspaceTab, label: 'Payments', icon: CreditCard }] : []),
   ];
@@ -1180,6 +1186,11 @@ export default function LeadDetail({ leadId, open, onClose, isStarred, onToggleS
               )}
               {activeTab === 'comments' && (
                 <CommentsSection leadId={lead.id} />
+              )}
+              {activeTab === 'whatsapp' && whatsappConversation && (
+                <div className="h-[520px] -mx-6 -mb-5 border-t border-slate-100">
+                  <WhatsAppThreadPanel conversation={whatsappConversation} />
+                </div>
               )}
               {activeTab === 'tasks' && booking && (
                 <TasksTab booking={booking} />

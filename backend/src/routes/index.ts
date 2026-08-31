@@ -31,6 +31,8 @@ import automationRuleRoutes from './automationRule.routes.js';
 import systemHealthRoutes from './systemHealth.routes.js';
 import searchRoutes from './search.routes.js';
 import hrRoutes from './hr.routes.js';
+import whatsappAccountRoutes from './whatsappAccount.routes.js';
+import whatsappConversationRoutes from './whatsappConversation.routes.js';
 
 const router = Router();
 
@@ -68,5 +70,7 @@ router.use('/automation-rules', automationRuleRoutes);
 router.use('/system', systemHealthRoutes);
 router.use('/search', searchRoutes);
 router.use('/hr', hrRoutes);
+router.use('/whatsapp-accounts', whatsappAccountRoutes);
+router.use('/whatsapp', whatsappConversationRoutes);
 
 export default router;

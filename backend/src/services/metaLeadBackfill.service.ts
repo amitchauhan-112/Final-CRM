@@ -99,7 +99,7 @@ export async function backfillLeadsForOrg(orgId: string, since?: Date): Promise<
   // past Vercel's function time limit (the scheduled runs were timing out
   // mid-execution, stuck showing "RUNNING" forever). The one-off "Import
   // Historical Leads" button still omits `since` for a full scan.
-  const sinceFilter = since
+  const sinceFilter: Record<string, string> = since
     ? { filtering: JSON.stringify([{ field: 'time_created', operator: 'GREATER_THAN', value: Math.floor(since.getTime() / 1000) }]) }
     : {};
 

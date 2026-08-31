@@ -4,6 +4,7 @@ import { createLead } from '../services/lead.service.js';
 import { WebhookWhatsAppEntry, WebhookInstagramEntry } from '../types/index.js';
 import logger from '../utils/logger.js';
 import { getAdEntry } from '../services/adMap.service.js';
+import { processInboundWhatsAppMessage, processWhatsAppStatusUpdate } from '../services/whatsapp.service.js';
 
 import prisma from '../lib/prisma.js';
 
@@ -27,38 +28,35 @@ export const handleWhatsAppWebhook = async (req: Request, res: Response): Promis
     const body = req.body;
     if (body.object !== 'whatsapp_business_account') return;
 
+    // Logged unconditionally, before any processing — the audit trail this
+    // relies on to capture real coexistence payload shapes once a pilot
+    // employee is connected (see whatsapp.service.ts's echo-detection note).
+    await prisma.webhookLog.create({
+      data: { source: 'WHATSAPP', payload: JSON.stringify(body), processed: false },
+    });
+
     for (const entry of (body.entry || []) as WebhookWhatsAppEntry[]) {
       for (const change of entry.changes || []) {
-        if (change.field !== 'messages') continue;
         const value = change.value;
-        const messages = value.messages || [];
-        const contacts = value.contacts || [];
         const phoneNumberId = value.metadata?.phone_number_id;
-        const displayPhone = value.metadata?.display_phone_number;
 
-        await prisma.webhookLog.create({
-          data: { source: 'WHATSAPP', payload: JSON.stringify(body), processed: false },
-        });
-
-        for (const msg of messages) {
-          if (msg.type !== 'text') continue;
-          const contact = contacts.find((c) => c.wa_id === msg.from);
-          const name = contact?.profile?.name || `WhatsApp User ${msg.from}`;
-          const messageText = msg.text?.body || '';
-
-          await createLead(
-            {
-              name,
-              phone: msg.from,
-              source: 'WHATSAPP',
-              message: messageText,
-              whatsappMsgId: msg.id,
-              metaPageId: phoneNumberId,
-            },
-            { whatsappNumber: `+${msg.from}` }
-          );
-
-          logger.info(`WhatsApp lead created: ${name} from ${msg.from}`);
+        if (change.field === 'messages') {
+          const contacts = value.contacts || [];
+          for (const msg of value.messages || []) {
+            try {
+              await processInboundWhatsAppMessage(msg, phoneNumberId, contacts);
+            } catch (err) {
+              logger.error(`[whatsapp] failed to process message ${msg.id}`, err);
+            }
+          }
+        } else if (change.field === 'statuses') {
+          for (const status of value.statuses || []) {
+            try {
+              await processWhatsAppStatusUpdate(status);
+            } catch (err) {
+              logger.error(`[whatsapp] failed to process status update ${status.id}`, err);
+            }
+          }
         }
       }
     }

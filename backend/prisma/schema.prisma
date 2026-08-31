@@ -109,6 +109,10 @@ model User {
   financeSalaryAccess  FinanceSalaryAccess?  @relation("FinanceSalaryAccessUser")
   grantedSalaryAccess  FinanceSalaryAccess[] @relation("FinanceSalaryAccessGrantedBy")
 
+  // WhatsApp coexistence — one connected number per employee
+  whatsappAccount      WhatsAppAccount?
+  sentWhatsappMessages WhatsAppMessage[]     @relation("WhatsAppMessageSender")
+
   @@index([organizationId])
   @@index([departmentId])
   @@index([designationId])
@@ -310,6 +314,7 @@ model Lead {
   tags          LeadTag[]
   comments      LeadComment[]
   booking       Booking?
+  whatsappConversations WhatsAppConversation[]
 
   @@index([organizationId])
   @@index([status])
@@ -506,6 +511,93 @@ model MetaConnection {
   updatedAt       DateTime @updatedAt
 
   @@map("meta_connections")
+}
+
+// ─── WhatsApp Coexistence ────────────────────────────────────────────────────
+// Each employee keeps chatting from their own phone/number via the regular
+// WhatsApp Business app; Meta's "coexistence" feature mirrors every message
+// (either direction) to our webhook so it can be logged here. One row per
+// employee — the same phone number can't be shared between two employees.
+model WhatsAppAccount {
+  id     String @id @default(uuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organizationId String?
+
+  phoneNumberId      String  @unique  // Meta's routing key — matches inbound webhook payloads to this account
+  wabaId             String           // WhatsApp Business Account ID
+  displayPhoneNumber String           // e.g. "+91 98765 43210" — what the customer sees
+  accessToken        String           // AES-256-GCM encrypted, same scheme as MetaConnection.systemUserToken
+
+  isActive  Boolean @default(true)
+  lastError String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  conversations WhatsAppConversation[]
+
+  @@index([organizationId])
+  @@map("whatsapp_accounts")
+}
+
+model WhatsAppConversation {
+  id        String          @id @default(uuid())
+  accountId String
+  account   WhatsAppAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  organizationId String?
+
+  customerPhone String  // normalized wa_id — digits only, no leading '+'
+
+  leadId String?
+  lead   Lead?   @relation(fields: [leadId], references: [id], onDelete: SetNull)
+
+  lastInboundAt      DateTime? // drives the 24h customer-service-window rule for sending
+  lastOutboundAt     DateTime?
+  lastMessagePreview String?
+  unreadCount        Int       @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  messages WhatsAppMessage[]
+
+  // At most one conversation (and therefore one Lead) per employee-number +
+  // customer-phone pair — fixes the old webhook creating a new Lead on every
+  // single inbound message from the same customer.
+  @@unique([accountId, customerPhone])
+  @@index([organizationId])
+  @@index([leadId])
+  @@map("whatsapp_conversations")
+}
+
+model WhatsAppMessage {
+  id             String               @id @default(uuid())
+  conversationId String
+  conversation   WhatsAppConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  direction     String  // INBOUND | OUTBOUND
+  metaMessageId String? @unique // Meta's wamid — dedups webhook retries, matches delivery-status updates
+  fromNumber    String
+  toNumber      String
+  type          String  @default("text")
+  body          String?
+
+  status          String    @default("RECEIVED") // RECEIVED | SENT | DELIVERED | READ | FAILED
+  statusUpdatedAt DateTime?
+  errorMessage    String?
+
+  // A message the employee sent from their own phone app, mirrored in via
+  // coexistence rather than sent through the CRM.
+  isEcho       Boolean @default(false)
+  sentById     String?
+  sentBy       User?   @relation("WhatsAppMessageSender", fields: [sentById], references: [id], onDelete: SetNull)
+
+  timestamp DateTime // Meta's message time — authoritative ordering, not createdAt
+  createdAt DateTime @default(now())
+
+  @@index([conversationId, timestamp])
+  @@map("whatsapp_messages")
 }
 
 model CampaignArchive {

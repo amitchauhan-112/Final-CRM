@@ -6,6 +6,7 @@ import {
   MessageSquarePlus, Activity, BarChart2, Building2,
   UserCheck, Database, ChevronRight, Package, BookOpen,
   Contact, Wallet, Map, Home, Gauge, LineChart, FolderKanban, Settings2, Zap, HeartPulse, IndianRupee,
+  MessageCircle,
 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import { useNotifications, useMarkAllAsRead, useMarkAsRead } from '../../hooks/useNotifications';
@@ -37,6 +38,7 @@ const NAV: NavEntry[] = [
     items: [
       { to: '/admin/leads',     label: 'Leads',     icon: UserCheck },
       { to: '/admin/campaigns', label: 'Campaigns', icon: Megaphone },
+      { to: '/admin/whatsapp',  label: 'WhatsApp',  icon: MessageCircle },
     ],
   },
   { type: 'item', to: '/admin/organization', label: 'Organization', icon: Building2 },

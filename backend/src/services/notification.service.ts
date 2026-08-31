@@ -14,6 +14,7 @@ const TYPE_META: Record<string, { category: string; severity: string }> = {
   FOLLOW_UP_ESCALATED: { category: 'SALES', severity: 'CRITICAL' },
   LEAD_STATUS_CHANGED: { category: 'SALES', severity: 'INFO' },
   NEW_LEAD_ASSIGNED: { category: 'SALES', severity: 'INFO' },
+  WHATSAPP_MESSAGE_RECEIVED: { category: 'SALES', severity: 'INFO' },
   DEPARTURE_APPROACHING: { category: 'OPERATIONS', severity: 'REMINDER' },
   HOTEL_PENDING: { category: 'OPERATIONS', severity: 'WARNING' },
   HOTEL_CONFIRMED: { category: 'OPERATIONS', severity: 'SUCCESS' },

@@ -51,6 +51,8 @@ import FinanceReportsPage from './pages/finance/ReportsPage';
 import AdminPayrollPage from './pages/admin/PayrollPage';
 import FinancePayrollPage from './pages/finance/PayrollPage';
 import MyTargetsPage from './pages/employee/MyTargetsPage';
+import AdminWhatsAppInboxPage from './pages/admin/WhatsAppInboxPage';
+import EmployeeWhatsAppInboxPage from './pages/employee/WhatsAppInboxPage';
 
 function RoleRedirect() {
   const { user, isAuthenticated } = useAuthStore();
@@ -104,6 +106,7 @@ export default function App() {
         <Route path="packages" element={<PackagesPage />} />
         <Route path="bookings" element={<BookingsPage />} />
         <Route path="customers" element={<CustomersPage />} />
+        <Route path="whatsapp" element={<AdminWhatsAppInboxPage />} />
         <Route path="operations" element={<Navigate to="/admin/operations/dashboard" replace />} />
         <Route path="operations/dashboard" element={<OperationsDashboardPage />} />
         <Route path="operations/departures" element={<DeparturesPage />} />
@@ -182,6 +185,7 @@ export default function App() {
         <Route path="customers" element={<MyCustomersPage />} />
         <Route path="tasks" element={<TasksPage />} />
         <Route path="targets" element={<MyTargetsPage />} />
+        <Route path="whatsapp" element={<EmployeeWhatsAppInboxPage />} />
         <Route path="settings" element={<EmployeeSettingsPage />} />
       </Route>
 
