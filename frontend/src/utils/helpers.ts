@@ -70,3 +70,18 @@ export const formatCurrency = (amount: number | null | undefined): string => {
 export const getInitials = (name: string): string => {
   return name.split(' ').map((n) => n[0]).slice(0, 2).join('').toUpperCase();
 };
+
+// Plain "click to chat" link (wa.me) — opens whatever WhatsApp is already
+// logged into the device that clicks it (the employee's own app/account).
+// No API, no Meta connection, no cost — just a deep link, same as any
+// "Chat on WhatsApp" button. Assumes Indian numbers by default since that's
+// this CRM's customer base; strips everything but digits and adds the
+// country code only if one isn't already present.
+export const buildWhatsAppLink = (phone: string | null | undefined, message?: string): string | null => {
+  if (!phone) return null;
+  const digits = phone.replace(/[^0-9]/g, '');
+  if (!digits) return null;
+  const withCountryCode = digits.length === 10 ? `91${digits}` : digits;
+  const base = `https://wa.me/${withCountryCode}`;
+  return message ? `${base}?text=${encodeURIComponent(message)}` : base;
+};

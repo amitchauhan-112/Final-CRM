@@ -948,7 +948,6 @@ export default function AdminSettingsPage() {
       {activeTab === 'integrations' && (
         <div className="space-y-5">
           <MetaIntegrationsSection />
-          <WhatsAppAccountsSection />
         </div>
       )}
 

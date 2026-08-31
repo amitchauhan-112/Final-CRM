@@ -1,8 +1,8 @@
-import { Phone, Mail, Calendar, AlertCircle, User, Megaphone } from 'lucide-react';
+import { Phone, Mail, Calendar, AlertCircle, User, Megaphone, MessageCircle } from 'lucide-react';
 import { Lead } from '../../types/index';
 import Badge from '../ui/Badge';
 import Avatar from '../ui/Avatar';
-import { formatDate, formatRelativeTime, isOverdue, cn } from '../../utils/helpers';
+import { formatDate, formatRelativeTime, isOverdue, cn, buildWhatsAppLink } from '../../utils/helpers';
 
 interface LeadCardProps {
   lead: Lead;
@@ -11,6 +11,7 @@ interface LeadCardProps {
 
 export default function LeadCard({ lead, onClick }: LeadCardProps) {
   const overdue = isOverdue(lead.followUpDate) && !lead.followUpDone;
+  const whatsappLink = buildWhatsAppLink(lead.phone, `Hi ${lead.name}, this is regarding your ${lead.destination || 'trip'} enquiry with FOD Holidays.`);
 
   return (
     <div
@@ -33,7 +34,21 @@ export default function LeadCard({ lead, onClick }: LeadCardProps) {
           </div>
         </div>
         <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
-          <Badge status={lead.status} />
+          <div className="flex items-center gap-1.5">
+            {whatsappLink && (
+              <a
+                href={whatsappLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                title="Chat on WhatsApp"
+                className="p-1 rounded-lg text-green-600 hover:bg-green-50 transition-colors"
+              >
+                <MessageCircle className="w-4 h-4" />
+              </a>
+            )}
+            <Badge status={lead.status} />
+          </div>
           <Badge source={lead.source} />
         </div>
       </div>

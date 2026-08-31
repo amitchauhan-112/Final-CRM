@@ -22,7 +22,6 @@ const navLinks = [
   { to: '/employee/packages',   label: 'Packages',     icon: Package },
   { to: '/employee/customers',  label: 'My Customers', icon: UserCheck },
   { to: '/employee/targets',    label: 'My Targets',   icon: Target },
-  { to: '/employee/whatsapp',   label: 'WhatsApp',     icon: MessageCircle },
   { to: '/employee/settings',   label: 'Settings',     icon: Settings },
 ];
 

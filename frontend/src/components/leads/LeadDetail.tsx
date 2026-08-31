@@ -26,7 +26,7 @@ import { ThreadPanel as WhatsAppThreadPanel } from '../whatsapp/WhatsAppInboxVie
 import { useWhatsAppConversations } from '../../hooks/useWhatsAppConversations';
 import { Skeleton } from '../ui/Skeleton';
 import {
-  formatDate, formatDateTime, formatRelativeTime, formatCurrency, isOverdue, cn, leadStatusConfig,
+  formatDate, formatDateTime, formatRelativeTime, formatCurrency, isOverdue, cn, leadStatusConfig, buildWhatsAppLink,
 } from '../../utils/helpers';
 import { useAuthStore } from '../../store/authStore';
 
@@ -952,6 +952,7 @@ export default function LeadDetail({ leadId, open, onClose, isStarred, onToggleS
   const employees = (usersData?.data ?? []).filter((e) => e.id !== lead?.assignedToId);
   const canAct = user?.role === 'ADMIN' || lead?.assignedToId === user?.id;
   const whatsappConversation = (whatsappConversations ?? []).find((c) => c.leadId === lead?.id) ?? null;
+  const whatsappLink = lead ? buildWhatsAppLink(lead.phone, `Hi ${lead.name}, this is regarding your ${lead.destination || 'trip'} enquiry with FOD Holidays.`) : null;
 
   const handleStatusChange = (status: LeadStatus) => {
     if (!lead) return;
@@ -1070,6 +1071,17 @@ export default function LeadDetail({ leadId, open, onClose, isStarred, onToggleS
                       >
                         <Phone className="w-3 h-3" />
                         {lead.phone}
+                      </a>
+                    )}
+                    {whatsappLink && (
+                      <a
+                        href={whatsappLink}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-green-50 hover:bg-green-100 text-green-700 rounded-lg text-xs font-medium transition-colors"
+                      >
+                        <MessageCircle className="w-3 h-3" />
+                        Chat on WhatsApp
                       </a>
                     )}
                     {lead.email && (

@@ -38,7 +38,6 @@ const NAV: NavEntry[] = [
     items: [
       { to: '/admin/leads',     label: 'Leads',     icon: UserCheck },
       { to: '/admin/campaigns', label: 'Campaigns', icon: Megaphone },
-      { to: '/admin/whatsapp',  label: 'WhatsApp',  icon: MessageCircle },
     ],
   },
   { type: 'item', to: '/admin/organization', label: 'Organization', icon: Building2 },
