@@ -289,13 +289,20 @@ export default function EmployeeDashboard() {
     const overdueFollowUps = statsLeads.filter(
       (l) => l.followUpDate && !l.followUpDone && isOverdue(l.followUpDate)
     );
+    // Everything pending that isn't today or overdue — mirrors the
+    // Upcoming/Later sections on the Follow-ups page, just combined into
+    // one reminder count here.
+    const upcomingFollowUps = statsLeads.filter(
+      (l) => l.followUpDate && !l.followUpDone && !isOverdue(l.followUpDate) && !l.followUpDate.startsWith(today)
+    );
     // These 7 status buckets are mutually exclusive and cover every possible
     // LeadStatus, so they always add up to `total` exactly — unlike
-    // todayFollowUps/overdueFollowUps below, which are a different axis
-    // (follow-up date, not status) and can overlap any of the 7 buckets.
+    // todayFollowUps/overdueFollowUps/upcomingFollowUps below, which are a
+    // different axis (follow-up date, not status) and can overlap any of
+    // the 7 buckets.
     return {
       total: statsLeads.length, fresh, contacted, interested, notContactable, followUpScheduled, lost, confirmed,
-      todayFollowUps, overdueFollowUps,
+      todayFollowUps, overdueFollowUps, upcomingFollowUps,
     };
   }, [statsLeads, today]);
 
@@ -416,7 +423,7 @@ export default function EmployeeDashboard() {
           not status), so a lead of any status above can also show up here.
           Not meant to add up with the status tiles. */}
       <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider -mb-1">Follow-up Reminders</p>
-      <div className="grid grid-cols-2 gap-3 sm:max-w-md">
+      <div className="grid grid-cols-3 gap-3 sm:max-w-xl">
         <StatsCard
           label="Today's Follow-ups"
           value={cardStats.todayFollowUps.length}
@@ -431,6 +438,14 @@ export default function EmployeeDashboard() {
           icon={CalendarClock}
           iconBg="bg-red-100"
           iconColor="text-red-600"
+          onClick={() => navigate('/employee/follow-ups')}
+        />
+        <StatsCard
+          label="Upcoming Follow-ups"
+          value={cardStats.upcomingFollowUps.length}
+          icon={CalendarCheck}
+          iconBg="bg-blue-100"
+          iconColor="text-blue-600"
           onClick={() => navigate('/employee/follow-ups')}
         />
       </div>
