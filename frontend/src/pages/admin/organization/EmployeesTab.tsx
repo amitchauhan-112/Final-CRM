@@ -17,6 +17,15 @@ import AvailabilityBadge from '../../../components/ui/AvailabilityBadge';
 import EmployeeProfileModal from '../../../components/employees/EmployeeProfileModal';
 import { Skeleton } from '../../../components/ui/Skeleton';
 import { formatDate, cn } from '../../../utils/helpers';
+import toast from 'react-hot-toast';
+
+interface ActiveWorkSummary {
+  leads: number;
+  campaigns: number;
+  tasks: number;
+  departments: number;
+  total: number;
+}
 
 interface UserForm {
   name: string;
@@ -378,6 +387,8 @@ export default function EmployeesTab() {
   const [createOpen, setCreateOpen] = useState(false);
   const [editUser, setEditUser] = useState<User | null>(null);
   const [deleteUserId, setDeleteUserId] = useState<string | null>(null);
+  const [activeWork, setActiveWork] = useState<ActiveWorkSummary | null>(null);
+  const [reassignToId, setReassignToId] = useState('');
   const [perfEmployee, setPerfEmployee] = useState<EmployeePerformance | null>(null);
   const [createdCreds, setCreatedCreds] = useState<{ email: string; password: string } | null>(null);
   const [resetPassUser, setResetPassUser] = useState<User | null>(null);
@@ -416,10 +427,34 @@ export default function EmployeesTab() {
     updateUser.mutate({ id: editUser.id, ...formData } as any, { onSuccess: () => setEditUser(null) });
   };
 
+  const closeDeleteModal = () => {
+    setDeleteUserId(null);
+    setActiveWork(null);
+    setReassignToId('');
+  };
+
   const handleDelete = () => {
     if (!deleteUserId) return;
-    deleteUser.mutate(deleteUserId, { onSuccess: () => setDeleteUserId(null) });
+    deleteUser.mutate(
+      { id: deleteUserId, reassignToId: reassignToId || undefined },
+      {
+        onSuccess: closeDeleteModal,
+        onError: (err: any) => {
+          const data = err?.response?.data;
+          // 409 = still has active work — switch the modal into "pick
+          // someone to hand it all to" mode instead of just failing.
+          if (err?.response?.status === 409 && data?.activeWork) {
+            setActiveWork(data.activeWork);
+          } else {
+            toast.error(data?.error || 'Failed to remove employee');
+          }
+        },
+      }
+    );
   };
+
+  const deletingUser = users.find((u) => u.id === deleteUserId) ?? null;
+  const reassignCandidates = users.filter((u) => u.id !== deleteUserId && u.isActive);
 
   return (
     <div className="space-y-4">
@@ -521,15 +556,41 @@ export default function EmployeesTab() {
           onSubmit={handleEdit} isLoading={updateUser.isPending} isEdit />
       )}
 
-      <Modal open={!!deleteUserId} onClose={() => setDeleteUserId(null)} title="Remove Employee" size="sm"
+      <Modal open={!!deleteUserId} onClose={closeDeleteModal} title="Remove Employee" size="sm"
         footer={<>
-          <button onClick={() => setDeleteUserId(null)} className="btn-secondary">Cancel</button>
-          <button onClick={handleDelete} disabled={deleteUser.isPending} className="btn-danger">
-            {deleteUser.isPending ? 'Removing…' : 'Remove'}
+          <button onClick={closeDeleteModal} className="btn-secondary">Cancel</button>
+          <button
+            onClick={handleDelete}
+            disabled={deleteUser.isPending || (!!activeWork && !reassignToId)}
+            className="btn-danger"
+          >
+            {deleteUser.isPending ? (activeWork ? 'Reassigning…' : 'Removing…') : activeWork ? 'Reassign & Remove' : 'Remove'}
           </button>
         </>}
       >
-        <p className="text-sm text-slate-600">Are you sure you want to remove this employee? This action cannot be undone.</p>
+        {!activeWork ? (
+          <p className="text-sm text-slate-600">Are you sure you want to remove {deletingUser?.name ?? 'this employee'}? This action cannot be undone.</p>
+        ) : (
+          <div className="space-y-3">
+            <p className="text-sm text-slate-600">
+              <strong>{deletingUser?.name}</strong> still has active work assigned to them:
+            </p>
+            <ul className="text-sm text-slate-700 bg-amber-50 border border-amber-200 rounded-xl p-3 space-y-1">
+              {activeWork.leads > 0 && <li>• {activeWork.leads} lead{activeWork.leads === 1 ? '' : 's'}</li>}
+              {activeWork.campaigns > 0 && <li>• {activeWork.campaigns} campaign membership{activeWork.campaigns === 1 ? '' : 's'}</li>}
+              {activeWork.tasks > 0 && <li>• {activeWork.tasks} task{activeWork.tasks === 1 ? '' : 's'}</li>}
+              {activeWork.departments > 0 && <li>• Head of {activeWork.departments} department{activeWork.departments === 1 ? '' : 's'}</li>}
+            </ul>
+            <div>
+              <label className="label">Reassign everything to *</label>
+              <select value={reassignToId} onChange={(e) => setReassignToId(e.target.value)} className="input">
+                <option value="">Select an employee…</option>
+                {reassignCandidates.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+              </select>
+            </div>
+            <p className="text-xs text-slate-400">Only then can {deletingUser?.name} be removed.</p>
+          </div>
+        )}
       </Modal>
 
       <PerformanceModal open={!!perfEmployee} onClose={() => setPerfEmployee(null)} employee={perfEmployee} />

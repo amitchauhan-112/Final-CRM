@@ -79,20 +79,21 @@ export function useUpdateUser() {
   });
 }
 
+// A 409 here means the employee still has active work assigned to them —
+// the response's `activeWork` breakdown drives a reassign-first popup
+// (EmployeesTab.tsx) rather than a plain error toast, so error handling is
+// left entirely to the caller instead of a blanket toast in this hook.
 export function useDeleteUser() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (id: string) => {
-      const { data } = await api.delete(`/users/${id}`);
+    mutationFn: async ({ id, reassignToId }: { id: string; reassignToId?: string }) => {
+      const { data } = await api.delete(`/users/${id}`, { data: reassignToId ? { reassignToId } : undefined });
       return data;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['users'] });
       qc.invalidateQueries({ queryKey: ['employee-performance'] });
-      toast.success('User deleted successfully');
-    },
-    onError: (err: any) => {
-      toast.error(err?.response?.data?.message || 'Failed to delete user');
+      toast.success('Employee removed successfully');
     },
   });
 }
