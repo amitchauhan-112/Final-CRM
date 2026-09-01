@@ -7,8 +7,9 @@ import {
 import Modal from '../ui/Modal';
 import { Lead, Booking, FoodPreference, RoomSharing, TourType } from '../../types/index';
 import { useCreateBooking, useUpdateBooking } from '../../hooks/useBookings';
-import { usePackages, usePackage } from '../../hooks/usePackages';
+import { usePackages, usePackage, useCreatePackage } from '../../hooks/usePackages';
 import { formatCurrency, cn } from '../../utils/helpers';
+import toast from 'react-hot-toast';
 
 interface BookingForm {
   travelerName: string;
@@ -61,6 +62,13 @@ export default function BookingConfirmModal({ open, onClose, lead, existingBooki
     { count: 0, roomSharing: 'DOUBLE' },
   ]);
   const [splitError, setSplitError] = useState<string | null>(null);
+
+  // Inline "create a new FIT package" — Sales can already create FIT
+  // packages (the backend allows it: only GIT is Admin-only), but previously
+  // had to leave this form and go to the Package Master screen to do it.
+  const createPackage = useCreatePackage();
+  const [showCreatePackage, setShowCreatePackage] = useState(false);
+  const [newPkg, setNewPkg] = useState({ name: '', code: '', nights: '', pricePerPerson: '' });
 
   const { register, handleSubmit, control, setValue, formState: { errors } } = useForm<BookingForm>({
     defaultValues: {
@@ -127,6 +135,7 @@ export default function BookingConfirmModal({ open, onClose, lead, existingBooki
   // Reset package when tour type changes
   useEffect(() => {
     if (!isEdit) setValue('packageId', '');
+    setShowCreatePackage(false);
   }, [watchedTourType]);
 
   useEffect(() => {
@@ -152,8 +161,18 @@ export default function BookingConfirmModal({ open, onClose, lead, existingBooki
       setSplitEnabled(false);
       setRoomSplit([{ count: 0, roomSharing: 'DOUBLE' }]);
       setSplitError(null);
+      setShowCreatePackage(false);
+      setNewPkg({ name: '', code: '', nights: '', pricePerPerson: '' });
     }
-  }, [open, existingBooking, lead]);
+    // Deliberately keyed on IDs, not the whole `lead`/`existingBooking`
+    // objects — both come from polling hooks (refetchInterval: 20000) that
+    // hand back a new object reference every ~20s even when nothing changed.
+    // Depending on the objects themselves reset every field on each poll
+    // while this form was open, silently discarding anything the employee
+    // had just typed/picked (e.g. a just-changed departure date reverting
+    // back to the booking's old saved value before they could hit Save).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, existingBooking?.id, lead.id]);
 
   const onSubmit = (data: BookingForm) => {
     if (splitEnabled) {
@@ -193,6 +212,33 @@ export default function BookingConfirmModal({ open, onClose, lead, existingBooki
       updateBooking.mutate({ ...payload, id: existingBooking.id }, { onSuccess: onClose });
     } else {
       createBooking.mutate(payload, { onSuccess: onClose });
+    }
+  };
+
+  const handleCreatePackage = async () => {
+    if (!newPkg.name.trim() || !newPkg.code.trim() || !newPkg.nights || isNaN(Number(newPkg.nights))) {
+      toast.error('Name, code and nights are required'); return;
+    }
+    const nights = Number(newPkg.nights);
+    try {
+      const result: any = await createPackage.mutateAsync({
+        name: newPkg.name.trim(),
+        code: newPkg.code.trim(),
+        nights,
+        days: nights + 2,
+        packageType: 'FIT',
+        status: 'ACTIVE',
+        isPopular: false,
+        pricePerPerson: newPkg.pricePerPerson ? Number(newPkg.pricePerPerson) : 0,
+        inclusions: '[]', exclusions: '[]', highlights: '[]', thingsToCarry: '[]',
+        bestSeason: '[]', images: '[]', gallery: '[]',
+      } as any);
+      const created = result?.data;
+      if (created?.id) setValue('packageId', created.id);
+      setShowCreatePackage(false);
+      setNewPkg({ name: '', code: '', nights: '', pricePerPerson: '' });
+    } catch {
+      // useCreatePackage's onError already toasts the server's message
     }
   };
 
@@ -284,6 +330,78 @@ export default function BookingConfirmModal({ open, onClose, lead, existingBooki
                   </button>
                 )}
               </div>
+
+              {/* Inline FIT package creation — Sales can already create FIT
+                  packages (only GIT is Admin-only), no need to leave this
+                  form to go create one first. */}
+              {watchedTourType === 'FIT' && (
+                <div className="mt-2">
+                  {!showCreatePackage ? (
+                    <button
+                      type="button"
+                      onClick={() => setShowCreatePackage(true)}
+                      className="text-xs font-medium text-primary-600 hover:text-primary-700"
+                    >
+                      + Create a new FIT package
+                    </button>
+                  ) : (
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-2.5">
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="label text-xs">Package Name *</label>
+                          <input
+                            value={newPkg.name}
+                            onChange={(e) => setNewPkg((p) => ({ ...p, name: e.target.value }))}
+                            className="input text-sm"
+                            placeholder="e.g. Kashmir Custom Trip"
+                          />
+                        </div>
+                        <div>
+                          <label className="label text-xs">Package Code *</label>
+                          <input
+                            value={newPkg.code}
+                            onChange={(e) => setNewPkg((p) => ({ ...p, code: e.target.value }))}
+                            className="input text-sm font-mono"
+                            placeholder="e.g. FIT-KASH-01"
+                          />
+                        </div>
+                        <div>
+                          <label className="label text-xs">Nights *</label>
+                          <input
+                            type="number" min={1}
+                            value={newPkg.nights}
+                            onChange={(e) => setNewPkg((p) => ({ ...p, nights: e.target.value }))}
+                            className="input text-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="label text-xs">Price / Person (₹)</label>
+                          <input
+                            type="number" min={0}
+                            value={newPkg.pricePerPerson}
+                            onChange={(e) => setNewPkg((p) => ({ ...p, pricePerPerson: e.target.value }))}
+                            className="input text-sm"
+                          />
+                        </div>
+                      </div>
+                      <p className="text-[10px] text-slate-400">
+                        Creates a minimal FIT package you can select right away — add full details (inclusions, itinerary, etc.) later from Package Master if needed.
+                      </p>
+                      <div className="flex items-center gap-2 justify-end">
+                        <button type="button" onClick={() => setShowCreatePackage(false)} className="btn-secondary py-1.5 text-xs">Cancel</button>
+                        <button
+                          type="button"
+                          onClick={handleCreatePackage}
+                          disabled={createPackage.isPending}
+                          className="btn-primary py-1.5 text-xs"
+                        >
+                          {createPackage.isPending ? 'Creating…' : 'Create & Select'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Selected package summary */}
