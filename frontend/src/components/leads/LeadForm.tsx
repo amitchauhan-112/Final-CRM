@@ -10,6 +10,7 @@ import { useDestinations } from '../../hooks/useMasters';
 import DuplicateWarningDialog from './DuplicateWarningDialog';
 import LostReasonModal from './LostReasonModal';
 import TagInput from '../ui/TagInput';
+import DateTimePicker from '../ui/DateTimePicker';
 import api from '../../services/api';
 import { cn } from '../../utils/helpers';
 
@@ -471,13 +472,20 @@ export default function LeadForm({ defaultValues, onSubmit, isLoading, onCancel 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="label">Follow-up Date & Time</label>
-              <input
-                {...register('followUpDate', {
+              <Controller
+                name="followUpDate"
+                control={control}
+                rules={{
                   validate: (val) => !val || new Date(val) > new Date() || 'Follow-up date must be in the future',
-                })}
-                type="datetime-local"
-                className={inputClass(!!errors.followUpDate)}
-                min={nowLocal}
+                }}
+                render={({ field }) => (
+                  <DateTimePicker
+                    value={field.value ?? ''}
+                    onChange={field.onChange}
+                    min={nowLocal}
+                    hasError={!!errors.followUpDate}
+                  />
+                )}
               />
               {errors.followUpDate && <p className="text-red-500 text-xs mt-1">{errors.followUpDate.message}</p>}
             </div>

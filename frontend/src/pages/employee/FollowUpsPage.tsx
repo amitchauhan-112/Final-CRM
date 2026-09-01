@@ -10,8 +10,9 @@ import { useStarredLeads } from '../../hooks/useStarredLeads';
 import { useRecentViews } from '../../hooks/useRecentViews';
 import Modal from '../../components/ui/Modal';
 import Badge from '../../components/ui/Badge';
+import DateTimePicker from '../../components/ui/DateTimePicker';
 import { formatDate, formatDateTime, isOverdue, cn } from '../../utils/helpers';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 
 interface RescheduleForm {
   followUpDate: string;
@@ -35,7 +36,7 @@ function RescheduleModal({
   lead: Lead | null;
 }) {
   const updateLead = useUpdateLead();
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<RescheduleForm>();
+  const { register, handleSubmit, reset, control, formState: { errors } } = useForm<RescheduleForm>();
 
   const onSubmit = (data: RescheduleForm) => {
     if (!lead) return;
@@ -58,17 +59,24 @@ function RescheduleModal({
           </div>
           <div>
             <label className="label">New Follow-up Date & Time *</label>
-            <input
-              {...register('followUpDate', {
+            <Controller
+              name="followUpDate"
+              control={control}
+              rules={{
                 required: 'Please select a date and time',
                 validate: (val) => {
                   if (!val) return true;
                   return new Date(val) > new Date() || 'Follow-up date must be in the future';
                 },
-              })}
-              type="datetime-local"
-              className="input"
-              min={minDatetime}
+              }}
+              render={({ field }) => (
+                <DateTimePicker
+                  value={field.value ?? ''}
+                  onChange={field.onChange}
+                  min={minDatetime}
+                  hasError={!!errors.followUpDate}
+                />
+              )}
             />
             {errors.followUpDate && <p className="text-red-500 text-xs mt-1">{errors.followUpDate.message}</p>}
           </div>

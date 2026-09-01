@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Clock } from 'lucide-react';
 import Modal from '../ui/Modal';
+import DateTimePicker from '../ui/DateTimePicker';
 
 interface Props {
   open: boolean;
@@ -48,12 +49,11 @@ export default function FollowUpModal({ open, onConfirm, onCancel }: Props) {
 
         <div>
           <label className="label">Follow-up Date & Time <span className="text-red-500">*</span></label>
-          <input
-            type="datetime-local"
+          <DateTimePicker
             value={date}
-            onChange={(e) => { setDate(e.target.value); setError(''); }}
+            onChange={(v) => { setDate(v); setError(''); }}
             min={nowLocal}
-            className="input"
+            hasError={!!error}
             autoFocus
           />
         </div>

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Calendar, TrendingUp, CheckCircle, XCircle, ArrowLeft, Clock } from 'lucide-react';
 import Modal from '../ui/Modal';
+import DateTimePicker from '../ui/DateTimePicker';
 import { cn } from '../../utils/helpers';
 import type { Lead } from '../../types';
 
@@ -145,12 +146,11 @@ export default function FollowUpOutcomeModal({
           </div>
           <div>
             <label className="label">Follow-up Date & Time <span className="text-red-500">*</span></label>
-            <input
-              type="datetime-local"
+            <DateTimePicker
               value={date}
-              onChange={(e) => { setDate(e.target.value); setError(''); }}
+              onChange={(v) => { setDate(v); setError(''); }}
               min={nowLocal}
-              className="input"
+              hasError={!!error}
               autoFocus
             />
           </div>
