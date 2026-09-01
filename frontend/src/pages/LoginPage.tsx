@@ -15,6 +15,7 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const { login, isAuthenticated, user } = useAuthStore();
   const [showPassword, setShowPassword] = useState(false);
+  const [showForgotHelp, setShowForgotHelp] = useState(false);
 
   // Redirect if already logged in
   if (isAuthenticated && user) {
@@ -41,7 +42,9 @@ export default function LoginPage() {
       else if (userData.role === 'FINANCE') navigate('/finance/dashboard');
       else navigate('/employee/dashboard');
     } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Invalid credentials. Please try again.');
+      // Backend sends the message under `error`, not `message` — this was
+      // silently always falling through to the generic fallback text below.
+      toast.error(err?.response?.data?.error || 'Incorrect email or password. Please try again.');
     }
   };
 
@@ -164,6 +167,23 @@ export default function LoginPage() {
                   <p className="text-red-500 text-xs mt-1">{errors.password.message}</p>
                 )}
               </div>
+
+              <div className="flex justify-end -mt-1">
+                <button
+                  type="button"
+                  onClick={() => setShowForgotHelp((v) => !v)}
+                  className="text-xs font-medium text-primary-600 hover:text-primary-700"
+                >
+                  Forgot password?
+                </button>
+              </div>
+
+              {showForgotHelp && (
+                <div className="flex items-start gap-2 px-3 py-2.5 bg-primary-50 border border-primary-200 rounded-xl text-xs text-primary-700">
+                  <Lock className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+                  <span>Passwords can only be reset by your administrator — ask them to reset it for you from Organization &gt; Employees.</span>
+                </div>
+              )}
 
               <button
                 type="submit"

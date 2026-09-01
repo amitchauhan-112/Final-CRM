@@ -39,7 +39,7 @@ function EmployeeFormModal({
   const { data: deptData } = useDepartments({ status: 'ACTIVE' });
   const departments = deptData?.data ?? [];
 
-  const { register, handleSubmit, control, formState: { errors } } = useForm<UserForm>({
+  const { register, handleSubmit, control, setValue, formState: { errors } } = useForm<UserForm>({
     defaultValues: {
       name: defaultValues?.name ?? '',
       email: defaultValues?.email ?? '',
@@ -53,6 +53,25 @@ function EmployeeFormModal({
   const selectedDeptId = useWatch({ control, name: 'departmentId' });
   const { data: desigData } = useDesignations({ departmentId: selectedDeptId || undefined, status: 'ACTIVE' });
   const designations = desigData?.data ?? [];
+
+  // Each role maps to the department seeded specifically for it (see
+  // backend/src/utils/seed.ts). Matched by department code, not name, since
+  // codes are stable identifiers while names could be relabeled later.
+  const ROLE_DEPARTMENT_CODE: Record<UserForm['role'], string> = {
+    EMPLOYEE: 'SALES', OPERATIONS: 'OPS', FINANCE: 'FINANCE', ADMIN: 'ADMIN',
+  };
+
+  const handleRoleChange = (role: UserForm['role']) => {
+    setValue('role', role);
+    // A fresh, deliberate email must be typed for whoever this account is
+    // actually for — clearing on every role change stops a value left over
+    // from picking the wrong role (or a browser autofill) from silently
+    // riding along into the wrong account.
+    if (!isEdit) setValue('email', '');
+    const match = departments.find((d) => d.code === ROLE_DEPARTMENT_CODE[role]);
+    setValue('departmentId', match?.id ?? '');
+    setValue('designationId', '');
+  };
 
   return (
     <Modal
@@ -78,27 +97,37 @@ function EmployeeFormModal({
           </div>
           <div>
             <label className="label">Email *</label>
-            <input {...register('email', { required: 'Email is required' })} type="email" className="input" placeholder="email@example.com" />
+            <input
+              {...register('email', { required: 'Email is required' })}
+              type="email" className="input" placeholder="email@example.com"
+              autoComplete="off"
+            />
             {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email.message}</p>}
           </div>
           <div>
-            <label className="label">Phone</label>
-            <input {...register('phone')} className="input" placeholder="+91 98765 43210" />
+            <label className="label">Phone *</label>
+            <input
+              {...register('phone', { required: 'Mobile number is required' })}
+              className="input" placeholder="+91 98765 43210"
+              autoComplete="off"
+            />
+            {errors.phone && <p className="text-red-500 text-xs mt-1">{errors.phone.message}</p>}
           </div>
           {!isEdit && (
             <div className="sm:col-span-2">
               <label className="label">Password *</label>
               <input
-                {...register('password', { required: !isEdit, minLength: { value: 6, message: 'Min 6 characters' } })}
-                type="password" className="input" placeholder="Minimum 6 characters"
+                {...register('password', { required: !isEdit, minLength: { value: 8, message: 'Min 8 characters' } })}
+                type="password" className="input" placeholder="Minimum 8 characters"
+                autoComplete="new-password"
               />
               {errors.password && <p className="text-red-500 text-xs mt-1">{errors.password.message}</p>}
             </div>
           )}
           <div>
             <label className="label">Role</label>
-            <select {...register('role')} className="input">
-              <option value="EMPLOYEE">Employee (Sales)</option>
+            <select {...register('role')} onChange={(e) => handleRoleChange(e.target.value as UserForm['role'])} className="input">
+              <option value="EMPLOYEE">Sales</option>
               <option value="OPERATIONS">Operations</option>
               <option value="FINANCE">Finance</option>
               <option value="ADMIN">Admin</option>
@@ -110,6 +139,7 @@ function EmployeeFormModal({
               <option value="">No Department</option>
               {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
             </select>
+            <p className="text-[10px] text-slate-400 mt-0.5">Auto-filled from Role — change if needed.</p>
           </div>
           <div className="sm:col-span-2">
             <label className="label">Designation</label>

@@ -70,6 +70,10 @@ export const createUser = async (req: AuthenticatedRequest, res: Response): Prom
       res.status(400).json({ success: false, error: 'Name, email, and password are required' });
       return;
     }
+    if (!phone?.trim()) {
+      res.status(400).json({ success: false, error: 'Mobile number is required' });
+      return;
+    }
     if (password.length < 8) {
       res.status(400).json({ success: false, error: 'Password must be at least 8 characters' });
       return;
@@ -93,7 +97,7 @@ export const createUser = async (req: AuthenticatedRequest, res: Response): Prom
         email: email.toLowerCase().trim(),
         password: hashed,
         role: role || 'EMPLOYEE',
-        phone: phone || null,
+        phone: phone.trim(),
         organizationId: orgId,
         employeeId,
         departmentId: departmentId || null,
@@ -116,6 +120,11 @@ export const updateUser = async (req: AuthenticatedRequest, res: Response): Prom
   try {
     const { id } = req.params;
     const { name, phone, isActive, departmentId, designationId } = req.body;
+
+    if (phone !== undefined && !phone?.trim()) {
+      res.status(400).json({ success: false, error: 'Mobile number is required' });
+      return;
+    }
 
     const updateData: any = {};
     if (name !== undefined) updateData.name = name;
