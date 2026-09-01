@@ -2,6 +2,7 @@ import { useState, useMemo, useCallback } from 'react';
 import {
   Users, Calendar, CalendarClock, CheckCircle, AlertCircle, Star, Clock,
   TrendingUp, XCircle, Eye, ChevronRight, Bell, Sparkles, PhoneOff,
+  Phone, CalendarCheck,
 } from 'lucide-react';
 import { PieChart, Pie, Cell, Legend, Tooltip, ResponsiveContainer } from 'recharts';
 import { useNavigate } from 'react-router-dom';
@@ -276,8 +277,10 @@ export default function EmployeeDashboard() {
   // which still powers the follow-up/confirmed work-lists further down.
   const cardStats = useMemo(() => {
     const fresh = statsLeads.filter((l) => l.status === 'NEW');
+    const contacted = statsLeads.filter((l) => l.status === 'CONTACTED');
     const interested = statsLeads.filter((l) => l.status === 'INTERESTED');
     const notContactable = statsLeads.filter((l) => l.status === 'NOT_CONTACTED');
+    const followUpScheduled = statsLeads.filter((l) => l.status === 'FOLLOW_UP_SCHEDULED');
     const lost = statsLeads.filter((l) => l.status === 'LOST');
     const confirmed = statsLeads.filter((l) => l.status === 'CONFIRMED');
     const todayFollowUps = statsLeads.filter(
@@ -286,7 +289,14 @@ export default function EmployeeDashboard() {
     const overdueFollowUps = statsLeads.filter(
       (l) => l.followUpDate && !l.followUpDone && isOverdue(l.followUpDate)
     );
-    return { total: statsLeads.length, fresh, interested, notContactable, lost, confirmed, todayFollowUps, overdueFollowUps };
+    // These 7 status buckets are mutually exclusive and cover every possible
+    // LeadStatus, so they always add up to `total` exactly — unlike
+    // todayFollowUps/overdueFollowUps below, which are a different axis
+    // (follow-up date, not status) and can overlap any of the 7 buckets.
+    return {
+      total: statsLeads.length, fresh, contacted, interested, notContactable, followUpScheduled, lost, confirmed,
+      todayFollowUps, overdueFollowUps,
+    };
   }, [statsLeads, today]);
 
   const pieData = useMemo(() =>
@@ -331,15 +341,19 @@ export default function EmployeeDashboard() {
         customRange={customRange}
         onCustomRangeChange={setCustomRange}
       />
-      <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-3">
-        <StatsCard
-          label="Total Leads"
-          value={cardStats.total}
-          icon={Users}
-          iconBg="bg-primary-100"
-          iconColor="text-primary-600"
-          onClick={() => navigate(`/employee/leads?${dateQuery}`)}
-        />
+      <StatsCard
+        label="Total Leads"
+        value={cardStats.total}
+        icon={Users}
+        iconBg="bg-primary-100"
+        iconColor="text-primary-600"
+        onClick={() => navigate(`/employee/leads?${dateQuery}`)}
+      />
+
+      {/* By status — these 7 tiles are mutually exclusive and always add up
+          to Total Leads above (every lead is in exactly one status). */}
+      <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider -mb-1">By Status</p>
+      <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-7 gap-3">
         <StatsCard
           label="Fresh Leads"
           value={cardStats.fresh.length}
@@ -348,6 +362,61 @@ export default function EmployeeDashboard() {
           iconColor="text-sky-600"
           onClick={() => navigate(`/employee/leads?status=NEW&${dateQuery}`)}
         />
+        <StatsCard
+          label="Not Contactable"
+          value={cardStats.notContactable.length}
+          icon={PhoneOff}
+          iconBg="bg-slate-100"
+          iconColor="text-slate-500"
+          onClick={() => navigate(`/employee/leads?status=NOT_CONTACTED&${dateQuery}`)}
+        />
+        <StatsCard
+          label="Contacted"
+          value={cardStats.contacted.length}
+          icon={Phone}
+          iconBg="bg-amber-100"
+          iconColor="text-amber-600"
+          onClick={() => navigate(`/employee/leads?status=CONTACTED&${dateQuery}`)}
+        />
+        <StatsCard
+          label="Interested"
+          value={cardStats.interested.length}
+          icon={TrendingUp}
+          iconBg="bg-violet-100"
+          iconColor="text-violet-600"
+          onClick={() => navigate(`/employee/leads?status=INTERESTED&${dateQuery}`)}
+        />
+        <StatsCard
+          label="Follow-up Sched."
+          value={cardStats.followUpScheduled.length}
+          icon={CalendarCheck}
+          iconBg="bg-orange-100"
+          iconColor="text-orange-600"
+          onClick={() => navigate(`/employee/leads?status=FOLLOW_UP_SCHEDULED&${dateQuery}`)}
+        />
+        <StatsCard
+          label="Confirmed"
+          value={cardStats.confirmed.length}
+          icon={CheckCircle}
+          iconBg="bg-green-100"
+          iconColor="text-green-600"
+          onClick={() => navigate(`/employee/leads?status=CONFIRMED&${dateQuery}`)}
+        />
+        <StatsCard
+          label="Lost"
+          value={cardStats.lost.length}
+          icon={XCircle}
+          iconBg="bg-red-100"
+          iconColor="text-red-500"
+          onClick={() => navigate(`/employee/leads?status=LOST&${dateQuery}`)}
+        />
+      </div>
+
+      {/* Follow-up reminders — a different axis entirely (by follow-up date,
+          not status), so a lead of any status above can also show up here.
+          Not meant to add up with the status tiles. */}
+      <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider -mb-1">Follow-up Reminders</p>
+      <div className="grid grid-cols-2 gap-3 sm:max-w-md">
         <StatsCard
           label="Today's Follow-ups"
           value={cardStats.todayFollowUps.length}
@@ -363,38 +432,6 @@ export default function EmployeeDashboard() {
           iconBg="bg-red-100"
           iconColor="text-red-600"
           onClick={() => navigate('/employee/follow-ups')}
-        />
-        <StatsCard
-          label="Interested"
-          value={cardStats.interested.length}
-          icon={TrendingUp}
-          iconBg="bg-violet-100"
-          iconColor="text-violet-600"
-          onClick={() => navigate(`/employee/leads?status=INTERESTED&${dateQuery}`)}
-        />
-        <StatsCard
-          label="Not Contactable"
-          value={cardStats.notContactable.length}
-          icon={PhoneOff}
-          iconBg="bg-slate-100"
-          iconColor="text-slate-500"
-          onClick={() => navigate(`/employee/leads?status=NOT_CONTACTED&${dateQuery}`)}
-        />
-        <StatsCard
-          label="Lost"
-          value={cardStats.lost.length}
-          icon={XCircle}
-          iconBg="bg-red-100"
-          iconColor="text-red-500"
-          onClick={() => navigate(`/employee/leads?status=LOST&${dateQuery}`)}
-        />
-        <StatsCard
-          label="Confirmed"
-          value={cardStats.confirmed.length}
-          icon={CheckCircle}
-          iconBg="bg-green-100"
-          iconColor="text-green-600"
-          onClick={() => navigate(`/employee/leads?status=CONFIRMED&${dateQuery}`)}
         />
       </div>
 

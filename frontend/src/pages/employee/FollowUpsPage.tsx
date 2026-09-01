@@ -102,7 +102,7 @@ function FollowUpCard({
   onView: (lead: Lead) => void;
   onMarkDone: (lead: Lead) => void;
   onReschedule: (lead: Lead) => void;
-  variant: 'overdue' | 'today' | 'upcoming';
+  variant: 'overdue' | 'today' | 'upcoming' | 'later';
 }) {
   const daysOverdue = variant === 'overdue' && lead.followUpDate
     ? Math.floor((Date.now() - new Date(lead.followUpDate).getTime()) / 86400000)
@@ -112,12 +112,14 @@ function FollowUpCard({
     overdue: 'bg-red-50 border-red-200',
     today: 'bg-orange-50 border-orange-200',
     upcoming: 'bg-blue-50 border-blue-100',
+    later: 'bg-slate-50 border-slate-200',
   };
 
   const textMap = {
     overdue: 'text-red-700',
     today: 'text-orange-700',
     upcoming: 'text-blue-700',
+    later: 'text-slate-600',
   };
 
   return (
@@ -141,6 +143,7 @@ function FollowUpCard({
         ) : (
           <Calendar className="w-3.5 h-3.5" />
         )}
+        {/* upcoming and later share the same calendar icon — only the section heading tells them apart */}
         <span>{formatDateTime(lead.followUpDate)}</span>
       </div>
 
@@ -277,6 +280,13 @@ export default function EmployeeFollowUpsPage() {
     const d = new Date(l.followUpDate!);
     return d > now && !l.followUpDate!.startsWith(todayStr) && d <= nextWeek;
   });
+  // Anything scheduled further out than a week used to be fetched but never
+  // shown in any section here — silently invisible until it drifted inside
+  // the 7-day window. This is the same "pending, not done" set, just further
+  // in the future, so every follow-up now always lands somewhere.
+  const later = pendingLeads
+    .filter((l) => new Date(l.followUpDate!) > nextWeek)
+    .sort((a, b) => new Date(a.followUpDate!).getTime() - new Date(b.followUpDate!).getTime());
 
   const handleMarkDone = (lead: Lead) => {
     updateLead.mutate({ id: lead.id, followUpDone: true });
@@ -294,7 +304,7 @@ export default function EmployeeFollowUpsPage() {
           <h2 className="text-xl font-bold text-slate-900">Follow-ups</h2>
           <p className="text-sm text-slate-500 mt-0.5">
             {overdue.length > 0 && <span className="text-red-600 font-medium">{overdue.length} overdue · </span>}
-            {today.length} today · {upcoming.length} upcoming · {completedLeads.length} completed
+            {today.length} today · {upcoming.length} upcoming · {later.length} later · {completedLeads.length} completed
           </p>
         </div>
         <button onClick={() => refetch()} className="btn-secondary flex items-center gap-2 py-2">
@@ -413,7 +423,31 @@ export default function EmployeeFollowUpsPage() {
             )}
           </div>
 
-          {!isLoading && overdue.length === 0 && today.length === 0 && upcoming.length === 0 && (
+          {/* Later (beyond 7 days) */}
+          {later.length > 0 && (
+            <div>
+              <div className="flex items-center gap-2 mb-3">
+                <Calendar className="w-4 h-4 text-slate-400" />
+                <h3 className="text-sm font-bold text-slate-600">
+                  Later {later.length > 0 ? `(${later.length})` : ''}
+                </h3>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {later.map((lead) => (
+                  <FollowUpCard
+                    key={lead.id}
+                    lead={lead}
+                    variant="later"
+                    onView={(l) => openDetail(l.id)}
+                    onMarkDone={handleMarkDone}
+                    onReschedule={setRescheduleLeadId}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {!isLoading && overdue.length === 0 && today.length === 0 && upcoming.length === 0 && later.length === 0 && (
             <div className="card p-12 text-center">
               <CheckCircle className="w-12 h-12 text-green-400 mx-auto mb-3" />
               <p className="text-slate-700 font-semibold text-lg">All caught up!</p>

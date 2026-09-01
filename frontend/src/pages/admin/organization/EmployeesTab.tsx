@@ -384,6 +384,11 @@ export default function EmployeesTab() {
   const [search, setSearch] = useState('');
   const [deptFilter, setDeptFilter] = useState('');
   const [desigFilter, setDesigFilter] = useState('');
+  // Defaults to Active only — a removed employee is deactivated, not
+  // erased (their leads/bookings/history stay correctly attributed), so
+  // without this default the list would otherwise mix them back in with
+  // everyone still working, which reads as if "Remove" didn't do anything.
+  const [statusFilter, setStatusFilter] = useState<'ACTIVE' | 'INACTIVE' | ''>('ACTIVE');
   const [createOpen, setCreateOpen] = useState(false);
   const [editUser, setEditUser] = useState<User | null>(null);
   const [deleteUserId, setDeleteUserId] = useState<string | null>(null);
@@ -398,6 +403,7 @@ export default function EmployeesTab() {
     search: search || undefined, limit: 100,
     departmentId: deptFilter || undefined,
     designationId: desigFilter || undefined,
+    isActive: statusFilter === '' ? undefined : statusFilter === 'ACTIVE',
   });
   const { data: perfData } = useEmployeePerformance();
   const { data: deptData } = useDepartments({ status: 'ACTIVE' });
@@ -468,6 +474,15 @@ export default function EmployeesTab() {
             className="flex-1 text-sm bg-transparent outline-none placeholder:text-slate-400"
           />
         </div>
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value as 'ACTIVE' | 'INACTIVE' | '')}
+          className="input py-2 text-sm w-auto min-w-[130px]"
+        >
+          <option value="ACTIVE">Active</option>
+          <option value="INACTIVE">Inactive</option>
+          <option value="">All</option>
+        </select>
         {departments.length > 0 && (
           <div className="flex items-center gap-1.5">
             <Filter className="w-3.5 h-3.5 text-slate-400" />
