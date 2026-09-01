@@ -139,8 +139,8 @@ function PackageCreateModal({ open, onClose }: { open: boolean; onClose: () => v
   const [pkgType, setPkgType] = useState<PackageType>(isAdmin ? 'GIT' : 'FIT');
   const [rows, setRows] = useState<ItineraryRow[]>(() => buildItineraryRows(3));
 
-  const { register, handleSubmit, formState: { errors }, reset } = useForm<{ name: string; code: string }>({
-    defaultValues: { name: '', code: '' },
+  const { register, handleSubmit, formState: { errors }, reset } = useForm<{ name: string }>({
+    defaultValues: { name: '' },
   });
 
   const changeNights = (n: number) => {
@@ -171,9 +171,9 @@ function PackageCreateModal({ open, onClose }: { open: boolean; onClose: () => v
     setPkgType(isAdmin ? 'GIT' : 'FIT');
   };
 
-  const onSubmit = (data: { name: string; code: string }) => {
+  const onSubmit = (data: { name: string }) => {
     createPkg.mutate({
-      name: data.name, code: data.code, packageType: pkgType, nights,
+      name: data.name, packageType: pkgType, nights,
       itineraryRows: rows.map((r) => ({
         dayOffset: r.dayIndex * 2 + (r.rowType === 'night' ? 1 : 0),
         title: r.label,
@@ -203,19 +203,14 @@ function PackageCreateModal({ open, onClose }: { open: boolean; onClose: () => v
     >
       <form id="pkg-create-form" onSubmit={handleSubmit(onSubmit)} className="space-y-5">
 
-        {/* Name, Code, Type */}
+        {/* Name, Type */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="sm:col-span-2">
             <label className="label">Package Name *</label>
             <input {...register('name', { required: 'Package name is required' })} className="input" placeholder="e.g. Manali–Leh Adventure" />
             {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name.message}</p>}
           </div>
-          <div>
-            <label className="label">Package Code *</label>
-            <input {...register('code', { required: 'Package code is required' })} className="input uppercase" placeholder="e.g. ML-7N9D" />
-            {errors.code && <p className="text-red-500 text-xs mt-1">{errors.code.message}</p>}
-          </div>
-          <div>
+          <div className="sm:col-span-2">
             <label className="label">Package Type *</label>
             <div className="flex gap-2">
               {(['GIT', 'FIT'] as PackageType[]).map((type) => {
@@ -327,7 +322,6 @@ function PackageCreateModal({ open, onClose }: { open: boolean; onClose: () => v
 
 interface PackageFormData {
   name: string;
-  code: string;
   description: string;
   overview: string;
   destinationId: string;
@@ -374,7 +368,6 @@ function PackageFormModal({ open, onClose, existing }: { open: boolean; onClose:
   const { register, handleSubmit, control, watch, formState: { errors } } = useForm<PackageFormData>({
     defaultValues: {
       name: existing?.name ?? '',
-      code: existing?.code ?? '',
       description: existing?.description ?? '',
       overview: existing?.overview ?? '',
       destinationId: existing?.destinationId ?? '',
@@ -407,7 +400,6 @@ function PackageFormModal({ open, onClose, existing }: { open: boolean; onClose:
   const onSubmit = (data: PackageFormData) => {
     const payload: any = {
       name: data.name,
-      code: data.code,
       description: data.description || undefined,
       overview: data.overview || undefined,
       destinationId: data.destinationId || undefined,
@@ -458,7 +450,7 @@ function PackageFormModal({ open, onClose, existing }: { open: boolean; onClose:
   return (
     <Modal
       open={open} onClose={onClose}
-      title={isEdit ? `Edit Package — ${existing?.code}` : 'New Package'}
+      title={isEdit ? `Edit Package — ${existing?.name}` : 'New Package'}
       size="2xl"
       footer={
         <>
@@ -495,11 +487,6 @@ function PackageFormModal({ open, onClose, existing }: { open: boolean; onClose:
                 <label className="label">Package Name *</label>
                 <input {...register('name', { required: 'Name is required' })} className="input" placeholder="e.g. Kedarnath Spiritual Journey" />
                 {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name.message}</p>}
-              </div>
-              <div>
-                <label className="label">Package Code *</label>
-                <input {...register('code', { required: 'Code is required' })} className="input uppercase" placeholder="e.g. KED-6N7D-DEL" />
-                {errors.code && <p className="text-red-500 text-xs mt-1">{errors.code.message}</p>}
               </div>
               <div>
                 <label className="label">Status</label>
@@ -941,7 +928,6 @@ function PackageDetailModal({ pkg, onClose, onEdit, canEdit }: {
       <div className="flex items-center gap-3 mb-4 pb-4 border-b border-slate-100">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-xs font-mono font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded">{pkg.code}</span>
             <span className={cn('badge text-[10px]', STATUS_COLORS[pkg.status])}>{pkg.status}</span>
             <span className={cn('text-[10px] font-bold px-2 py-0.5 rounded-full',
               pkg.packageType === 'GIT' ? 'bg-blue-100 text-blue-700' : 'bg-violet-100 text-violet-700'
@@ -1095,7 +1081,6 @@ function PackageCard({ pkg, onView, onEdit, onDelete, canMutate }: {
             <h3 className="font-semibold text-slate-800 text-sm leading-tight truncate">{pkg.name}</h3>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-[10px] font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-mono">{pkg.code}</span>
             <span className={cn('text-[10px] font-bold px-1.5 py-0.5 rounded',
               pkg.packageType === 'GIT' ? 'bg-blue-100 text-blue-700' : 'bg-violet-100 text-violet-700'
             )}>{pkg.packageType ?? 'GIT'}</span>

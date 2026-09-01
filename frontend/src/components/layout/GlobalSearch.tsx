@@ -53,7 +53,7 @@ export default function GlobalSearch() {
       case 'payments':
         return <button key={item.id} onClick={() => goTo('/admin/finance/verification')} className="w-full text-left px-3 py-2 hover:bg-slate-50 rounded-lg"><p className="text-sm font-medium text-slate-800">₹{item.amount.toLocaleString()}</p><p className="text-xs text-slate-400">{item.reference ?? item.receiptNo ?? 'No reference'}</p></button>;
       case 'packages':
-        return <button key={item.id} onClick={() => goTo('/admin/packages')} className="w-full text-left px-3 py-2 hover:bg-slate-50 rounded-lg"><p className="text-sm font-medium text-slate-800">{item.name}</p><p className="text-xs text-slate-400">{item.code}</p></button>;
+        return <button key={item.id} onClick={() => goTo('/admin/packages')} className="w-full text-left px-3 py-2 hover:bg-slate-50 rounded-lg"><p className="text-sm font-medium text-slate-800">{item.name}</p><p className="text-xs text-slate-400">Package</p></button>;
       case 'hotels':
         return <button key={item.id} onClick={() => goTo(`/admin/operations/departures/${item.departureId}`)} className="w-full text-left px-3 py-2 hover:bg-slate-50 rounded-lg"><p className="text-sm font-medium text-slate-800">{item.name}</p><p className="text-xs text-slate-400">View trip</p></button>;
       case 'vehicles':

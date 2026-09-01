@@ -150,7 +150,6 @@ function FITViewModal({ pkg, onClose }: { pkg: PkgType; onClose: () => void }) {
     >
       <div className="space-y-5">
         <div className="flex flex-wrap gap-2 text-xs">
-          <span className="font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-mono">{pkg.code}</span>
           <span className={cn('font-bold px-1.5 py-0.5 rounded', pkg.packageType === 'GIT' ? 'bg-blue-100 text-blue-700' : 'bg-violet-100 text-violet-700')}>{pkg.packageType ?? 'GIT'}</span>
           {pkg.destination && <span className="flex items-center gap-1 text-slate-600"><MapPin className="w-3 h-3" />{pkg.destination.name}, {pkg.destination.country}</span>}
           {pkg.tourCategory && <span className="flex items-center gap-1 text-slate-600"><Tag className="w-3 h-3" />{pkg.tourCategory.name}</span>}
@@ -236,7 +235,7 @@ function EditFITModal({ pkg, onClose }: { pkg: PkgType; onClose: () => void }) {
   }, [itinData, itinInitialized, pkg.nights]);
 
   const { register, handleSubmit, formState: { errors } } = useForm({
-    defaultValues: { name: pkg.name, code: pkg.code },
+    defaultValues: { name: pkg.name },
   });
 
   const changeNights = (n: number) => {
@@ -261,11 +260,10 @@ function EditFITModal({ pkg, onClose }: { pkg: PkgType; onClose: () => void }) {
     }));
   };
 
-  const onSubmit = (data: { name: string; code: string }) => {
+  const onSubmit = (data: { name: string }) => {
     updatePkg.mutate({
       id: pkg.id,
       name: data.name,
-      code: data.code,
       nights,
       itineraryRows: rows.map((r) => ({
         dayOffset: r.dayIndex * 2 + (r.rowType === 'night' ? 1 : 0),
@@ -304,12 +302,7 @@ function EditFITModal({ pkg, onClose }: { pkg: PkgType; onClose: () => void }) {
               <input {...register('name', { required: 'Name is required' })} className="input" />
               {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name.message}</p>}
             </div>
-            <div>
-              <label className="label">Package Code *</label>
-              <input {...register('code', { required: 'Code is required' })} className="input uppercase" />
-              {errors.code && <p className="text-red-500 text-xs mt-1">{errors.code.message}</p>}
-            </div>
-            <div className="flex items-center gap-3 px-4 py-2 bg-violet-50 border border-violet-200 rounded-xl self-end">
+            <div className="flex items-center gap-3 px-4 py-2 bg-violet-50 border border-violet-200 rounded-xl self-end sm:col-span-2">
               <UserCircle className="w-4 h-4 text-violet-500 flex-shrink-0" />
               <div>
                 <p className="text-xs font-semibold text-violet-700">FIT Package</p>
@@ -355,8 +348,8 @@ function NewFITModal({ open, onClose }: { open: boolean; onClose: () => void }) 
   const [nights, setNights] = useState(3);
   const [rows, setRows] = useState<ItineraryRow[]>(() => buildItineraryRows(3));
 
-  const { register, handleSubmit, formState: { errors }, reset } = useForm<{ name: string; code: string }>({
-    defaultValues: { name: '', code: '' },
+  const { register, handleSubmit, formState: { errors }, reset } = useForm<{ name: string }>({
+    defaultValues: { name: '' },
   });
 
   const changeNights = (n: number) => {
@@ -386,9 +379,9 @@ function NewFITModal({ open, onClose }: { open: boolean; onClose: () => void }) 
     setNights(3); setRows(buildItineraryRows(3));
   };
 
-  const onSubmit = (data: { name: string; code: string }) => {
+  const onSubmit = (data: { name: string }) => {
     createPkg.mutate({
-      name: data.name, code: data.code, nights, packageType: 'FIT',
+      name: data.name, nights, packageType: 'FIT',
       itineraryRows: rows.map((r) => ({
         dayOffset: r.dayIndex * 2 + (r.rowType === 'night' ? 1 : 0),
         title: r.label,
@@ -428,12 +421,7 @@ function NewFITModal({ open, onClose }: { open: boolean; onClose: () => void }) 
             <input {...register('name', { required: 'Name is required' })} className="input" placeholder="e.g. Manali Private Trip — Sharma Family" />
             {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name.message}</p>}
           </div>
-          <div>
-            <label className="label">Package Code *</label>
-            <input {...register('code', { required: 'Code is required' })} className="input uppercase" placeholder="e.g. FIT-MNL-5N" />
-            {errors.code && <p className="text-red-500 text-xs mt-1">{errors.code.message}</p>}
-          </div>
-          <div className="flex items-center gap-3 px-4 py-2 bg-violet-50 border border-violet-200 rounded-xl self-end">
+          <div className="flex items-center gap-3 px-4 py-2 bg-violet-50 border border-violet-200 rounded-xl self-end sm:col-span-2">
             <UserCircle className="w-4 h-4 text-violet-500 flex-shrink-0" />
             <div>
               <p className="text-xs font-semibold text-violet-700">FIT Package</p>
@@ -531,7 +519,6 @@ function PackageCard({
             <h3 className="font-semibold text-slate-800 text-sm leading-tight truncate">{pkg.name}</h3>
           </div>
           <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="text-[10px] font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-mono">{pkg.code}</span>
             <span className={cn(
               'text-[10px] font-bold px-1.5 py-0.5 rounded',
               pkg.packageType === 'GIT' ? 'bg-blue-100 text-blue-700' : 'bg-violet-100 text-violet-700'

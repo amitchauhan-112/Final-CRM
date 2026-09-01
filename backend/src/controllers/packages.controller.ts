@@ -6,6 +6,16 @@ const orgId = (req: AuthenticatedRequest) => req.user?.organizationId ?? null;
 const userId = (req: AuthenticatedRequest) => req.user?.id ?? '';
 const userRole = (req: AuthenticatedRequest) => req.user?.role ?? 'EMPLOYEE';
 
+// Package codes are no longer a user-facing concept (nobody types one
+// anymore) — generated internally so PackageAuditLog still has something
+// stable to denormalize, and other backend code that reads `code` off a
+// Package keeps working unchanged.
+function generatePackageCode(name: string, packageType: string): string {
+  const slug = name.trim().toUpperCase().replace(/[^A-Z0-9]+/g, '').slice(0, 10) || 'PKG';
+  const rand = Math.floor(1000 + Math.random() * 9000);
+  return `${packageType}-${slug}-${rand}`;
+}
+
 const parseList = (raw: any): string[] => {
   if (Array.isArray(raw)) return raw.filter(Boolean);
   if (typeof raw === 'string') {
@@ -159,7 +169,7 @@ export const getPackageAudit = async (req: AuthenticatedRequest, res: Response):
 export const createPackage = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const {
-      name, code, description, overview, destinationId, tourCategoryId,
+      name, description, overview, destinationId, tourCategoryId,
       nights, inclusions, exclusions, highlights, thingsToCarry,
       pricePerPerson, priceSingle, priceDouble, priceTriple, priceQuad, offerPrice,
       capacityMin, capacityMax, difficultyLevel, bestSeason,
@@ -171,7 +181,6 @@ export const createPackage = async (req: AuthenticatedRequest, res: Response): P
     } = req.body;
 
     if (!name?.trim()) { res.status(400).json({ success: false, error: 'Package name is required' }); return; }
-    if (!code?.trim()) { res.status(400).json({ success: false, error: 'Package code is required' }); return; }
     if (nights === undefined || nights === '' || isNaN(Number(nights))) {
       res.status(400).json({ success: false, error: 'Stay nights is required' }); return;
     }
@@ -190,7 +199,7 @@ export const createPackage = async (req: AuthenticatedRequest, res: Response): P
       data: {
         organizationId: orgId(req),
         name: name.trim(),
-        code: code.trim().toUpperCase(),
+        code: generatePackageCode(name, packageType),
         description: description?.trim() || null,
         overview: overview?.trim() || null,
         destinationId: destinationId || null,
@@ -290,7 +299,7 @@ export const updatePackage = async (req: AuthenticatedRequest, res: Response): P
     }
 
     const {
-      name, code, description, overview, destinationId, tourCategoryId,
+      name, description, overview, destinationId, tourCategoryId,
       nights, inclusions, exclusions, highlights, thingsToCarry,
       pricePerPerson, priceSingle, priceDouble, priceTriple, priceQuad, offerPrice,
       capacityMin, capacityMax, difficultyLevel, bestSeason,
@@ -305,7 +314,8 @@ export const updatePackage = async (req: AuthenticatedRequest, res: Response): P
 
     const nextData: Record<string, any> = {
       name: name?.trim() ?? existing.name,
-      code: code ? code.trim().toUpperCase() : existing.code,
+      // code is generated once at creation and never user-editable — always
+      // keeps its original value on update.
       description: description !== undefined ? description?.trim() || null : existing.description,
       overview: overview !== undefined ? overview?.trim() || null : existing.overview,
       destinationId: destinationId !== undefined ? destinationId || null : existing.destinationId,

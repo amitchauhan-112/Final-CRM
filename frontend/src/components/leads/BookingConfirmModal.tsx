@@ -48,6 +48,100 @@ function SectionHeader({ icon: Icon, label }: { icon: React.ElementType; label: 
   );
 }
 
+// ─── Day-by-day itinerary builder for inline FIT package creation ────────────
+// Same pattern used for FIT packages on the Package Catalogue page — kept as
+// a local copy here (matching this codebase's existing convention of two
+// near-identical itinerary builders rather than a shared one) so the inline
+// "create a new FIT package" flow collects real day/night details instead of
+// falling back to the backend's generic Day 0/Night 0 placeholder scaffold.
+
+type PkgActivityType = 'JOURNEY' | 'STAY' | 'SIGHTSEEING';
+
+interface PkgItineraryRow {
+  key: string;
+  label: string;
+  rowType: 'day' | 'night';
+  dayIndex: number;
+  activityType: PkgActivityType;
+  activityDetails: string;
+}
+
+function buildPkgItineraryRows(nights: number): PkgItineraryRow[] {
+  const rows: PkgItineraryRow[] = [];
+  for (let i = 0; i <= nights + 1; i++) {
+    const isEdge = i === 0 || i === nights + 1;
+    rows.push({ key: `day-${i}`, label: `Day ${i}`, rowType: 'day', dayIndex: i, activityType: isEdge ? 'JOURNEY' : 'SIGHTSEEING', activityDetails: '' });
+    rows.push({ key: `night-${i}`, label: `Night ${i}`, rowType: 'night', dayIndex: i, activityType: isEdge ? 'JOURNEY' : 'STAY', activityDetails: '' });
+  }
+  return rows;
+}
+
+const PKG_ACTIVITY_OPTIONS: { value: PkgActivityType; label: string }[] = [
+  { value: 'JOURNEY', label: 'Journey' },
+  { value: 'STAY', label: 'Stay' },
+  { value: 'SIGHTSEEING', label: 'Sightseeing' },
+];
+
+function PkgItineraryTable({ rows, nights, onUpdateRow }: {
+  rows: PkgItineraryRow[];
+  nights: number;
+  onUpdateRow: (key: string, field: 'activityType' | 'activityDetails', value: string) => void;
+}) {
+  return (
+    <div>
+      <div className="hidden sm:grid sm:grid-cols-[8rem_7rem_1fr] gap-x-2 mb-1.5 px-1">
+        <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Day / Night</p>
+        <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Activity Type</p>
+        <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Activity Details</p>
+      </div>
+      <div className="space-y-1.5 max-h-64 overflow-y-auto pr-1">
+        {rows.map((row) => {
+          const isDep = row.dayIndex === 0;
+          const isRet = row.dayIndex === nights + 1;
+          const isJourney = row.activityType === 'JOURNEY';
+          const badgeColor = isDep
+            ? 'bg-amber-100 text-amber-700'
+            : isRet
+            ? 'bg-emerald-100 text-emerald-700'
+            : row.rowType === 'day' ? 'bg-sky-100 text-sky-700' : 'bg-blue-100 text-blue-700';
+          const badgeText = row.rowType === 'day' ? `D${row.dayIndex}` : `N${row.dayIndex}`;
+          return (
+            <div key={row.key} className="grid grid-cols-1 sm:grid-cols-[8rem_7rem_1fr] gap-2 sm:gap-x-2 sm:items-center">
+              <div className="flex items-center gap-2">
+                <span className={cn('text-[10px] font-bold px-1.5 py-0.5 rounded-full tabular-nums flex-shrink-0', badgeColor)}>
+                  {badgeText}
+                </span>
+                <span className="text-xs font-medium text-slate-700 whitespace-nowrap">{row.label}</span>
+              </div>
+              <select
+                value={row.activityType}
+                onChange={(e) => onUpdateRow(row.key, 'activityType', e.target.value)}
+                className="input text-sm py-1.5"
+              >
+                {PKG_ACTIVITY_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+              <input
+                type="text"
+                value={row.activityDetails}
+                onChange={(e) => onUpdateRow(row.key, 'activityDetails', e.target.value)}
+                disabled={isJourney}
+                placeholder={
+                  isJourney ? '—'
+                  : row.activityType === 'STAY' ? 'Hotel / camp name or location…'
+                  : 'Place or activity name…'
+                }
+                className={cn('input text-sm py-1.5', isJourney && 'bg-slate-50 text-slate-300 cursor-not-allowed')}
+              />
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export default function BookingConfirmModal({ open, onClose, lead, existingBooking }: Props) {
   const createBooking = useCreateBooking();
   const updateBooking = useUpdateBooking();
@@ -68,7 +162,30 @@ export default function BookingConfirmModal({ open, onClose, lead, existingBooki
   // had to leave this form and go to the Package Master screen to do it.
   const createPackage = useCreatePackage();
   const [showCreatePackage, setShowCreatePackage] = useState(false);
-  const [newPkg, setNewPkg] = useState({ name: '', code: '', nights: '', pricePerPerson: '' });
+  const [newPkg, setNewPkg] = useState({ name: '', nights: '3', pricePerPerson: '' });
+  const [newPkgRows, setNewPkgRows] = useState<PkgItineraryRow[]>(() => buildPkgItineraryRows(3));
+
+  const changeNewPkgNights = (nightsStr: string) => {
+    setNewPkg((p) => ({ ...p, nights: nightsStr }));
+    const n = Number(nightsStr);
+    if (!nightsStr || isNaN(n) || n < 1) return;
+    setNewPkgRows((prev) => {
+      const next = buildPkgItineraryRows(n);
+      return next.map((row) => {
+        const existing = prev.find((r) => r.key === row.key);
+        return existing ? { ...row, activityType: existing.activityType, activityDetails: existing.activityDetails } : row;
+      });
+    });
+  };
+
+  const updateNewPkgRow = (key: string, field: 'activityType' | 'activityDetails', value: string) => {
+    setNewPkgRows((prev) => prev.map((r) => {
+      if (r.key !== key) return r;
+      const updated = { ...r, [field]: value as PkgActivityType };
+      if (field === 'activityType' && value === 'JOURNEY') updated.activityDetails = '';
+      return updated;
+    }));
+  };
 
   const { register, handleSubmit, control, setValue, formState: { errors } } = useForm<BookingForm>({
     defaultValues: {
@@ -162,7 +279,8 @@ export default function BookingConfirmModal({ open, onClose, lead, existingBooki
       setRoomSplit([{ count: 0, roomSharing: 'DOUBLE' }]);
       setSplitError(null);
       setShowCreatePackage(false);
-      setNewPkg({ name: '', code: '', nights: '', pricePerPerson: '' });
+      setNewPkg({ name: '', nights: '3', pricePerPerson: '' });
+      setNewPkgRows(buildPkgItineraryRows(3));
     }
     // Deliberately keyed on IDs, not the whole `lead`/`existingBooking`
     // objects — both come from polling hooks (refetchInterval: 20000) that
@@ -216,14 +334,13 @@ export default function BookingConfirmModal({ open, onClose, lead, existingBooki
   };
 
   const handleCreatePackage = async () => {
-    if (!newPkg.name.trim() || !newPkg.code.trim() || !newPkg.nights || isNaN(Number(newPkg.nights))) {
-      toast.error('Name, code and nights are required'); return;
+    if (!newPkg.name.trim() || !newPkg.nights || isNaN(Number(newPkg.nights))) {
+      toast.error('Name and nights are required'); return;
     }
     const nights = Number(newPkg.nights);
     try {
       const result: any = await createPackage.mutateAsync({
         name: newPkg.name.trim(),
-        code: newPkg.code.trim(),
         nights,
         days: nights + 2,
         packageType: 'FIT',
@@ -232,11 +349,18 @@ export default function BookingConfirmModal({ open, onClose, lead, existingBooki
         pricePerPerson: newPkg.pricePerPerson ? Number(newPkg.pricePerPerson) : 0,
         inclusions: '[]', exclusions: '[]', highlights: '[]', thingsToCarry: '[]',
         bestSeason: '[]', images: '[]', gallery: '[]',
+        itineraryRows: newPkgRows.map((r) => ({
+          dayOffset: r.dayIndex * 2 + (r.rowType === 'night' ? 1 : 0),
+          title: r.label,
+          activityType: r.activityType,
+          activityDetails: r.activityDetails,
+        })),
       } as any);
       const created = result?.data;
       if (created?.id) setValue('packageId', created.id);
       setShowCreatePackage(false);
-      setNewPkg({ name: '', code: '', nights: '', pricePerPerson: '' });
+      setNewPkg({ name: '', nights: '3', pricePerPerson: '' });
+      setNewPkgRows(buildPkgItineraryRows(3));
     } catch {
       // useCreatePackage's onError already toasts the server's message
     }
@@ -310,7 +434,7 @@ export default function BookingConfirmModal({ open, onClose, lead, existingBooki
                 <option value="">-- Select a {watchedTourType} package --</option>
                 {displayedPackages.map((p) => (
                   <option key={p.id} value={p.id}>
-                    {p.code} — {p.name} ({p.nights}N/{p.days}D) — {formatCurrency(p.offerPrice ?? p.pricePerPerson)}/person
+                    {p.name} ({p.nights}N/{p.days}D) — {formatCurrency(p.offerPrice ?? p.pricePerPerson)}/person
                   </option>
                 ))}
               </select>
@@ -345,9 +469,9 @@ export default function BookingConfirmModal({ open, onClose, lead, existingBooki
                       + Create a new FIT package
                     </button>
                   ) : (
-                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-2.5">
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-3">
                       <div className="grid grid-cols-2 gap-2">
-                        <div>
+                        <div className="col-span-2">
                           <label className="label text-xs">Package Name *</label>
                           <input
                             value={newPkg.name}
@@ -357,20 +481,11 @@ export default function BookingConfirmModal({ open, onClose, lead, existingBooki
                           />
                         </div>
                         <div>
-                          <label className="label text-xs">Package Code *</label>
-                          <input
-                            value={newPkg.code}
-                            onChange={(e) => setNewPkg((p) => ({ ...p, code: e.target.value }))}
-                            className="input text-sm font-mono"
-                            placeholder="e.g. FIT-KASH-01"
-                          />
-                        </div>
-                        <div>
                           <label className="label text-xs">Nights *</label>
                           <input
                             type="number" min={1}
                             value={newPkg.nights}
-                            onChange={(e) => setNewPkg((p) => ({ ...p, nights: e.target.value }))}
+                            onChange={(e) => changeNewPkgNights(e.target.value)}
                             className="input text-sm"
                           />
                         </div>
@@ -384,8 +499,14 @@ export default function BookingConfirmModal({ open, onClose, lead, existingBooki
                           />
                         </div>
                       </div>
+
+                      <div>
+                        <label className="label text-xs mb-1.5">Day Plan</label>
+                        <PkgItineraryTable rows={newPkgRows} nights={Number(newPkg.nights) || 0} onUpdateRow={updateNewPkgRow} />
+                      </div>
+
                       <p className="text-[10px] text-slate-400">
-                        Creates a minimal FIT package you can select right away — add full details (inclusions, itinerary, etc.) later from Package Master if needed.
+                        Add full pricing details, inclusions, etc. later from Package Master if needed.
                       </p>
                       <div className="flex items-center gap-2 justify-end">
                         <button type="button" onClick={() => setShowCreatePackage(false)} className="btn-secondary py-1.5 text-xs">Cancel</button>
@@ -411,9 +532,6 @@ export default function BookingConfirmModal({ open, onClose, lead, existingBooki
                   <span className={cn('text-[10px] font-bold px-2 py-0.5 rounded-full',
                     selectedPkg.packageType === 'GIT' ? 'bg-blue-100 text-blue-700' : 'bg-violet-100 text-violet-700'
                   )}>{selectedPkg.packageType}</span>
-                  <span className="text-xs font-mono font-bold bg-white border border-slate-200 text-slate-600 px-2 py-0.5 rounded">
-                    {selectedPkg.code}
-                  </span>
                   <span className="text-xs font-semibold text-slate-800">{selectedPkg.name}</span>
                   <span className="text-xs text-slate-500 ml-auto">{selectedPkg.nights}N / {selectedPkg.days}D</span>
                 </div>

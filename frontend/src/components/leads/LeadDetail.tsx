@@ -272,9 +272,7 @@ function BookingSummary({ booking, onEdit }: { booking: Booking; onEdit: () => v
             <Package className="w-3.5 h-3.5 text-emerald-600 mt-0.5 flex-shrink-0" />
             <div>
               <p className="text-[10px] text-emerald-600 font-semibold uppercase tracking-wider">Package</p>
-              <p className="text-sm font-medium text-slate-800">{booking.package.name}
-                <span className="ml-1.5 text-xs text-slate-400 font-mono">({booking.package.code})</span>
-              </p>
+              <p className="text-sm font-medium text-slate-800">{booking.package.name}</p>
             </div>
           </div>
         )}

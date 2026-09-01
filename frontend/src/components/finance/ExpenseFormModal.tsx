@@ -71,7 +71,7 @@ export default function ExpenseFormModal({ open, onClose, onSubmit, isLoading }:
           <label className="label">Package (optional)</label>
           <select {...register('packageId')} className="input">
             <option value="">—</option>
-            {packages.map((p) => <option key={p.id} value={p.id}>{p.name} ({p.code})</option>)}
+            {packages.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
         </div>
         <div>
