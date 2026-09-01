@@ -272,12 +272,25 @@ export const updateLead = async (req: AuthenticatedRequest, res: Response): Prom
     const updateData: Record<string, unknown> = { ...rest };
 
     if (status !== undefined) {
+      // Once confirmed, a lead's status is permanently locked — not even the
+      // usual LOST exit is allowed anymore. A confirmed lead has already
+      // become a booking; any later outcome (cancellation, completion) is
+      // tracked on the Booking record's own status, not by moving the lead
+      // backward. Enforced for every role, including ADMIN.
+      if (existing.status === 'CONFIRMED' && status !== 'CONFIRMED') {
+        res.status(400).json({ success: false, error: 'A confirmed lead\'s status can never be changed again' });
+        return;
+      }
       // Forward-only pipeline, enforced for every role (including ADMIN) and
       // any direct API caller — LOST is always reachable as an exit, but no
       // status may ever move backward through the pipeline once advanced.
+      // One further exception: completing a scheduled follow-up can lead to
+      // "still interested, no concrete date yet" — allowed to fall back to
+      // INTERESTED specifically from FOLLOW_UP_SCHEDULED, same as LOST.
+      const isFollowUpToInterested = existing.status === 'FOLLOW_UP_SCHEDULED' && status === 'INTERESTED';
       const fromIdx = LEAD_STATUS_ORDER.indexOf(existing.status);
       const toIdx = LEAD_STATUS_ORDER.indexOf(status as string);
-      if (status !== existing.status && status !== 'LOST' && fromIdx !== -1 && toIdx !== -1 && toIdx < fromIdx) {
+      if (status !== existing.status && status !== 'LOST' && !isFollowUpToInterested && fromIdx !== -1 && toIdx !== -1 && toIdx < fromIdx) {
         res.status(400).json({ success: false, error: `A lead cannot move backward from ${existing.status} to ${status}` });
         return;
       }

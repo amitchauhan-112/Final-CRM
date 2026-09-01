@@ -281,6 +281,12 @@ export default function EmployeeDashboard() {
     const interested = statsLeads.filter((l) => l.status === 'INTERESTED');
     const notContactable = statsLeads.filter((l) => l.status === 'NOT_CONTACTED');
     const followUpScheduled = statsLeads.filter((l) => l.status === 'FOLLOW_UP_SCHEDULED');
+    // "Follow-up Sched." below counts by STATUS, so it still includes leads
+    // whose follow-up was already marked done (via Mark Done) but whose
+    // status was never moved forward — that's why this tile plus the
+    // Today/Overdue/Upcoming reminder tiles (which all exclude done ones)
+    // won't sum to the same number; this is the gap between them.
+    const followUpScheduledDone = followUpScheduled.filter((l) => l.followUpDone).length;
     const lost = statsLeads.filter((l) => l.status === 'LOST');
     const confirmed = statsLeads.filter((l) => l.status === 'CONFIRMED');
     const todayFollowUps = statsLeads.filter(
@@ -302,7 +308,7 @@ export default function EmployeeDashboard() {
     // the 7 buckets.
     return {
       total: statsLeads.length, fresh, contacted, interested, notContactable, followUpScheduled, lost, confirmed,
-      todayFollowUps, overdueFollowUps, upcomingFollowUps,
+      followUpScheduledDone, todayFollowUps, overdueFollowUps, upcomingFollowUps,
     };
   }, [statsLeads, today]);
 
@@ -399,6 +405,7 @@ export default function EmployeeDashboard() {
           icon={CalendarCheck}
           iconBg="bg-orange-100"
           iconColor="text-orange-600"
+          trendLabel={cardStats.followUpScheduledDone > 0 ? `${cardStats.followUpScheduledDone} already completed` : undefined}
           onClick={() => navigate(`/employee/leads?status=FOLLOW_UP_SCHEDULED&${dateQuery}`)}
         />
         <StatsCard

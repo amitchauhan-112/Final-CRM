@@ -140,7 +140,7 @@ export function useUpdateLead() {
       toast.success('Lead updated successfully');
     },
     onError: (err: any) => {
-      toast.error(err?.response?.data?.message || 'Failed to update lead');
+      toast.error(err?.response?.data?.error || 'Failed to update lead');
     },
   });
 }
@@ -177,7 +177,7 @@ export function useDeleteLead() {
       toast.success('Lead deleted successfully');
     },
     onError: (err: any) => {
-      toast.error(err?.response?.data?.message || 'Failed to delete lead');
+      toast.error(err?.response?.data?.error || 'Failed to delete lead');
     },
   });
 }

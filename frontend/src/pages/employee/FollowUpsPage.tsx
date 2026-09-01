@@ -4,6 +4,8 @@ import { useLeads, useUpdateLead } from '../../hooks/useLeads';
 import { useAuthStore } from '../../store/authStore';
 import { Lead } from '../../types/index';
 import LeadDetail from '../../components/leads/LeadDetail';
+import FollowUpOutcomeModal from '../../components/leads/FollowUpOutcomeModal';
+import BookingConfirmModal from '../../components/leads/BookingConfirmModal';
 import { useStarredLeads } from '../../hooks/useStarredLeads';
 import { useRecentViews } from '../../hooks/useRecentViews';
 import Modal from '../../components/ui/Modal';
@@ -249,6 +251,8 @@ export default function EmployeeFollowUpsPage() {
   const [activeTab, setActiveTab] = useState<TabKey>('pending');
   const [detailLeadId, setDetailLeadId] = useState<string | null>(null);
   const [rescheduleLeadId, setRescheduleLeadId] = useState<Lead | null>(null);
+  const [outcomeLead, setOutcomeLead] = useState<Lead | null>(null);
+  const [bookingLead, setBookingLead] = useState<Lead | null>(null);
   const { isStarred, toggle: toggleStar } = useStarredLeads();
   const { trackView } = useRecentViews();
 
@@ -288,8 +292,47 @@ export default function EmployeeFollowUpsPage() {
     .filter((l) => new Date(l.followUpDate!) > nextWeek)
     .sort((a, b) => new Date(a.followUpDate!).getTime() - new Date(b.followUpDate!).getTime());
 
+  // A completed follow-up must always resolve to one of four outcomes — never
+  // just silently marked done and left stuck at Follow-up Scheduled with no
+  // next step, so Mark Done opens the outcome picker instead of mutating directly.
   const handleMarkDone = (lead: Lead) => {
-    updateLead.mutate({ id: lead.id, followUpDone: true });
+    // A confirmed lead's status is permanently locked, so none of the four
+    // outcomes apply — just clear the stale reminder directly.
+    if (lead.status === 'CONFIRMED') {
+      updateLead.mutate({ id: lead.id, followUpDone: true });
+    } else {
+      setOutcomeLead(lead);
+    }
+  };
+
+  const handleOutcomeReschedule = (followUpDate: string, followUpNotes?: string) => {
+    if (!outcomeLead) return;
+    updateLead.mutate(
+      { id: outcomeLead.id, status: 'FOLLOW_UP_SCHEDULED', followUpDate, followUpNotes, followUpDone: false },
+      { onSuccess: () => setOutcomeLead(null) }
+    );
+  };
+  const handleOutcomeInterested = () => {
+    if (!outcomeLead) return;
+    updateLead.mutate(
+      { id: outcomeLead.id, status: 'INTERESTED', followUpDone: true },
+      { onSuccess: () => setOutcomeLead(null) }
+    );
+  };
+  const handleOutcomeConfirmed = () => {
+    if (!outcomeLead) return;
+    const lead = outcomeLead;
+    updateLead.mutate(
+      { id: lead.id, followUpDone: true },
+      { onSuccess: () => { setOutcomeLead(null); setBookingLead(lead); } }
+    );
+  };
+  const handleOutcomeLost = (reason: string, otherText?: string) => {
+    if (!outcomeLead) return;
+    updateLead.mutate(
+      { id: outcomeLead.id, status: 'LOST', followUpDone: true, lostReason: reason, lostReasonOther: otherText },
+      { onSuccess: () => setOutcomeLead(null) }
+    );
   };
 
   const tabs: { key: TabKey; label: string; count: number }[] = [
@@ -497,6 +540,24 @@ export default function EmployeeFollowUpsPage() {
         onClose={() => setRescheduleLeadId(null)}
         lead={rescheduleLeadId}
       />
+
+      <FollowUpOutcomeModal
+        open={!!outcomeLead}
+        lead={outcomeLead}
+        onClose={() => setOutcomeLead(null)}
+        onReschedule={handleOutcomeReschedule}
+        onInterested={handleOutcomeInterested}
+        onConfirmed={handleOutcomeConfirmed}
+        onLost={handleOutcomeLost}
+      />
+
+      {bookingLead && (
+        <BookingConfirmModal
+          open={!!bookingLead}
+          onClose={() => setBookingLead(null)}
+          lead={bookingLead}
+        />
+      )}
     </div>
   );
 }

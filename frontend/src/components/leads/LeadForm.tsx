@@ -160,7 +160,8 @@ export default function LeadForm({ defaultValues, onSubmit, isLoading, onCancel 
 
   // Status options based on role + edit mode
   const getStatusOptions = (): LeadStatus[] => {
-    if (isConfirmedLead) return ['CONFIRMED', 'LOST'];
+    // Once confirmed, status is permanently locked — not even Lost is reachable.
+    if (isConfirmedLead) return ['CONFIRMED'];
     const currentIdx = STATUS_ORDER.indexOf((defaultValues?.status as LeadStatus) ?? 'NEW');
     if (isEmployee && isEditMode) {
       // Employees can only move forward, never backward, never set CONFIRMED directly
@@ -309,7 +310,7 @@ export default function LeadForm({ defaultValues, onSubmit, isLoading, onCancel 
           </div>
           <div>
             <label className="label">Status <span className="text-red-500">*</span></label>
-            <select {...register('status', { required: true })} className="input">
+            <select {...register('status', { required: true })} className="input" disabled={isConfirmedLead}>
               {statusOptions.map((s) => (
                 <option key={s} value={s}>
                   {s === 'NEW' ? 'New'
@@ -323,7 +324,7 @@ export default function LeadForm({ defaultValues, onSubmit, isLoading, onCancel 
               ))}
             </select>
             {isConfirmedLead && (
-              <p className="text-xs text-amber-600 mt-1">Confirmed bookings can only be marked as Lost from here.</p>
+              <p className="text-xs text-amber-600 mt-1">Confirmed — status is permanently locked and can never change again.</p>
             )}
             {isEmployee && isEditMode && !isConfirmedLead && (
               <p className="text-xs text-slate-400 mt-1">Status can only move forward in the workflow.</p>

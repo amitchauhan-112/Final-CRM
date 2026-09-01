@@ -19,6 +19,7 @@ import Avatar from '../ui/Avatar';
 import Modal from '../ui/Modal';
 import LeadForm from './LeadForm';
 import FollowUpModal from './FollowUpModal';
+import FollowUpOutcomeModal from './FollowUpOutcomeModal';
 import PriorityBadge from '../ui/PriorityBadge';
 import TagChip from '../ui/TagChip';
 import CommentsSection from './CommentsSection';
@@ -109,8 +110,10 @@ function StatusBar({ current, pending, onUpdate, disabled, isEmployee }: {
         const cfg = leadStatusConfig[s];
         const isCurrent = current === s;
         const isPending = pending === s && !isCurrent;
-        // Once confirmed: only CONFIRMED (current) and LOST are valid
-        const isLocked = current === 'CONFIRMED' && s !== 'CONFIRMED' && s !== 'LOST';
+        // Once confirmed, status is permanently locked — not even LOST is
+        // reachable anymore; a confirmed lead is already a booking, and any
+        // later outcome (cancellation, completion) belongs on the booking.
+        const isLocked = current === 'CONFIRMED' && s !== 'CONFIRMED';
         // Employees cannot set CONFIRMED directly (booking flow handles it)
         const isHiddenForEmployee = isEmployee && s === 'CONFIRMED' && !isCurrent;
         // Forward-only workflow, enforced for everyone (server-enforced too —
@@ -126,7 +129,7 @@ function StatusBar({ current, pending, onUpdate, disabled, isEmployee }: {
             key={s}
             onClick={() => !isCurrent && !inactive && onUpdate(s)}
             disabled={isCurrent || disabled || inactive}
-            title={isLocked ? 'Cannot revert a confirmed booking' : isBackward ? 'Cannot move status backward' : undefined}
+            title={isLocked ? 'A confirmed lead\'s status can never be changed again' : isBackward ? 'Cannot move status backward' : undefined}
             className={cn(
               'px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all whitespace-nowrap',
               isCurrent
@@ -714,8 +717,8 @@ function PaymentsTab({ booking }: { booking: Booking }) {
   );
 }
 
-function OverviewTab({ lead, canAct, onUpdateLead, booking, onEditBooking }: {
-  lead: Lead; canAct: boolean; onUpdateLead: (data: any) => void;
+function OverviewTab({ lead, canAct, onUpdateLead, onFollowUpDoneClick, booking, onEditBooking }: {
+  lead: Lead; canAct: boolean; onUpdateLead: (data: any) => void; onFollowUpDoneClick: () => void;
   booking?: Booking | null; onEditBooking: () => void;
 }) {
   const { data: journeyData } = useLeadJourney(lead.id);
@@ -801,7 +804,7 @@ function OverviewTab({ lead, canAct, onUpdateLead, booking, onEditBooking }: {
             </div>
             {!lead.followUpDone && canAct && (
               <button
-                onClick={() => onUpdateLead({ id: lead.id, followUpDone: true })}
+                onClick={onFollowUpDoneClick}
                 className="btn-primary py-1 px-3 text-xs"
               >
                 Mark Done
@@ -860,6 +863,7 @@ export default function LeadDetail({ leadId, open, onClose, isStarred, onToggleS
   const [bookingOpen, setBookingOpen] = useState(false);
   const [pendingStatus, setPendingStatus] = useState<LeadStatus | null>(null);
   const [followUpModalOpen, setFollowUpModalOpen] = useState(false);
+  const [outcomeModalOpen, setOutcomeModalOpen] = useState(false);
 
   const { data, isLoading } = useLead(leadId);
   const updateLead = useUpdateLead();
@@ -877,8 +881,8 @@ export default function LeadDetail({ leadId, open, onClose, isStarred, onToggleS
 
   const handleStatusChange = (status: LeadStatus) => {
     if (!lead) return;
-    // Guard: once confirmed, can only move to LOST
-    if (lead.status === 'CONFIRMED' && status !== 'LOST') return;
+    // Guard: once confirmed, status is permanently locked — nothing changes it again
+    if (lead.status === 'CONFIRMED') return;
     if (status === 'CONFIRMED') {
       setBookingOpen(true);
       return;
@@ -914,6 +918,39 @@ export default function LeadDetail({ leadId, open, onClose, isStarred, onToggleS
     updateLead.mutate(
       { id: lead.id, status: 'FOLLOW_UP_SCHEDULED', followUpDate, followUpNotes },
       { onSuccess: () => setFollowUpModalOpen(false) }
+    );
+  };
+
+  // A completed follow-up must always resolve to one of four outcomes —
+  // never just silently marked done and left stuck at Follow-up Scheduled.
+  const handleOutcomeReschedule = (followUpDate: string, followUpNotes?: string) => {
+    if (!lead) return;
+    updateLead.mutate(
+      { id: lead.id, status: 'FOLLOW_UP_SCHEDULED', followUpDate, followUpNotes, followUpDone: false },
+      { onSuccess: () => setOutcomeModalOpen(false) }
+    );
+  };
+  const handleOutcomeInterested = () => {
+    if (!lead) return;
+    updateLead.mutate(
+      { id: lead.id, status: 'INTERESTED', followUpDone: true },
+      { onSuccess: () => setOutcomeModalOpen(false) }
+    );
+  };
+  const handleOutcomeConfirmed = () => {
+    if (!lead) return;
+    // Mark the follow-up itself done, then hand off to the real booking
+    // flow — Confirmed always needs the full booking form, never a shortcut.
+    updateLead.mutate(
+      { id: lead.id, followUpDone: true },
+      { onSuccess: () => { setOutcomeModalOpen(false); setBookingOpen(true); } }
+    );
+  };
+  const handleOutcomeLost = (reason: string, otherText?: string) => {
+    if (!lead) return;
+    updateLead.mutate(
+      { id: lead.id, status: 'LOST', followUpDone: true, lostReason: reason, lostReasonOther: otherText },
+      { onSuccess: () => setOutcomeModalOpen(false) }
     );
   };
 
@@ -1114,6 +1151,15 @@ export default function LeadDetail({ leadId, open, onClose, isStarred, onToggleS
               {activeTab === 'overview' && (
                 <OverviewTab
                   lead={lead} canAct={canAct} onUpdateLead={(data) => updateLead.mutate(data)}
+                  onFollowUpDoneClick={() => {
+                    // A confirmed lead's status is permanently locked, so none
+                    // of the four outcomes apply — just clear the stale reminder.
+                    if (lead.status === 'CONFIRMED') {
+                      updateLead.mutate({ id: lead.id, followUpDone: true });
+                    } else {
+                      setOutcomeModalOpen(true);
+                    }
+                  }}
                   booking={booking} onEditBooking={() => setBookingOpen(true)}
                 />
               )}
@@ -1156,6 +1202,17 @@ export default function LeadDetail({ leadId, open, onClose, isStarred, onToggleS
         open={followUpModalOpen}
         onConfirm={handleConfirmFollowUp}
         onCancel={() => setFollowUpModalOpen(false)}
+      />
+
+      {/* ── Follow-up Outcome Modal (shown on Mark Done) ─────────────────── */}
+      <FollowUpOutcomeModal
+        open={outcomeModalOpen}
+        lead={lead ?? null}
+        onClose={() => setOutcomeModalOpen(false)}
+        onReschedule={handleOutcomeReschedule}
+        onInterested={handleOutcomeInterested}
+        onConfirmed={handleOutcomeConfirmed}
+        onLost={handleOutcomeLost}
       />
 
       {/* ── Booking Confirm Modal ────────────────────────────────────────── */}

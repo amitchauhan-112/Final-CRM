@@ -48,13 +48,16 @@ function KanbanCard({
   const hasTodayFollowup =
     lead.followUpDate && !lead.followUpDone && !hasOverdueFollowup &&
     lead.followUpDate.startsWith(todayStr);
+  // Confirmed leads are permanently locked — never draggable to another column.
+  const isLocked = lead.status === 'CONFIRMED';
 
   return (
     <div
-      draggable
+      draggable={!isLocked}
       onDragStart={(e) => onDragStart(e, lead.id)}
       onDragEnd={onDragEnd}
       onClick={() => onOpenDetail(lead.id)}
+      title={isLocked ? 'A confirmed lead\'s status can never be changed again' : undefined}
       className={cn(
         'bg-white rounded-xl border border-slate-200 p-3.5 shadow-sm hover:shadow-md cursor-pointer transition-all select-none',
         isDragging && 'opacity-40 scale-95'
@@ -165,7 +168,7 @@ export default function KanbanBoard({ leads, onOpenDetail, onStatusChange }: Kan
     if (!draggingId) return;
 
     const lead = leads.find((l) => l.id === draggingId);
-    if (!lead || lead.status === status) {
+    if (!lead || lead.status === status || lead.status === 'CONFIRMED') {
       setDraggingId(null);
       setOverColumn(null);
       return;
