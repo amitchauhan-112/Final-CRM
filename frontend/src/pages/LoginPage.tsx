@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
-import { Mountain, Eye, EyeOff, Lock, Mail } from 'lucide-react';
+import { Mountain, Eye, EyeOff, Lock, Mail, Instagram, CheckCircle2, ShieldCheck, ArrowRight } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import api from '../services/api';
 import toast from 'react-hot-toast';
@@ -52,6 +52,11 @@ export default function LoginPage() {
     <div className="min-h-screen flex">
       {/* Left side - gradient */}
       <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-slate-900 via-primary-900 to-mountain-900 relative overflow-hidden flex-col items-center justify-center p-12">
+        {/* Ambient drifting gradient orbs */}
+        <div className="absolute -top-24 -left-20 w-96 h-96 bg-primary-500/30 rounded-full blur-3xl animate-blob" />
+        <div className="absolute top-1/3 -right-24 w-80 h-80 bg-mountain-500/30 rounded-full blur-3xl animate-blob" style={{ animationDelay: '5s' }} />
+        <div className="absolute -bottom-24 left-1/4 w-96 h-96 bg-teal-400/20 rounded-full blur-3xl animate-blob" style={{ animationDelay: '10s' }} />
+
         {/* Background pattern */}
         <div className="absolute inset-0 opacity-10">
           <svg width="100%" height="100%">
@@ -66,16 +71,19 @@ export default function LoginPage() {
         </div>
 
         <div className="relative z-10 text-center">
-          <div className="w-20 h-20 bg-white/10 backdrop-blur-sm rounded-3xl flex items-center justify-center mx-auto mb-6 border border-white/20">
-            <Mountain className="w-10 h-10 text-white" />
+          <div className="relative w-20 h-20 mx-auto mb-6">
+            <div className="absolute inset-0 bg-primary-400/50 rounded-3xl blur-xl animate-pulse" />
+            <div className="relative w-20 h-20 bg-white/10 backdrop-blur-sm rounded-3xl flex items-center justify-center border border-white/20 shadow-xl">
+              <Mountain className="w-10 h-10 text-white" />
+            </div>
           </div>
-          <h1 className="text-4xl font-black text-white mb-3">Travel CRM</h1>
+          <h1 className="text-4xl font-black text-white mb-3 tracking-tight">Travel CRM</h1>
           <p className="text-xl text-primary-200 font-medium mb-2">Trek & Pilgrimage</p>
-          <p className="text-slate-300 text-sm max-w-xs">
+          <p className="text-slate-300 text-sm max-w-xs mx-auto">
             Manage your leads, campaigns, and team — all in one professional platform built for travel agencies.
           </p>
 
-          <div className="mt-10 grid grid-cols-3 gap-6">
+          <div className="mt-10 grid grid-cols-3 gap-6 pt-6 border-t border-white/10">
             {[
               { label: 'Leads Managed', value: '10K+' },
               { label: 'Campaigns', value: '500+' },
@@ -90,19 +98,39 @@ export default function LoginPage() {
         </div>
 
         {/* Floating cards */}
-        <div className="absolute bottom-12 left-8 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-3 max-w-[180px]">
-          <p className="text-white text-xs font-medium">New lead from Instagram</p>
-          <p className="text-slate-300 text-xs mt-0.5">Kedarnath Yatra - 4 pax</p>
+        <div
+          className="absolute bottom-12 left-8 flex items-center gap-2.5 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl p-3 max-w-[190px] shadow-xl animate-float"
+          style={{ animationDelay: '0.6s' }}
+        >
+          <div className="w-7 h-7 rounded-lg bg-pink-500/30 flex items-center justify-center flex-shrink-0">
+            <Instagram className="w-3.5 h-3.5 text-pink-200" />
+          </div>
+          <div>
+            <p className="text-white text-xs font-semibold">New lead from Instagram</p>
+            <p className="text-slate-300 text-xs mt-0.5">Kedarnath Yatra · 4 pax</p>
+          </div>
         </div>
-        <div className="absolute top-1/4 right-8 bg-green-500/20 backdrop-blur-sm border border-green-400/30 rounded-xl p-3 max-w-[180px]">
-          <p className="text-green-200 text-xs font-medium">Booking Confirmed!</p>
-          <p className="text-slate-300 text-xs mt-0.5">Manaslu Circuit - 6 pax</p>
+        <div
+          className="absolute top-1/4 right-8 flex items-center gap-2.5 bg-green-500/20 backdrop-blur-md border border-green-400/30 rounded-xl p-3 max-w-[190px] shadow-xl animate-float"
+          style={{ animationDelay: '1.8s' }}
+        >
+          <div className="w-7 h-7 rounded-lg bg-green-500/30 flex items-center justify-center flex-shrink-0">
+            <CheckCircle2 className="w-3.5 h-3.5 text-green-200" />
+          </div>
+          <div>
+            <p className="text-green-100 text-xs font-semibold">Booking Confirmed!</p>
+            <p className="text-slate-300 text-xs mt-0.5">Manaslu Circuit · 6 pax</p>
+          </div>
         </div>
       </div>
 
       {/* Right side - login form */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-6 bg-slate-50">
-        <div className="w-full max-w-md">
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-6 relative overflow-hidden bg-slate-50">
+        {/* Soft ambient color, echoing the left panel without competing with the form */}
+        <div className="absolute -top-32 -right-32 w-96 h-96 bg-primary-200/40 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-32 -left-24 w-80 h-80 bg-mountain-200/30 rounded-full blur-3xl pointer-events-none" />
+
+        <div className="w-full max-w-md relative z-10 animate-fade-in-up">
           {/* Mobile logo */}
           <div className="flex items-center gap-3 mb-8 lg:hidden">
             <div className="w-10 h-10 bg-gradient-to-br from-primary-500 to-mountain-600 rounded-xl flex items-center justify-center">
@@ -114,8 +142,13 @@ export default function LoginPage() {
             </div>
           </div>
 
-          <div className="card p-8">
+          <div className="card p-8 shadow-elevate-lg relative overflow-hidden">
+            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-primary-500 via-primary-400 to-mountain-500" />
+
             <div className="mb-6">
+              <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-primary-700 bg-primary-50 px-2.5 py-1 rounded-full mb-3">
+                <ShieldCheck className="w-3 h-3" /> Secure Sign-in
+              </div>
               <h2 className="text-2xl font-bold text-slate-900">Welcome back</h2>
               <p className="text-slate-500 text-sm mt-1">Sign in to your account to continue</p>
             </div>
@@ -188,7 +221,7 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="btn-primary w-full py-2.5 text-sm font-semibold mt-2"
+                className="btn-primary w-full py-2.5 text-sm font-semibold mt-2 group"
               >
                 {isSubmitting ? (
                   <span className="flex items-center justify-center gap-2">
@@ -196,7 +229,10 @@ export default function LoginPage() {
                     Signing in...
                   </span>
                 ) : (
-                  'Sign In'
+                  <span className="flex items-center justify-center gap-1.5">
+                    Sign In
+                    <ArrowRight className="w-4 h-4 transition-transform duration-200 ease-enterprise group-hover:translate-x-1" />
+                  </span>
                 )}
               </button>
             </form>
