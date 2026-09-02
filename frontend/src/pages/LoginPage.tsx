@@ -1,10 +1,25 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
-import { Mountain, Eye, EyeOff, Lock, Mail, Instagram, CheckCircle2, ShieldCheck, ArrowRight } from 'lucide-react';
+import { Mountain, Eye, EyeOff, Lock, Mail, Instagram, CheckCircle2, ShieldCheck, ArrowRight, Quote } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import api from '../services/api';
 import toast from 'react-hot-toast';
+
+// Himalaya (Annapurna region, Nepal) — free to use under the Unsplash License.
+// Photo by Iqx Azmi: https://unsplash.com/photos/PbCCnvId660
+const HERO_PHOTO_URL = 'https://images.unsplash.com/photo-1640876522637-9432f175581f?w=1200&q=80&auto=format&fit=crop';
+
+// Rotates automatically behind the branding panel — a small, positive touch
+// while someone waits to sign in. Public-domain/well-known travel quotes.
+const QUOTES: { text: string; author: string }[] = [
+  { text: 'The mountains are calling and I must go.', author: 'John Muir' },
+  { text: 'Not all those who wander are lost.', author: 'J.R.R. Tolkien' },
+  { text: 'A journey of a thousand miles begins with a single step.', author: 'Lao Tzu' },
+  { text: 'To travel is to live.', author: 'Hans Christian Andersen' },
+  { text: 'Adventure is worthwhile in itself.', author: 'Amelia Earhart' },
+  { text: 'The world is a book, and those who do not travel read only one page.', author: 'Saint Augustine' },
+];
 
 interface LoginForm {
   email: string;
@@ -16,6 +31,12 @@ export default function LoginPage() {
   const { login, isAuthenticated, user } = useAuthStore();
   const [showPassword, setShowPassword] = useState(false);
   const [showForgotHelp, setShowForgotHelp] = useState(false);
+  const [quoteIndex, setQuoteIndex] = useState(0);
+
+  useEffect(() => {
+    const id = setInterval(() => setQuoteIndex((i) => (i + 1) % QUOTES.length), 6000);
+    return () => clearInterval(id);
+  }, []);
 
   // Redirect if already logged in
   if (isAuthenticated && user) {
@@ -50,25 +71,22 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex">
-      {/* Left side - gradient */}
-      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-slate-900 via-primary-900 to-mountain-900 relative overflow-hidden flex-col items-center justify-center p-12">
+      {/* Left side - hero photo */}
+      <div className="hidden lg:flex lg:w-1/2 bg-slate-900 relative overflow-hidden flex-col items-center justify-center p-12">
+        {/* Hero photo */}
+        <img
+          src={HERO_PHOTO_URL}
+          alt=""
+          className="absolute inset-0 w-full h-full object-cover"
+          loading="eager"
+        />
+        {/* Dark gradient wash for text legibility over the photo */}
+        <div className="absolute inset-0 bg-gradient-to-br from-slate-900/90 via-primary-900/75 to-mountain-900/85" />
+
         {/* Ambient drifting gradient orbs */}
         <div className="absolute -top-24 -left-20 w-96 h-96 bg-primary-500/30 rounded-full blur-3xl animate-blob" />
         <div className="absolute top-1/3 -right-24 w-80 h-80 bg-mountain-500/30 rounded-full blur-3xl animate-blob" style={{ animationDelay: '5s' }} />
         <div className="absolute -bottom-24 left-1/4 w-96 h-96 bg-teal-400/20 rounded-full blur-3xl animate-blob" style={{ animationDelay: '10s' }} />
-
-        {/* Background pattern */}
-        <div className="absolute inset-0 opacity-10">
-          <svg width="100%" height="100%">
-            <defs>
-              <pattern id="mountains" x="0" y="0" width="120" height="80" patternUnits="userSpaceOnUse">
-                <polygon points="0,80 60,20 120,80" fill="white" opacity="0.3" />
-                <polygon points="20,80 80,10 140,80" fill="white" opacity="0.2" />
-              </pattern>
-            </defs>
-            <rect width="100%" height="100%" fill="url(#mountains)" />
-          </svg>
-        </div>
 
         <div className="relative z-10 text-center">
           <div className="relative w-20 h-20 mx-auto mb-6">
@@ -83,7 +101,16 @@ export default function LoginPage() {
             Manage your leads, campaigns, and team — all in one professional platform built for travel agencies.
           </p>
 
-          <div className="mt-10 grid grid-cols-3 gap-6 pt-6 border-t border-white/10">
+          {/* Auto-rotating quote */}
+          <div className="mt-6 max-w-xs mx-auto min-h-[3.5rem] flex items-start justify-center gap-1.5">
+            <Quote className="w-3.5 h-3.5 text-primary-300/70 flex-shrink-0 mt-0.5" />
+            <p key={quoteIndex} className="text-slate-200 text-xs italic leading-relaxed animate-fade-in-up">
+              "{QUOTES[quoteIndex].text}"
+              <span className="block not-italic text-slate-400 text-[11px] mt-1">— {QUOTES[quoteIndex].author}</span>
+            </p>
+          </div>
+
+          <div className="mt-6 grid grid-cols-3 gap-6 pt-6 border-t border-white/10">
             {[
               { label: 'Leads Managed', value: '10K+' },
               { label: 'Campaigns', value: '500+' },
