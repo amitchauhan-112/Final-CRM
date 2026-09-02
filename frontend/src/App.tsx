@@ -31,6 +31,7 @@ import EmployeeFollowUpsPage from './pages/employee/FollowUpsPage';
 import EmployeeSettingsPage from './pages/employee/SettingsPage';
 import PackageCatalogPage from './pages/employee/PackageCatalogPage';
 import MyCustomersPage from './pages/employee/MyCustomersPage';
+import MyBookingsPage from './pages/employee/MyBookingsPage';
 import TasksPage from './pages/employee/TasksPage';
 import OperationsDashboardPage from './pages/operations/DashboardPage';
 import DeparturesPage from './pages/operations/DeparturesPage';
@@ -183,6 +184,7 @@ export default function App() {
         <Route path="follow-ups" element={<EmployeeFollowUpsPage />} />
         <Route path="packages" element={<PackageCatalogPage />} />
         <Route path="customers" element={<MyCustomersPage />} />
+        <Route path="bookings" element={<MyBookingsPage />} />
         <Route path="tasks" element={<TasksPage />} />
         <Route path="targets" element={<MyTargetsPage />} />
         <Route path="whatsapp" element={<EmployeeWhatsAppInboxPage />} />

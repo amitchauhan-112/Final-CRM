@@ -85,6 +85,9 @@ export const getAllBookings = async (req: AuthenticatedRequest, res: Response): 
 
     const skip = (Number(page) - 1) * Number(limit);
     const where: any = { organizationId: oid };
+    // Sales only ever sees their own bookings here — scoped server-side by
+    // role, same pattern as getLeads, not trusted from a client-side param.
+    if (req.user?.role === 'EMPLOYEE') where.lead = { assignedToId: req.user.id };
     if (status) where.status = status;
     if (from || to) {
       where.createdAt = {};
