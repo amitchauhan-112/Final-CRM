@@ -8,6 +8,25 @@ import { buildUploadUrl } from '../middleware/upload.js';
 
 const orgId = (req: AuthenticatedRequest) => req.user?.organizationId ?? null;
 
+// Whoever submitted the payment proof isn't always the lead's actual Sales
+// owner — Ops/Finance sometimes enter a payment on the customer's behalf.
+// Notify both: the submitter (so they know what happened to what they
+// entered) and the lead's assigned Sales rep (so the person actually
+// responsible for the customer relationship always hears about it too),
+// without sending a duplicate when they're the same person.
+const notifyPaymentParties = async (
+  recordedById: string | null,
+  assignedToId: string | null | undefined,
+  type: string, title: string, message: string, leadId: string
+) => {
+  const recipients = new Set<string>();
+  if (recordedById) recipients.add(recordedById);
+  if (assignedToId) recipients.add(assignedToId);
+  await Promise.all(
+    [...recipients].map((userId) => createNotification(userId, type, title, message, leadId))
+  );
+};
+
 // ─── List payments for a booking ─────────────────────────────────────────────
 
 export const getBookingPayments = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
@@ -183,10 +202,8 @@ export const approvePayment = async (req: AuthenticatedRequest, res: Response): 
       }).catch((err) => console.error('[payment] receipt generation error:', err));
     }
 
-    if (payment.recordedById) {
-      await createNotification(payment.recordedById, 'PAYMENT_APPROVED', 'Payment Approved',
-        `Your ₹${payment.amount.toLocaleString()} payment for ${payment.booking.lead.name} has been verified.`, payment.booking.leadId);
-    }
+    await notifyPaymentParties(payment.recordedById, payment.booking.lead.assignedToId, 'PAYMENT_APPROVED', 'Payment Approved',
+      `The ₹${payment.amount.toLocaleString()} payment for ${payment.booking.lead.name} has been verified.`, payment.booking.leadId);
     emitFinanceUpdated();
 
     res.json({ success: true, data: updatedPayment });
@@ -225,10 +242,8 @@ export const rejectPayment = async (req: AuthenticatedRequest, res: Response): P
       },
     });
 
-    if (payment.recordedById) {
-      await createNotification(payment.recordedById, 'PAYMENT_REJECTED', 'Payment Rejected',
-        `Your ₹${payment.amount.toLocaleString()} payment for ${payment.booking.lead.name} was rejected: ${reason.trim()}`, payment.booking.leadId);
-    }
+    await notifyPaymentParties(payment.recordedById, payment.booking.lead.assignedToId, 'PAYMENT_REJECTED', 'Payment Rejected',
+      `The ₹${payment.amount.toLocaleString()} payment for ${payment.booking.lead.name} was rejected: ${reason.trim()}`, payment.booking.leadId);
     emitFinanceUpdated();
 
     res.json({ success: true, data: updated });
@@ -254,10 +269,8 @@ export const requestCorrection = async (req: AuthenticatedRequest, res: Response
       data: { status: 'CORRECTION_REQUESTED', financeNote: note.trim() },
     });
 
-    if (payment.recordedById) {
-      await createNotification(payment.recordedById, 'PAYMENT_CORRECTION_REQUESTED', 'Payment Correction Requested',
-        `Finance requested a correction on the ₹${payment.amount.toLocaleString()} payment for ${payment.booking.lead.name}: ${note.trim()}`, payment.booking.leadId);
-    }
+    await notifyPaymentParties(payment.recordedById, payment.booking.lead.assignedToId, 'PAYMENT_CORRECTION_REQUESTED', 'Payment Correction Requested',
+      `Finance requested a correction on the ₹${payment.amount.toLocaleString()} payment for ${payment.booking.lead.name}: ${note.trim()}`, payment.booking.leadId);
     emitFinanceUpdated();
 
     res.json({ success: true, data: updated });
