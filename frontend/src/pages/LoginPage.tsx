@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
-import { Mountain, Eye, EyeOff, Lock, Mail, Instagram, CheckCircle2, ShieldCheck, ArrowRight, Quote } from 'lucide-react';
+import { Mountain, Eye, EyeOff, Lock, Mail, ShieldCheck, ArrowRight, Quote } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import api from '../services/api';
 import toast from 'react-hot-toast';
@@ -121,32 +121,6 @@ export default function LoginPage() {
                 <p className="text-xs text-slate-400 mt-1">{stat.label}</p>
               </div>
             ))}
-          </div>
-        </div>
-
-        {/* Floating cards */}
-        <div
-          className="absolute bottom-12 left-8 flex items-center gap-2.5 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl p-3 max-w-[190px] shadow-xl animate-float"
-          style={{ animationDelay: '0.6s' }}
-        >
-          <div className="w-7 h-7 rounded-lg bg-pink-500/30 flex items-center justify-center flex-shrink-0">
-            <Instagram className="w-3.5 h-3.5 text-pink-200" />
-          </div>
-          <div>
-            <p className="text-white text-xs font-semibold">New lead from Instagram</p>
-            <p className="text-slate-300 text-xs mt-0.5">Kedarnath Yatra · 4 pax</p>
-          </div>
-        </div>
-        <div
-          className="absolute top-1/4 right-8 flex items-center gap-2.5 bg-green-500/20 backdrop-blur-md border border-green-400/30 rounded-xl p-3 max-w-[190px] shadow-xl animate-float"
-          style={{ animationDelay: '1.8s' }}
-        >
-          <div className="w-7 h-7 rounded-lg bg-green-500/30 flex items-center justify-center flex-shrink-0">
-            <CheckCircle2 className="w-3.5 h-3.5 text-green-200" />
-          </div>
-          <div>
-            <p className="text-green-100 text-xs font-semibold">Booking Confirmed!</p>
-            <p className="text-slate-300 text-xs mt-0.5">Manaslu Circuit · 6 pax</p>
           </div>
         </div>
       </div>
