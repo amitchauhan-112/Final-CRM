@@ -2,6 +2,7 @@ import { Response } from 'express';
 import prisma from '../lib/prisma.js';
 import { AuthenticatedRequest } from '../types/index.js';
 import { renderFinanceDocumentPdf, FinanceDocumentSnapshot } from '../services/pdf.service.js';
+import { isWholeAmount, WHOLE_AMOUNT_ERROR } from '../utils/amountValidation.js';
 
 const orgId = (req: AuthenticatedRequest) => req.user?.organizationId ?? null;
 
@@ -104,6 +105,7 @@ export const createFinanceDocument = async (req: AuthenticatedRequest, res: Resp
   try {
     const { type, bookingId, amount, taxAmount, reason } = req.body;
     if (!VALID_TYPES.includes(type)) { res.status(400).json({ success: false, error: 'Invalid document type' }); return; }
+    if (!isWholeAmount(amount) || !isWholeAmount(taxAmount)) { res.status(400).json({ success: false, error: WHOLE_AMOUNT_ERROR }); return; }
 
     const booking = await prisma.booking.findFirst({ where: { id: bookingId, ...(orgId(req) ? { organizationId: orgId(req) } : {}) } });
     if (!booking) { res.status(404).json({ success: false, error: 'Booking not found' }); return; }

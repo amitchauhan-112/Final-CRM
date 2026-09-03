@@ -1,6 +1,7 @@
 import { AlertTriangle } from 'lucide-react';
 import { useVendorAllocation } from '../../hooks/useVendorAllocation';
 import Modal from '../ui/Modal';
+import { blockDecimalKey } from '../../utils/helpers';
 
 /**
  * Vendor picker + rate/contact fields shared by the Hotel and Vehicle
@@ -50,7 +51,7 @@ export function VendorAllocationFields({ alloc }: { alloc: ReturnType<typeof use
           </div>
           <div>
             <label className="label">Rate (₹)</label>
-            <input type="number" step="0.01" value={values.rate} onChange={(e) => updateField('rate', e.target.value)} className="input" />
+            <input type="number" step="1" onKeyDown={blockDecimalKey} value={values.rate} onChange={(e) => updateField('rate', e.target.value)} className="input" />
           </div>
           {isNew && (
             <label className="flex items-center gap-2 text-xs text-slate-600 sm:col-span-2 pt-1">

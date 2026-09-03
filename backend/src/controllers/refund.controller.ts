@@ -3,6 +3,7 @@ import prisma from '../lib/prisma.js';
 import { AuthenticatedRequest } from '../types/index.js';
 import { notifyFinanceTeam, emitFinanceUpdated, createNotification } from '../services/notification.service.js';
 import { generateFinanceDocument } from './financeDocument.controller.js';
+import { isWholeAmount, WHOLE_AMOUNT_ERROR } from '../utils/amountValidation.js';
 
 const orgId = (req: AuthenticatedRequest) => req.user?.organizationId ?? null;
 const orgFilter = (req: AuthenticatedRequest) => (orgId(req) ? { organizationId: orgId(req) } : {});
@@ -35,6 +36,7 @@ export const createRefund = async (req: AuthenticatedRequest, res: Response): Pr
     const booking = await prisma.booking.findFirst({ where: { id: bookingId, ...orgFilter(req) }, include: { lead: true } });
     if (!booking) { res.status(404).json({ success: false, error: 'Booking not found' }); return; }
     if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) { res.status(400).json({ success: false, error: 'Valid refund amount is required' }); return; }
+    if (!isWholeAmount(amount)) { res.status(400).json({ success: false, error: WHOLE_AMOUNT_ERROR }); return; }
     if (!reason?.trim()) { res.status(400).json({ success: false, error: 'Refund reason is required' }); return; }
 
     const refund = await prisma.refund.create({

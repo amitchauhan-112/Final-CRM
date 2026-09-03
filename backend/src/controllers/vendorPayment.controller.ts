@@ -3,6 +3,7 @@ import prisma from '../lib/prisma.js';
 import { AuthenticatedRequest } from '../types/index.js';
 import { emitFinanceUpdated } from '../services/notification.service.js';
 import { buildUploadUrl } from '../middleware/upload.js';
+import { isWholeAmount, WHOLE_AMOUNT_ERROR } from '../utils/amountValidation.js';
 
 const orgId = (req: AuthenticatedRequest) => req.user?.organizationId ?? null;
 const orgFilter = (req: AuthenticatedRequest) => (orgId(req) ? { organizationId: orgId(req) } : {});
@@ -44,6 +45,7 @@ export const createVendorPayment = async (req: AuthenticatedRequest, res: Respon
     const vendor = await prisma.vendor.findFirst({ where: { id: vendorId, ...orgFilter(req) } });
     if (!vendor) { res.status(404).json({ success: false, error: 'Vendor not found' }); return; }
     if (!totalAmount || isNaN(Number(totalAmount))) { res.status(400).json({ success: false, error: 'Valid total amount is required' }); return; }
+    if (!isWholeAmount(totalAmount) || !isWholeAmount(advancePaid)) { res.status(400).json({ success: false, error: WHOLE_AMOUNT_ERROR }); return; }
 
     const total = Number(totalAmount);
     const advance = Number(advancePaid ?? 0);
@@ -82,6 +84,7 @@ export const updateVendorPayment = async (req: AuthenticatedRequest, res: Respon
     if (!existing) { res.status(404).json({ success: false, error: 'Vendor payment not found' }); return; }
 
     const b = req.body;
+    if (!isWholeAmount(b.totalAmount) || !isWholeAmount(b.advancePaid)) { res.status(400).json({ success: false, error: WHOLE_AMOUNT_ERROR }); return; }
     const total = b.totalAmount !== undefined ? Number(b.totalAmount) : existing.totalAmount;
     const advance = b.advancePaid !== undefined ? Number(b.advancePaid) : existing.advancePaid;
     const due = b.dueDate !== undefined ? (b.dueDate ? new Date(b.dueDate) : null) : existing.dueDate;

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { IndianRupee, CheckCircle2, Clock, AlertCircle } from 'lucide-react';
 import { usePayouts, useReleasePayout, PayoutLine } from '../../hooks/useHR';
-import { formatCurrency, cn } from '../../utils/helpers';
+import { formatCurrency, cn, blockDecimalKey } from '../../utils/helpers';
 import { Skeleton } from '../ui/Skeleton';
 import Modal from '../ui/Modal';
 
@@ -47,7 +47,7 @@ function PayoutCell({ line, onRelease }: { line: PayoutLine | null; onRelease: (
           <p className="text-sm text-slate-600">Amount pending: {formatCurrency(remaining)}</p>
           <div>
             <label className="label">Amount to release (₹)</label>
-            <input type="number" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} className="input" autoFocus />
+            <input type="number" step="1" onKeyDown={blockDecimalKey} value={amount} onChange={(e) => setAmount(e.target.value)} className="input" autoFocus />
           </div>
         </div>
       </Modal>

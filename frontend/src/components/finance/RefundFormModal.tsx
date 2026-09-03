@@ -4,7 +4,7 @@ import { Search } from 'lucide-react';
 import { useAllBookings } from '../../hooks/useErp';
 import { useCreateRefund } from '../../hooks/useFinance';
 import Modal from '../ui/Modal';
-import { formatCurrency } from '../../utils/helpers';
+import { formatCurrency, blockDecimalKey, wholeNumberRule } from '../../utils/helpers';
 
 interface RefundForm { amount: number; reason: string; remarks?: string; }
 
@@ -67,7 +67,7 @@ export default function RefundFormModal({ open, onClose }: { open: boolean; onCl
           </div>
           <div>
             <label className="label">Refund Amount *</label>
-            <input type="number" step="0.01" {...register('amount', { required: true, min: 1 })} className="input" placeholder="0.00" />
+            <input type="number" step="1" onKeyDown={blockDecimalKey} {...register('amount', { required: true, min: 1, ...wholeNumberRule })} className="input" placeholder="0" />
           </div>
           <div>
             <label className="label">Refund Reason *</label>

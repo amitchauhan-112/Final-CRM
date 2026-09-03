@@ -2,6 +2,7 @@ import { Response } from 'express';
 import prisma from '../lib/prisma.js';
 import { AuthenticatedRequest } from '../types/index.js';
 import { buildUploadUrl, filePathFromUploadUrl, deleteUploadedFile } from '../middleware/upload.js';
+import { isWholeAmount, WHOLE_AMOUNT_ERROR } from '../utils/amountValidation.js';
 
 // keywords is stored as JSON string in DB; parse before sending to client
 function parseCampaign(c: any) {
@@ -87,6 +88,7 @@ export const createCampaign = async (req: AuthenticatedRequest, res: Response): 
       targetLeads, budget, whatsappNumber, instagramAdId,
       utmSource, utmCampaign, keywords, employeeIds,
     } = req.body;
+    if (!isWholeAmount(budget)) { res.status(400).json({ success: false, error: WHOLE_AMOUNT_ERROR }); return; }
 
     const campaign = await prisma.campaign.create({
       data: {
@@ -118,6 +120,7 @@ export const updateCampaign = async (req: AuthenticatedRequest, res: Response): 
   try {
     const { id } = req.params;
     const { employeeIds, keywords, ...rest } = req.body;
+    if (!isWholeAmount(rest.budget)) { res.status(400).json({ success: false, error: WHOLE_AMOUNT_ERROR }); return; }
 
     await prisma.campaign.update({
       where: { id },

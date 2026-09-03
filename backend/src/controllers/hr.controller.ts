@@ -6,6 +6,7 @@
 import { Response, NextFunction } from 'express';
 import prisma from '../lib/prisma.js';
 import { AuthenticatedRequest } from '../types/index.js';
+import { isWholeAmount, WHOLE_AMOUNT_ERROR } from '../utils/amountValidation.js';
 
 const orgId = (req: AuthenticatedRequest) => req.user?.organizationId ?? null;
 const orgFilter = (req: AuthenticatedRequest) => (orgId(req) ? { organizationId: orgId(req) } : {});
@@ -199,6 +200,7 @@ export const setSalesTarget = async (req: AuthenticatedRequest, res: Response): 
     const { userId } = req.params;
     const { month, year, targetRevenue, targetBookings, incentivePercent } = req.body;
     if (!month || !year) { res.status(400).json({ success: false, error: 'month and year are required' }); return; }
+    if (!isWholeAmount(targetRevenue)) { res.status(400).json({ success: false, error: WHOLE_AMOUNT_ERROR }); return; }
 
     const employee = await prisma.user.findFirst({ where: { id: userId, role: 'EMPLOYEE', ...orgFilter(req) } });
     if (!employee) { res.status(404).json({ success: false, error: 'Sales employee not found' }); return; }
@@ -254,6 +256,7 @@ export const setSalaryConfig = async (req: AuthenticatedRequest, res: Response):
     const { userId } = req.params;
     const baseSalary = Number(req.body.baseSalary);
     if (!Number.isFinite(baseSalary) || baseSalary < 0) { res.status(400).json({ success: false, error: 'A valid baseSalary is required' }); return; }
+    if (!isWholeAmount(baseSalary)) { res.status(400).json({ success: false, error: WHOLE_AMOUNT_ERROR }); return; }
 
     const employee = await prisma.user.findFirst({ where: { id: userId, ...orgFilter(req) } });
     if (!employee) { res.status(404).json({ success: false, error: 'Employee not found' }); return; }
@@ -326,6 +329,7 @@ export const releasePayout = async (req: AuthenticatedRequest, res: Response): P
     if (!['SALARY', 'INCENTIVE'].includes(type)) { res.status(400).json({ success: false, error: 'type must be SALARY or INCENTIVE' }); return; }
     const amountToRelease = Number(amount);
     if (!Number.isFinite(amountToRelease) || amountToRelease <= 0) { res.status(400).json({ success: false, error: 'A valid amount is required' }); return; }
+    if (!isWholeAmount(amountToRelease)) { res.status(400).json({ success: false, error: WHOLE_AMOUNT_ERROR }); return; }
 
     const employee = await prisma.user.findFirst({ where: { id: userId, ...orgFilter(req) } });
     if (!employee) { res.status(404).json({ success: false, error: 'Employee not found' }); return; }

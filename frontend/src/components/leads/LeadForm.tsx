@@ -12,7 +12,7 @@ import LostReasonModal from './LostReasonModal';
 import TagInput from '../ui/TagInput';
 import DateTimePicker from '../ui/DateTimePicker';
 import api from '../../services/api';
-import { cn } from '../../utils/helpers';
+import { cn, blockDecimalKey, wholeNumberRule } from '../../utils/helpers';
 
 const STATUS_ORDER: LeadStatus[] = ['NEW', 'NOT_CONTACTED', 'CONTACTED', 'INTERESTED', 'FOLLOW_UP_SCHEDULED', 'CONFIRMED', 'LOST'];
 
@@ -443,7 +443,7 @@ export default function LeadForm({ defaultValues, onSubmit, isLoading, onCancel 
           </div>
           <div>
             <label className="label">Budget (INR)</label>
-            <input {...register('budget', { valueAsNumber: true, min: 0 })} type="number" className="input" placeholder="e.g. 25000" min={0} />
+            <input {...register('budget', { valueAsNumber: true, min: 0, ...wholeNumberRule })} type="number" step="1" onKeyDown={blockDecimalKey} className="input" placeholder="e.g. 25000" min={0} />
           </div>
         </div>
 

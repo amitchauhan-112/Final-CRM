@@ -3,6 +3,7 @@ import { useForm } from 'react-hook-form';
 import { X, Plus, Link2 } from 'lucide-react';
 import { Campaign, CampaignStatus } from '../../types/index';
 import { useUsers } from '../../hooks/useUsers';
+import { blockDecimalKey, wholeNumberRule } from '../../utils/helpers';
 
 function parseKeywords(value: unknown): string[] {
   if (Array.isArray(value)) return value;
@@ -204,8 +205,10 @@ export default function CampaignForm({
       <div>
         <label className="label">Budget (INR)</label>
         <input
-          {...register('budget', { valueAsNumber: true, min: 0 })}
+          {...register('budget', { valueAsNumber: true, min: 0, ...wholeNumberRule })}
           type="number"
+          step="1"
+          onKeyDown={blockDecimalKey}
           className={isMetaCampaign ? 'input bg-slate-50 cursor-not-allowed' : 'input'}
           placeholder="e.g. 50000"
           min={0}

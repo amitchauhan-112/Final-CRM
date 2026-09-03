@@ -2,6 +2,7 @@ import { useForm } from 'react-hook-form';
 import { useFinanceVendors } from '../../hooks/useFinance';
 import { VendorPayment, VendorServiceType } from '../../types/index';
 import Modal from '../ui/Modal';
+import { blockDecimalKey, wholeNumberRule } from '../../utils/helpers';
 
 interface VendorPaymentForm {
   vendorId: string; departureId?: string; serviceType: VendorServiceType;
@@ -55,11 +56,11 @@ export default function VendorPaymentFormModal({ open, onClose, defaultValues, o
         </div>
         <div>
           <label className="label">Total Amount *</label>
-          <input type="number" step="0.01" {...register('totalAmount', { required: true, min: 0 })} className="input" />
+          <input type="number" step="1" onKeyDown={blockDecimalKey} {...register('totalAmount', { required: true, min: 0, ...wholeNumberRule })} className="input" />
         </div>
         <div>
           <label className="label">Advance Paid</label>
-          <input type="number" step="0.01" {...register('advancePaid')} className="input" />
+          <input type="number" step="1" onKeyDown={blockDecimalKey} {...register('advancePaid', wholeNumberRule)} className="input" />
         </div>
         <div>
           <label className="label">Due Date</label>

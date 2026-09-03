@@ -6,7 +6,7 @@ import { useVendors, useCreateVendor, useUpdateVendor, useDeleteVendor } from '.
 import { Vendor, VendorType } from '../../types/index';
 import Modal from '../../components/ui/Modal';
 import { Skeleton } from '../../components/ui/Skeleton';
-import { cn } from '../../utils/helpers';
+import { cn, blockDecimalKey, wholeNumberRule } from '../../utils/helpers';
 
 const TYPE_LABELS: Record<VendorType, string> = {
   HOTEL: 'Hotel Vendor',
@@ -83,7 +83,7 @@ function VendorFormModal({ open, onClose, defaultValues, onSubmit, isLoading }: 
         </div>
         <div>
           <label className="label">Default Rate (₹)</label>
-          <input type="number" step="0.01" {...register('rate')} className="input" placeholder="Per-night (hotel) or per-trip (vehicle) rate" />
+          <input type="number" step="1" onKeyDown={blockDecimalKey} {...register('rate', wholeNumberRule)} className="input" placeholder="Per-night (hotel) or per-trip (vehicle) rate" />
         </div>
         <div>
           <label className="label">Notes</label>

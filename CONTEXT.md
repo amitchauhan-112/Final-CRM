@@ -1,16 +1,33 @@
-# Travel CRM — Project Context
+# Travel CRM ("FOD Holidays") — Project Context
 
-> Feed this file to Claude to get full project understanding without exploring the codebase.
+> Feed this file to Claude/ChatGPT to get full project understanding without exploring the codebase.
+> **Last verified accurate:** 2026-09-03. The previous version of this file (and SETUP.md) described an
+> EC2/Docker deployment with only Admin/Employee roles and no Bookings/Payments/Finance/Operations
+> modules — that was the state of the project many months ago. Both were **severely out of date**
+> before this rewrite: entire modules that are now live in production were listed as "not started."
+> If you're an AI reading this to understand the project, trust this file over any older doc or your
+> own assumptions from a partial code read — verify against the live code for anything load-bearing.
 
 ---
 
 ## 1. What This Is
 
-A **multi-tenant SaaS CRM** built specifically for **trek and pilgrimage travel companies** (e.g., Kedarnath, Manaslu Circuit tours). It manages the full sales pipeline from lead capture (WhatsApp, Instagram, Website, Manual) through employee assignment, follow-ups, campaigns, and analytics.
+A **multi-tenant SaaS CRM** for a trek & pilgrimage travel agency (**FOD Holidays**), covering the
+full lifecycle: lead capture (WhatsApp, Instagram, Meta Ads, Website, Manual) → employee assignment →
+follow-ups → booking confirmation → payment collection & verification → operations (departures, hotels,
+vehicles, trip captains) → finance (ledgers, refunds, vendor payments, payroll) → reporting/analytics.
 
-**Live URL:** `https://crm.bhatko.in`  
-**EC2 Instance:** `i-013aa7a7dabebee0b` at `13.207.29.130`  
+**Production URL:** `https://final-crm-kappa.vercel.app`
+**GitHub repo (active/deployed):** `https://github.com/amitchauhan-112/Final-CRM` — remote name `final-crm`, branch `main`, Vercel auto-deploys on push.
+**GitHub repo (stale, do not use):** an `origin` remote also exists pointing to `https://github.com/Cyberamit007/travel-crm.git` — this is a leftover from an earlier fork and is **not** what's deployed. Always push to `final-crm`.
+**Local working directory:** `C:\Users\Amit FOD holidays\Desktop\master crm` — note a separate, unrelated older copy also exists at `Desktop\travel-crm-master`; ignore it.
 **Branding:** "Travel CRM — Trek & Pilgrimage"
+
+### Standing workflow rule (non-negotiable)
+**Nothing gets pushed to `main` (= production) without the explicit password "amit" from the user**,
+given *after* local verification (type-check + build, and a live test against the test DB for anything
+with real logic). This rule has been enforced consistently across the whole project history — don't
+skip it even if a change seems trivial or the user seems to be asking for it implicitly.
 
 ---
 
@@ -19,628 +36,360 @@ A **multi-tenant SaaS CRM** built specifically for **trek and pilgrimage travel 
 ### Backend
 | Layer | Technology |
 |-------|-----------|
-| Runtime | Node.js (ESM, `.js` extensions in imports) |
+| Runtime | Node.js (ESM — `.js` extensions in relative imports even though source is `.ts`) |
 | Framework | Express 5 |
-| Language | TypeScript (compiled, not ts-node) |
-| ORM | Prisma 5 + PostgreSQL |
-| Auth | JWT (access, 15min) + rotating refresh tokens (7d, httpOnly cookie) |
-| Password | bcrypt, cost factor 12 |
-| Real-time | Socket.IO |
-| File uploads | Multer (disk storage, `/app/uploads`) |
-| Logging | Winston (JSON) + Morgan (HTTP) |
-| Rate limiting | express-rate-limit (300/15min general, 20/15min on `/auth/login`) |
-| Security headers | Helmet + CSP |
-| Cron | node-cron (follow-up reminders every 30min) |
-| Containerized | Docker (`linux-musl-openssl-3.0.x` binary target for Alpine) |
+| Language | TypeScript |
+| ORM | Prisma 5+ + PostgreSQL (hosted on **Supabase**) |
+| Auth | JWT access token (`JWT_EXPIRES_IN=7d`, not short-lived) + rotating refresh tokens (httpOnly cookie, SHA-256 hashed in DB) |
+| Password hashing | bcrypt, cost factor 12 — **one-way, cannot be reversed or displayed**; only reset (overwrite) is possible, ever |
+| Real-time | **None** — Socket.IO was removed during the Vercel migration (serverless functions can't hold persistent connections). Replaced everywhere by React Query `refetchInterval` polling. If you see a comment like "Replaces the old 'finance_updated' Socket.IO event", that's why. |
+| File storage | Supabase Storage (S3-compatible) via `@aws-sdk/client-s3` — not local disk (`multer` still handles the multipart parsing, but files are uploaded to Supabase's S3 endpoint, not `/uploads`) |
+| Logging | Winston |
+| Rate limiting | express-rate-limit |
+| Security headers | Helmet |
+| Cron / scheduled jobs | **GitHub Actions** (`.github/workflows/cron.yml`), not node-cron — Vercel serverless can't host a persistent scheduler. The workflow calls `POST /api/cron/*` routes on a schedule, authenticated via an `x-cron-secret` header matched against `CRON_SECRET`. Jobs: `reminders-followup`/`reminders-operations`/`reminders-finance` (every 30 min), `meta-sync`/`automation-sweep` (every 5 min), `lead-backfill` (every 10 min). |
+| PDF/Excel | pdfkit, exceljs (finance documents, exports) |
 
 ### Frontend
 | Layer | Technology |
 |-------|-----------|
 | Framework | React 18 + Vite |
 | Language | TypeScript |
-| Routing | React Router v6 (nested routes) |
-| State (server) | TanStack Query v5 (`useQuery`, `useMutation`, `useQueryClient`) |
+| Routing | React Router v6 (nested routes, one layout per role) |
+| State (server) | TanStack Query v5 — `staleTime: 30s`, `refetchOnMount: true` globally (see `main.tsx`) |
 | State (client) | Zustand (`useAuthStore`) |
-| Forms | React Hook Form + `Controller` for non-standard inputs |
-| HTTP client | Axios (with silent 401→refresh interceptor) |
-| Styling | Tailwind CSS (custom `primary` and `mountain` color palettes) |
-| Charts | Recharts 2.12+ (BarChart, PieChart, ResponsiveContainer) |
-| Icons | Lucide React |
-| Notifications | react-hot-toast |
-| Real-time | Socket.IO client |
+| Forms | React Hook Form + `Controller` for non-native inputs |
+| HTTP client | Axios (silent 401→refresh interceptor) |
+| Styling | Tailwind CSS — custom `primary` (sky blue) and `mountain` (violet) palettes, `enterprise` easing curve, extensive `@layer components` classes in `index.css` (`.card`, `.btn-primary`, `.input`, `.badge`, etc. — reuse these, don't hand-roll new button/input styles) |
+| Charts | Recharts |
+| Icons | lucide-react |
+| Toasts | react-hot-toast |
+| Excel export | xlsx / jspdf+jspdf-autotable |
+
+### Deployment architecture (important, non-obvious)
+- **One Vercel project** serves both the static frontend build and the backend API as a single serverless function.
+- `vercel.json` rewrites `/api/:path*` → `/api` (a single file, `api/index.ts` at the repo root), and everything else → `/index.html` (SPA fallback).
+- `api/index.ts` is a **two-line wrapper**: `import app from '../backend/src/app.js'; export default app;` — the existing Express app is exported directly. **Do not add a `serverless-http` wrapper** — that was tried and silently broke every response (Express logged requests as received but the client never got a byte back). Vercel's Node runtime already hands the function a plain `(req, res)` pair Express understands natively.
+- **Do not rename `api/index.ts` to a catch-all like `api/[...path].ts`** — that's a Next.js convention that silently only matches single-segment paths on a plain Vercel project (multi-segment routes like `/api/auth/login` 404 at the platform level before reaching the handler). This was tested and confirmed broken; the rewrite-based approach is deliberate.
+- `vercel.json` also pins `"regions": ["syd1"]` (Sydney) to co-locate the function with the Supabase database (also Sydney) — this fixed a severe latency issue (1.3–1.6s → 0.34–0.55s per request) from an earlier default-region deployment.
+- Build command runs both `frontend` and `backend` installs plus `prisma generate` (see `vercel.json`'s `buildCommand`).
 
 ---
 
-## 3. Repository Layout
+## 3. Roles & Access Model
+
+Four roles, each with its own layout, dashboard, and route namespace. `User.role` is a plain string
+(`ADMIN | EMPLOYEE | OPERATIONS | FINANCE`), enforced by `middleware/auth.ts` (`requireAdmin`,
+`requireAdminOrOperations`, `requireFinanceOrAdmin`, `requireAdminOrSelf`).
+
+| Role | Route prefix | Layout | Purpose |
+|------|--------------|--------|---------|
+| **ADMIN** | `/admin/*` | `AdminLayout` | Full visibility — leads, campaigns, org/employees, packages, bookings, customers, finance/ops oversight, BI, settings, automation |
+| **EMPLOYEE** (Sales) | `/employee/*` | `EmployeeLayout` | Own leads/customers/bookings only (server-enforced via `assignedToId` filters, never trust a client-supplied override) |
+| **OPERATIONS** | `/operations/*` | shares `EmployeeSettingsPage` for settings | Departures, hotels, vehicles, vendors, rooms/stay planning |
+| **FINANCE** | `/finance/*` | shares `EmployeeSettingsPage` for settings | Payment verification, ledgers, refunds, vendor payments, expenses, payroll, reports |
+
+**Employee data isolation is a server-side pattern repeated in every relevant controller** — e.g.
+`getLeads`, `getAllBookings`, `getCustomers` all do `if (req.user?.role === 'EMPLOYEE') where.assignedToId
+= req.user.id` (or `where.lead = { assignedToId: ... }` for bookings), overriding/ignoring any client
+query param. Never rely on the frontend to hide data — always scope in the controller.
+
+**Login:** default seeded admin is `admin@travelcrm.com` / `admin123` (see `backend/src/utils/seed.ts`
+for other seeded employees, e.g. `amit@travelcrm.com`). Only usable against the **test** Supabase DB —
+production has real accounts created by the real admin.
+
+---
+
+## 4. Repository Layout
 
 ```
-C:\Travel_CRM\
+Desktop\master crm\
+├── api/
+│   └── index.ts                 # Vercel serverless entry — wraps backend/src/app.js, see §2
+├── vercel.json                  # Rewrites, region pin, build command
+├── CONTEXT.md                   # This file
+├── SETUP.md                     # Local dev setup (see §11 for current instructions)
 ├── backend/
 │   ├── prisma/
-│   │   └── schema.prisma          # Single source of truth for DB
+│   │   └── schema.prisma        # ~50 models — single source of truth for the DB (see §5)
+│   ├── .env                     # Real credentials — never print/paste this file's contents
+│   ├── .env.example
+│   ├── .env.supabase-test       # Test Supabase project creds — safe to use for local verification
 │   └── src/
-│       ├── index.ts               # Express app, CORS, Helmet, rate limits, Socket.IO, cron
-│       ├── lib/prisma.ts          # Singleton PrismaClient
+│       ├── app.ts               # Express app construction (separated from server-listen, for the Vercel wrapper)
+│       ├── index.ts             # Local dev entry — same app, but actually calls .listen()
+│       ├── lib/prisma.ts        # Singleton PrismaClient
 │       ├── middleware/
-│       │   ├── auth.ts            # authenticate, requireAdmin, requireAdminOrSelf
-│       │   └── upload.ts          # Multer config, MIME allowlist, 20MB limit
-│       ├── controllers/           # One file per resource
-│       │   ├── auth.controller.ts
-│       │   ├── lead.controller.ts
-│       │   ├── campaign.controller.ts
-│       │   ├── user.controller.ts
-│       │   ├── comment.controller.ts
-│       │   ├── tag.controller.ts
-│       │   ├── settings.controller.ts
-│       │   ├── activity.controller.ts
-│       │   ├── notification.controller.ts
-│       │   ├── feedback.controller.ts
-│       │   ├── webhook.controller.ts
-│       │   └── report.controller.ts
+│       │   ├── auth.ts          # authenticate + role guards
+│       │   └── upload.ts        # Multer config, MIME allowlist, uploads to Supabase S3
+│       ├── controllers/         # ~35 files, one per resource (lead, booking, payment, finance,
+│       │                        #   departure, hotel, vehicle, vendor, expense, refund, packages,
+│       │                        #   campaign, user, notification, analytics, webhook, ...)
 │       ├── routes/
-│       │   └── index.ts           # Mounts all sub-routers under /api
-│       ├── services/
-│       │   ├── lead.service.ts    # createLead() used by both manual + webhook
-│       │   └── notification.service.ts # Socket.IO emit + follow-up cron
-│       ├── types/index.ts         # AuthenticatedRequest, JWTPayload, webhook types
+│       │   └── index.ts         # Mounts all sub-routers under /api
+│       ├── services/            # lead.service.ts (createLead — shared by manual + webhook + backfill),
+│       │                        #   notification.service.ts, metaSync.service.ts,
+│       │                        #   metaLeadBackfill.service.ts, automationEngine.service.ts,
+│       │                        #   paymentSchedule.service.ts, financeDocument generation, etc.
+│       ├── types/index.ts       # AuthenticatedRequest, webhook payload types
 │       └── utils/
-│           ├── logger.ts          # Winston config
-│           └── seed.ts            # DB seeder
+│           ├── logger.ts
+│           ├── encryption.ts    # Encrypts stored Meta system-user tokens etc.
+│           └── seed.ts          # DB seeder — org, users, leads, campaigns, packages, bookings, ...
 └── frontend/
     └── src/
-        ├── App.tsx                # All routes — admin/* and employee/*
-        ├── store/authStore.ts     # Zustand store — user, token, login/logout
-        ├── services/api.ts        # Axios instance + silent refresh interceptor
-        ├── types/index.ts         # All TypeScript interfaces and enums
-        ├── hooks/                 # One hook file per resource
+        ├── App.tsx              # All routes — admin/*, employee/*, operations/*, finance/*
+        ├── main.tsx             # QueryClient setup (staleTime 30s, refetchOnMount true)
+        ├── store/authStore.ts   # Zustand — user, token, login/logout
+        ├── services/api.ts      # Axios instance + silent refresh interceptor
+        ├── types/index.ts       # All TS interfaces/enums — check here before assuming a field exists
+        ├── index.css            # Tailwind layer components — .card/.btn-*/.input/.badge/animations
+        ├── hooks/                # One file per resource, React Query wrappers (see §8)
         ├── pages/
         │   ├── LoginPage.tsx
-        │   ├── admin/             # Dashboard, Leads, Campaigns, Employees,
-        │   │                      # Reports, Activity, Feedback, Settings
-        │   └── employee/          # Dashboard, Leads, FollowUps, Settings
+        │   ├── admin/           # Dashboard, Leads, Campaigns, Organization, Packages, Bookings,
+        │   │                    #   Customers, Business Intelligence, Reports, Report Center,
+        │   │                    #   Automation Builder, Business Rules, System Health, Settings, ...
+        │   ├── employee/        # Dashboard, Leads, Follow-ups, Packages (catalog), My Customers,
+        │   │                    #   My Bookings, Tasks, My Targets, WhatsApp Inbox, Settings
+        │   ├── operations/      # Dashboard, Departures, Departure Detail, Stay Planning,
+        │   │                    #   Rooms Required, Vendors, Vendor Detail
+        │   └── finance/         # Dashboard, Payment Verification, Customer Ledger, Pending
+        │                        #   Tracker, Refunds, Vendor Payments, Vendor Ledger, Expenses,
+        │                        #   Reports, Payroll
         └── components/
-            ├── layout/            # AdminLayout.tsx, EmployeeLayout.tsx
-            ├── dashboard/         # AdminDashboard, EmployeeDashboard
-            ├── leads/             # LeadForm, LeadDetail, CommentsSection,
-            │                      # DuplicateWarningDialog, LostReasonModal
-            ├── campaigns/         # CampaignForm, CampaignNotesSection,
-            │                      # CampaignAttachmentsSection
-            ├── employees/         # EmployeeProfileModal
-            ├── feedback/          # FeedbackButton
-            └── ui/                # Badge, Modal, Table, Pagination, Avatar,
-                                   # PriorityBadge, AvailabilityBadge, TagChip,
-                                   # TagInput, StatsCard, Skeleton, ErrorBoundary
+            ├── layout/           # AdminLayout, EmployeeLayout (Operations/Finance settings reuse
+            │                     #   EmployeeSettingsPage), GlobalSearch, BookingLookup, FollowUpPopup
+            ├── dashboard/        # AdminDashboard, EmployeeDashboard
+            ├── leads/            # LeadForm, LeadDetail, StatusBar, KanbanBoard, BookingConfirmModal,
+            │                     #   FollowUpModal, FollowUpOutcomeModal, LostReasonModal,
+            │                     #   CommentsSection (merged with what used to be separate Notes)
+            ├── finance/          # Payment/refund/expense forms
+            ├── operations/       # Hotel/vehicle/trip-captain widgets
+            └── ui/               # Badge, Modal, DateTimePicker (custom-built, not native
+                                  #   <input type="datetime-local">), Table, Avatar, StatsCard, Skeleton
 ```
 
 ---
 
-## 4. Database Schema (Prisma / PostgreSQL)
+## 5. Database Schema — Key Models (Prisma / PostgreSQL, Supabase-hosted)
 
-### Organization (multi-tenant root)
-```
-id, name, slug (unique), plan (FREE|STARTER|PRO|ENTERPRISE),
-status (ACTIVE|SUSPENDED|CANCELLED), settings (Json), createdAt, updatedAt
-→ has many: User, Campaign, Lead, Tag, LeaveRequest
-```
+Full model list (see `backend/prisma/schema.prisma` for exact fields):
+`Organization, User, RefreshToken, Campaign, MetaAdMap, CampaignEmployee, CampaignNote,
+CampaignAttachment, Lead, Tag, LeadTag, LeadComment, LeaveRequest, Notification, ActivityLog,
+WebhookLog, MetaConnection, WhatsAppAccount, WhatsAppConversation, WhatsAppMessage, CampaignArchive,
+Feedback, Department, Designation, Destination, TourCategory, Booking, Traveler, Package,
+PackageAuditLog, PackageItinerary, Payment, PaymentScheduleItem, BookingTask, Departure, Hotel,
+Vehicle, Vendor, VendorDocument, OperationsDocument, OperationsNote, DepartureTask, Refund,
+FinanceDocument, BusinessRule, ScheduledJobRun, AutomationRule, AutomationExecution, ErrorLog,
+VendorPayment, Expense, SalesTarget, EmployeeSalaryConfig, EmployeePayout, FinanceSalaryAccess`
 
-### User
+### Lead — the primary entity, the sales pipeline
 ```
-id, organizationId?, name, email (unique), password (bcrypt),
-role (ADMIN|EMPLOYEE), phone?, avatar?, isActive, availability (AVAILABLE|BUSY|OFFLINE),
-lastLogin?, createdAt, updatedAt
-→ has many: Lead (assignedLeads), CampaignEmployee, Notification,
-            ActivityLog, Feedback, RefreshToken, CampaignNote,
-            CampaignAttachment, LeaveRequest (x2), LeadComment
+status: NEW | NOT_CONTACTED | CONTACTED | INTERESTED | FOLLOW_UP_SCHEDULED | CONFIRMED | LOST
+source: WHATSAPP | INSTAGRAM | MANUAL | WEBSITE | META_ADS
+priority, followUpDate?, followUpNotes?, followUpDone, preferredDate? (customer's preferred
+  departure, plain YYYY-MM-DD string), assignedToId?, campaignId?, deletedAt? (soft delete only —
+  never hard-deleted), createdAt, updatedAt
 ```
+**Status pipeline rules (server-enforced in `updateLead`, `lead.controller.ts`, applies to every role
+including ADMIN):**
+- **Forward-only.** A lead can never move backward through
+  `NEW → NOT_CONTACTED → CONTACTED → INTERESTED → FOLLOW_UP_SCHEDULED → CONFIRMED`.
+- **LOST is always reachable** as an exit from any status *except* CONFIRMED (see next point).
+- **One narrow, deliberate exception:** `FOLLOW_UP_SCHEDULED → INTERESTED` is allowed (completing a
+  follow-up can legitimately mean "still interested, no concrete next date yet").
+- **Once CONFIRMED, the status is permanently locked — nothing can ever change it again, not even to
+  LOST.** A confirmed lead has become a booking; any post-confirmation outcome (cancellation) belongs
+  on `Booking.status` (`ACTIVE | CANCELLED | COMPLETED`), not by moving the lead backward. (Note:
+  `Booking.status` has the enum but no UI/endpoint sets it to `CANCELLED` yet — flagged as an unbuilt
+  gap, not a bug.)
+- Setting status to `CONFIRMED` always routes through the full booking-confirmation flow
+  (`BookingConfirmModal` → `createBooking`) — never a bare status PATCH.
 
-### RefreshToken
-```
-id, tokenHash (SHA-256, unique), userId, expiresAt, revokedAt?,
-userAgent?, ipAddress?, createdAt
-```
+**Sort order convention (applies to Leads, Bookings, and Customers lists — deliberately, not everywhere):**
+these three lists default to sorting by **`updatedAt desc`**, not `createdAt`, so a lead/booking that
+was just confirmed/edited/paid rises to the top instead of staying wherever its original creation time
+placed it — with a deterministic 3-level tiebreaker (`updatedAt → createdAt → id`, all `desc`) so exact
+timestamp ties never produce unstable/flip-flopping pagination. **This is a deliberate, explicit product
+decision requested by the user — do not "fix" it back to createdAt.** It is *not* applied to
+task/itinerary/schedule-type lists (those correctly stay chronological-by-due-date or sequence-ordered),
+notification/activity-log lists (correctly `createdAt desc` — those entities are never edited after
+creation so createdAt already *is* "latest first"), or master/reference data (correctly alphabetical).
+One related gotcha already fixed: the Meta lead backfill sync backdates `createdAt` to the real
+historical submission time but must **also** backdate `updatedAt` to match — otherwise a months-old
+backfilled lead would jump to the top of every list as if it just came in.
 
-### Lead  ← primary business entity
+### Booking
 ```
-id, organizationId?, name, phone, email?,
-source (WHATSAPP|INSTAGRAM|MANUAL|WEBSITE),
-status (NEW|CONTACTED|INTERESTED|FOLLOW_UP_SCHEDULED|CONFIRMED|LOST),
-priority (HIGH|MEDIUM|LOW),
-message?, lostReason?, lostReasonOther?,
-destination?, campaignId?, assignedToId?,
-followUpDate?, followUpNotes?, followUpDone,
-whatsappMsgId?, instagramLeadId?, metaPageId?, adId?, adName?,
-notes?, budget?, groupSize?, preferredDate?,
-isRead, deletedAt? (soft delete), createdAt, updatedAt
-→ has many: Notification, ActivityLog, LeadTag, LeadComment
+leadId (unique — one booking per lead), bookingNumber, packageId?, travelerName, numberOfTravelers,
+foodPreference (VEG|NON_VEG|JAIN|NO_PREFERENCE), roomSharing (SINGLE|DOUBLE|TRIPLE|QUAD),
+roomSplit support via Traveler rows (split a group across room types at confirmation time),
+tourType (FIT|GIT), departureDate?, returnDate?, finalPrice, amountPaid, balanceAmount,
+balanceDueDate?, departureId?, travelerPortalTokenHash? (customer self-service link),
+status: ACTIVE | CANCELLED | COMPLETED
 ```
-**Indexes:** status, priority, source, assignedToId, campaignId, createdAt, deletedAt, followUpDate
+`createBooking` requires an initial `amountPaid` (advance) on first confirmation; calling it again for
+an already-booked lead **upserts** onto the same Booking row (adds a new Payment, doesn't create a
+second booking) — expect this if testing repeatedly against the same lead.
 
-### Campaign
+### Payment
 ```
-id, organizationId?, name, destination, description?,
-status (ACTIVE|PAUSED|DRAFT|ENDED), startDate?, endDate?,
-targetLeads?, budget?, whatsappNumber?, instagramAdId?,
-utmSource?, utmCampaign?, keywords (Json array as String), createdAt, updatedAt
-→ has many: Lead, CampaignEmployee, CampaignNote, CampaignAttachment
+status: PENDING | VERIFIED | REJECTED | CORRECTION_REQUESTED
+type: ADVANCE | INSTALLMENT | REFUND
+recordedById (whoever submitted it — often Sales, but Ops/Finance can record on a customer's behalf)
 ```
-
-### CampaignEmployee (join table)
-```
-id, campaignId, userId, assignedAt
-@@unique([campaignId, userId])
-```
-
-### CampaignNote
-```
-id, content, isEdited, campaignId, authorId, createdAt, updatedAt
-```
-
-### CampaignAttachment
-```
-id, name, fileUrl, fileSize, mimeType, campaignId, uploadedById, createdAt
-```
-
-### Tag
-```
-id, name, color (hex), organizationId?, createdAt
-@@unique([name, organizationId])
-```
-
-### LeadTag (join table)
-```
-id, leadId, tagId
-@@unique([leadId, tagId])
-```
-
-### LeadComment (threaded)
-```
-id, content, isEdited, leadId, authorId, parentId? (self-ref), createdAt, updatedAt
-→ replies: LeadComment[]
-```
-
-### LeaveRequest (schema only — UI removed)
-```
-id, organizationId?, startDate, endDate, reason,
-status (PENDING|APPROVED|REJECTED), adminNote?,
-employeeId, approvedById?, createdAt, updatedAt
-```
-> Note: LeaveRequest is in the schema but the frontend feature was removed. The DB table exists.
+Finance approves/rejects/requests-correction. **On any of these three actions, both the recorder AND
+the lead's assigned Sales rep get notified** (deduplicated if the same person) — this was a deliberate
+fix for a real gap where a Sales rep never heard about a rejection if someone else had recorded the
+payment.
 
 ### Notification
 ```
-id, type (FOLLOW_UP_DUE|FOLLOW_UP_OVERDUE|NEW_LEAD_ASSIGNED|
-          LEAD_STATUS_CHANGED|CAMPAIGN_UPDATE|SYSTEM),
-title, message, isRead, userId, leadId?, createdAt
+type (free string — see notification.service.ts's TYPE_META for the full taxonomy),
+category: SALES | OPERATIONS | FINANCE | CUSTOMER | SYSTEM (defaulted per-type)
+severity: INFO | REMINDER | SUCCESS | WARNING | CRITICAL
+channel: IN_APP only — EMAIL/SMS/WHATSAPP are architecture-ready tags, never actually dispatched
 ```
-
-### ActivityLog
-```
-id, action, details?, entityType (LEAD|CAMPAIGN|USER|LEAVE)?,
-entityId?, userId, leadId?, createdAt
-```
-
-### WebhookLog
-```
-id, source, payload (raw JSON string), processed, error?, createdAt
-```
-
-### Feedback
-```
-id, type (BUG|SUGGESTION|OTHER), title, description, page?,
-priority (LOW|MEDIUM|HIGH|CRITICAL), status (OPEN|IN_PROGRESS|RESOLVED|CLOSED),
-adminNotes?, submittedById, createdAt, updatedAt
-```
+Follow-up due/overdue reminders are the one notification type that also gets a dedicated **in-app modal
+popup** (`components/layout/FollowUpPopup.tsx` + `hooks/useFollowUpNotifications.ts`), not just a bell
+entry — it fires at (or after, never before) the exact scheduled time, checked every 5s, queues if
+several come due together, and is shown **only to EMPLOYEE, deliberately not to ADMIN** (admin is a
+monitoring role — they get aggregate stats like Pending Leads / Overdue Follow-ups on their dashboard
+instead of per-lead interruptions).
 
 ---
 
-## 5. API Routes
+## 6. Key Business Rules & Conventions (things a fresh AI would NOT infer from a partial code read)
 
-All routes are prefixed `/api`. All except `/auth/login`, `/auth/refresh`, `/webhooks/*` require `authenticate` middleware.
-
-### Auth — `/api/auth`
-| Method | Path | Auth | Notes |
-|--------|------|------|-------|
-| POST | `/login` | Public | Rate limited: 20/15min |
-| POST | `/refresh` | Cookie | Rotates refresh token |
-| POST | `/logout` | Bearer | Revokes refresh token |
-| GET | `/me` | Bearer | Returns current user (no password) |
-| PUT | `/change-password` | Bearer | Revokes all sessions on success |
-
-### Leads — `/api/leads`
-| Method | Path | Auth | Notes |
-|--------|------|------|-------|
-| GET | `/` | Bearer | Paginated; employees auto-filtered to assigned only |
-| GET | `/stats` | Bearer | Counts by status/source |
-| GET | `/check-duplicate` | Bearer | ?phone=&email= |
-| GET | `/dashboard-stats` | Admin | Admin dashboard aggregates |
-| GET | `/export` | Admin | CSV export |
-| GET | `/overdue` | Bearer | Follow-ups past due |
-| GET | `/activity` | Bearer | Recent lead activity |
-| GET | `/:id` | Bearer | Single lead with all relations |
-| POST | `/` | Bearer | Create lead |
-| PUT | `/:id` | Bearer | Update lead |
-| POST | `/:id/transfer` | Bearer | Reassign to another employee |
-| DELETE | `/:id` | Admin | Soft delete (sets deletedAt) |
-
-### Comments — `/api/leads/:leadId/comments`
-| Method | Path | Auth |
-|--------|------|------|
-| GET | `/` | Bearer |
-| POST | `/` | Bearer |
-| PUT | `/:commentId` | Bearer (author or admin) |
-| DELETE | `/:commentId` | Bearer (author or admin) |
-
-### Campaigns — `/api/campaigns`
-| Method | Path | Auth |
-|--------|------|------|
-| GET | `/` | Bearer |
-| GET | `/:id` | Bearer |
-| POST | `/` | Admin |
-| PUT | `/:id` | Admin |
-| DELETE | `/:id` | Admin |
-| POST | `/:id/employees` | Admin |
-| DELETE | `/:id/employees/:userId` | Admin |
-| GET | `/:id/notes` | Bearer |
-| POST | `/:id/notes` | Bearer |
-| PUT | `/:id/notes/:noteId` | Bearer |
-| DELETE | `/:id/notes/:noteId` | Bearer |
-| GET | `/:id/attachments` | Bearer |
-| POST | `/:id/attachments` | Bearer (multipart) |
-| DELETE | `/:id/attachments/:attachId` | Bearer |
-
-### Users/Employees — `/api/users`
-| Method | Path | Auth |
-|--------|------|------|
-| GET | `/` | Bearer |
-| GET | `/:id` | Bearer |
-| GET | `/:id/profile` | Bearer |
-| POST | `/` | Admin |
-| PUT | `/:id` | Admin or Self |
-| DELETE | `/:id` | Admin |
-
-### Tags — `/api/tags`
-| Method | Path | Auth |
-|--------|------|------|
-| GET | `/` | Bearer |
-| POST | `/` | Admin |
-| PUT | `/:id` | Admin |
-| DELETE | `/:id` | Admin |
-
-### Settings — `/api/settings`
-| Method | Path | Auth |
-|--------|------|------|
-| GET | `/` | Bearer |
-| PUT | `/` | Admin |
-
-### Reports — `/api/reports`
-| Method | Path | Auth |
-|--------|------|------|
-| GET | `/leads` | Admin |
-| GET | `/performance` | Admin |
-
-### Activity — `/api/activity`
-| Method | Path | Auth |
-|--------|------|------|
-| GET | `/` | Admin |
-
-### Notifications — `/api/notifications`
-| Method | Path | Auth |
-|--------|------|------|
-| GET | `/` | Bearer |
-| PUT | `/:id/read` | Bearer |
-| PUT | `/read-all` | Bearer |
-
-### Feedback — `/api/feedback`
-| Method | Path | Auth |
-|--------|------|------|
-| GET | `/` | Admin |
-| GET | `/stats` | Admin |
-| POST | `/` | Bearer |
-| PUT | `/:id` | Admin |
-
-### Webhooks — `/api/webhooks` (no auth)
-| Method | Path | Notes |
-|--------|------|-------|
-| GET | `/whatsapp` | Meta verification handshake |
-| POST | `/whatsapp` | Incoming WhatsApp messages → auto-creates leads |
-| GET | `/instagram` | Meta verification handshake |
-| POST | `/instagram` | Incoming Instagram leads → auto-creates leads |
+- **bcrypt is one-way.** No admin "view employee password" feature exists or should ever be built —
+  only reset (overwrite) is possible. This has been explicitly asked for and explicitly declined twice.
+- **User "deletion" is always a soft deactivate** (`User.isActive = false`), never a real SQL delete —
+  ~30 tables have Restrict-constrained FKs to User that must stay attributed after someone leaves.
+  Deleting an employee with active leads/campaigns/tasks triggers a reassignment flow (transaction-safe,
+  handles the `CampaignEmployee` unique-constraint collision case).
+- **Package `code` is auto-generated** (`${packageType}-${slug}-${rand}`), never user-entered — the
+  field is immutable after creation and hidden from every create/edit UI.
+- **Payments only affect `Booking.amountPaid` on approval**, not on submission — a `PENDING` payment
+  sitting unverified doesn't move the ledger yet.
+- **`orgFilter(req)` pattern**: every controller defines/uses this to scope queries by
+  `req.user.organizationId` — repeated per-file, not centralized in middleware.
+- **DateTimePicker is custom-built**, not the native `<input type="datetime-local">` — a
+  Date→Hour→Minute wizard component in `components/ui/DateTimePicker.tsx`, used everywhere a
+  follow-up date/time is picked, styled to match the app instead of the OS picker.
+- **No email/SMS infrastructure exists** — `nodemailer` is an installed dependency but is never
+  imported/used anywhere. "Forgot password" is a static "contact your admin" info panel, not a real
+  token-based email flow, by explicit user choice.
+- **Meta Ads integration** has two paths into the same `createLead()` service function: a real-time
+  webhook (`webhook.controller.ts`, Instagram DMs + leadgen) and a periodic backfill safety-net
+  (`metaLeadBackfill.service.ts`, catches anything the webhook missed, plus a one-off "Import Historical
+  Leads" full scan from Admin Settings → Integrations). The backfill requires the connected Page to be
+  assigned to the Meta System User with `leads_retrieval` permission — a missing permission can return
+  an empty list silently (no error) rather than failing loudly, which looks identical to "genuinely no
+  leads yet" from the UI.
 
 ---
 
-## 6. Frontend Routes
+## 7. Frontend Hooks Reference (React Query)
 
-```
-/login                          → LoginPage
+Convention: `use<Resource>()` for lists/single items, `use<Verb><Resource>()` for mutations, query keys
+as arrays starting with the resource name (e.g. `['leads', filters]`, `['erp-bookings', filters]`,
+`['customers', filters]`). Mutations invalidate every list their change could affect — this has been a
+recurring source of bugs when a new mutation forgets to invalidate a *related* list (e.g. confirming a
+booking needs to invalidate `['leads']`, `['erp-bookings']`, **and** `['customers']`, not just the one
+that feels most directly related).
 
-/admin/*                        → RequireAuth(role=ADMIN) → AdminLayout
-  /admin/dashboard              → AdminDashboard
-  /admin/leads                  → admin/LeadsPage
-  /admin/campaigns              → admin/CampaignsPage
-  /admin/employees              → admin/EmployeesPage
-  /admin/reports                → admin/ReportsPage
-  /admin/activity               → admin/ActivityFeedPage
-  /admin/feedback               → admin/FeedbackPage
-  /admin/settings               → admin/SettingsPage
-
-/employee/*                     → RequireAuth(role=EMPLOYEE) → EmployeeLayout
-  /employee/dashboard           → EmployeeDashboard
-  /employee/leads               → employee/LeadsPage
-  /employee/follow-ups          → employee/FollowUpsPage
-  /employee/settings            → employee/SettingsPage
-```
-
----
-
-## 7. Authentication Flow
-
-1. **Login** → POST `/api/auth/login` → returns `{ token (JWT 15min), user }` + sets `crm_refresh` httpOnly cookie (7d)
-2. **Client stores** access token in `localStorage.crm_token`, user in `localStorage.crm_user`
-3. **Every request** → Axios interceptor attaches `Authorization: Bearer <token>`
-4. **401 received** → Axios interceptor silently calls POST `/api/auth/refresh` (sends cookie)
-5. **Refresh success** → new access token stored, failed request retried automatically
-6. **Refresh fails** → redirect to `/login`, localStorage cleared
-7. **Logout** → POST `/api/auth/logout` → server revokes refresh token → clear localStorage → redirect
-8. **Password change** → revokes ALL refresh tokens for that user (all devices logged out)
-
-**Zustand store** (`useAuthStore`): `{ user, token, isAuthenticated, login(), logout(), updateUser() }`
+| Hook file | Covers |
+|-----------|--------|
+| `useLeads.ts` | Leads CRUD, transfer, stats |
+| `useBookings.ts` | Booking create/update, review/referral marking |
+| `usePayments.ts` | Record/delete payment |
+| `useFinance.ts` | Payment verification (approve/reject/correction), refunds |
+| `useErp.ts` | `useAllBookings` (`/erp/bookings-list`), `useCustomers` (`/erp/customers`) — shared by Admin and Employee "My X" pages, auto-scoped server-side by role |
+| `useAnalytics.ts` | Business Intelligence tabs — package/destination/campaign/customer/**employee** analytics |
+| `useUsers.ts` | Employee CRUD, `useDeleteUser` (handles reassignment) |
+| `useNotifications.ts` | Bell dropdown |
+| `useFollowUpNotifications.ts` | The in-app popup system (not the bell) |
+| `useCampaigns.ts`, `usePackages.ts`, `useOperations.ts`, `useMasters.ts`, `useDepartments.ts`, `useDesignations.ts` | As named |
 
 ---
 
-## 8. Key Frontend Patterns
+## 8. Environment Variables
 
-### Data Fetching (TanStack Query)
-```typescript
-// All hooks follow this pattern
-export function useLeads(params) {
-  return useQuery({
-    queryKey: ['leads', params],
-    queryFn: () => api.get('/leads', { params }).then(r => r.data.data),
-  });
-}
-export function useCreateLead() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (data) => api.post('/leads', data).then(r => r.data.data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['leads'] }),
-  });
-}
+### Backend — production (`.env`, never paste its real values into chat/artifacts)
+Key vars: `DATABASE_URL`, `DIRECT_URL` (Prisma needs both — pooled + direct connection to Supabase),
+`JWT_SECRET`, `JWT_EXPIRES_IN=7d`, `TOKEN_ENCRYPTION_KEY` (encrypts stored Meta tokens), `CRON_SECRET`
+(matched against the GitHub Actions cron requests), `SUPABASE_S3_*` (file storage), Meta/WhatsApp
+tokens, `SMTP_*` (unused — see §6).
+
+### Backend — test (`.env.supabase-test`, safe to use for local verification)
+A separate `travelcrm-test` Supabase project, reused across sessions for local backend testing since
+local Docker Postgres isn't reachable in this environment. Start the backend against it on an ad-hoc
+free port, e.g.:
 ```
-
-### Query Keys Convention
-- `['leads', filters]` — lead list
-- `['lead', id]` — single lead
-- `['campaigns', filters]` — campaign list
-- `['users', filters]` — employee list
-- `['tags']` — org tags
-- `['settings']` — org settings
-- `['reports', 'leads', params]` — lead report
-- `['reports', 'performance', params]` — performance report
-- `['notifications', page, limit]`
-- `['activity', params]`
-
-### Multi-tenant Organization Filter (Backend Pattern)
-Every controller defines and uses this:
-```typescript
-function orgFilter(req: AuthenticatedRequest): Record<string, unknown> {
-  return req.user?.organizationId ? { organizationId: req.user.organizationId } : {};
-}
-// Usage: prisma.lead.findMany({ where: { ...orgFilter(req), deletedAt: null } })
+export DATABASE_URL="<from .env.supabase-test>"
+export DIRECT_URL="<from .env.supabase-test>"
+export JWT_SECRET="<from .env.supabase-test>"
+export PORT=51xx   # pick something free
+npx tsx src/index.ts
 ```
-This pattern is repeated in every controller — never imported from auth middleware.
+then curl against `http://localhost:51xx/api/...`, verify, and kill the process afterward. Never test
+destructive/writing operations against production data directly — always use this test project first.
 
-### Employee Auto-Isolation
-```typescript
-// lead.controller.ts — employees only see their own leads
-if (req.user?.role === 'EMPLOYEE') where.assignedToId = req.user.id;
-```
-
-### File Upload Pattern
-```typescript
-// Multipart form on routes that need it:
-router.post('/:id/attachments', authenticate, upload.single('file'), handler);
-// Served statically: GET /api/uploads/<filename>
-```
-
-### Soft Delete
-Leads use soft delete. All lead queries must include `deletedAt: null`. Hard delete is not used.
-
-### React Hook Form + Controller (for non-standard inputs)
-```tsx
-// Used for TagInput since it's not a native input
-<Controller
-  name="tagIds"
-  control={control}
-  render={({ field }) => (
-    <TagInput value={field.value ?? []} onChange={field.onChange} />
-  )}
-/>
-```
+### Frontend
+`VITE_API_URL` — empty in production (same-origin, since frontend+API are one Vercel deployment).
 
 ---
 
-## 9. Frontend Hooks Reference
+## 9. Verification Workflow (how every change in this project's history has been shipped)
 
-| Hook file | Exports |
-|-----------|---------|
-| `useLeads.ts` | `useLeads`, `useLeadById`, `useCreateLead`, `useUpdateLead`, `useDeleteLead`, `useTransferLead`, `useLeadStats`, `useCheckDuplicate` |
-| `useCampaigns.ts` | `useCampaigns`, `useCampaignById`, `useCreateCampaign`, `useUpdateCampaign`, `useDeleteCampaign`, `useCampaignEmployees` |
-| `useUsers.ts` | `useUsers`, `useUserById` |
-| `useTags.ts` | `useTags`, `useCreateTag`, `useUpdateTag`, `useDeleteTag` |
-| `useSettings.ts` | `useSettings`, `useUpdateSettings` |
-| `useComments.ts` | `useComments`, `useCreateComment`, `useUpdateComment`, `useDeleteComment` |
-| `useCampaignNotes.ts` | `useCampaignNotes`, `useCreateCampaignNote`, `useUpdateCampaignNote`, `useDeleteCampaignNote` |
-| `useActivity.ts` | `useActivity` |
-| `useNotifications.ts` | `useNotifications`, `useMarkAsRead`, `useMarkAllAsRead` |
-| `useDashboard.ts` | `useDashboardStats`, `useLeadStats`, `useOverdueFollowUps` |
-| `useReports.ts` | `useLeadReport`, `usePerformanceReport` |
-| `useEmployeeProfile.ts` | `useEmployeeProfile` |
-| `useFollowUpNotifications.ts` | Browser notification polling hook |
-| `useRealtimeSync.ts` | Socket.IO event subscription → invalidates queries |
-| `useSocket.ts` | Raw Socket.IO connection |
-| `useStarredLeads.ts` | `isStarred(id)`, `toggle(id)` — localStorage |
-| `useRecentViews.ts` | `trackView(id)`, `recentIds` — localStorage |
-| `useKeyboardShortcuts.ts` | Global keyboard shortcut bindings |
-
----
-
-## 10. UI Component Reference
-
-### Layout
-- **AdminLayout** — dark sidebar (slate-900), notification bell, user menu, FeedbackButton floating
-- **EmployeeLayout** — dark sidebar (mountain-900), same top bar pattern
-
-### Admin Nav Links
-Dashboard → Leads → Campaigns → Employees → Reports → Activity → Feedback → Settings
-
-### Employee Nav Links
-Dashboard → My Leads → Follow-ups → Settings
-
-### Reusable UI Components
-| Component | Props / Notes |
-|-----------|--------------|
-| `Badge` | `status?: LeadStatus`, `source?: LeadSource` — color-coded |
-| `PriorityBadge` | `priority: 'HIGH'│'MEDIUM'│'LOW'` — colored dot |
-| `AvailabilityBadge` | `status: AvailabilityStatus`, `size?`, `showLabel?` |
-| `TagChip` | `tag: { name, color }` — colored pill |
-| `TagInput` | Multi-select tag input fetching from `useTags()` |
-| `Modal` | `open`, `onClose`, `title`, `size?` (sm/md/lg/xl/2xl) |
-| `Table` | `columns`, `data`, `loading`, `emptyMessage`, `onRowClick?` |
-| `Pagination` | `page`, `totalPages`, `onPageChange` |
-| `Avatar` | `name`, `size?` — initials-based |
-| `StatsCard` | `title`, `value`, `icon`, `color`, `delta?` |
-| `Skeleton` | Shimmer loading placeholder |
-| `ErrorBoundary` | Wraps children, catches render errors |
-
-### Lead-Specific Components
-| Component | Notes |
-|-----------|-------|
-| `LeadForm` | Full create/edit form with duplicate detection, LostReasonModal intercept, TagInput, priority select |
-| `LeadDetail` | Slide-over with Details tab + Comments tab |
-| `CommentsSection` | Threaded comments with edit/delete, reply support |
-| `DuplicateWarningDialog` | Modal shown when phone/email match existing lead |
-| `LostReasonModal` | Required when setting status → LOST |
-
-### Settings Page (admin/SettingsPage.tsx) — 4 tabs
-1. **Account** — change password (ChangePasswordSection)
-2. **Organization** — CompanyInfoCard + 3 ListEditors (sources, destinations, lostReasons)
-3. **Lead Tags** — create/edit/delete tags with 10 preset hex colors
-4. **Webhooks** — webhook simulator + API key display
-
-### Reports Page (admin/ReportsPage.tsx)
-- Period selector: 7d / 30d / 90d / Custom (date range inputs)
-- Tab 1 — Lead Analytics: summary stat cards, BarChart by status, PieChart by source, horizontal BarChart by priority
-- Tab 2 — Employee Performance: ranked table with conversion progress bars, top campaigns list
-- CSV export via Blob URL (no library)
+1. Implement the change.
+2. `npx tsc --noEmit` on both `frontend/` and `backend/` — backend has a **known pre-existing baseline
+   of ~35 unrelated errors** in `booking.controller.ts`/`departure.controller.ts`; a clean diff means
+   "same count as before your change," not zero.
+3. For anything with real logic (not pure UI), start the backend against the test Supabase project and
+   exercise it live via curl — create real records, verify the actual behavior, clean up test data
+   afterward (soft-delete leads/users created for the test).
+4. `npm run build` on the frontend (catches issues `tsc --noEmit` alone sometimes misses).
+5. Summarize what changed and what was verified to the user.
+6. **Wait for the literal word "amit"** before committing/pushing — this is a password, not a rubber
+   stamp; general enthusiasm ("yes deploy it", "go ahead") is explicitly *not* sufficient per the
+   standing rule and should prompt asking for the password again.
+7. Commit, push to `final-crm main`.
+8. Poll the deployed HTML for a bundle-hash change (`grep -oE 'assets/index-[a-zA-Z0-9_-]*\.js'`) to
+   confirm the new build actually went live, then run basic health checks (frontend 200, wrong-login
+   401, unauthenticated API call 401). For higher confidence on a specific change, download the live JS
+   bundle and grep it for a string unique to the new code — this has caught cases where the deploy
+   looked "successful" per Vercel but the user still reported seeing the old page (browser cache on
+   their end, not a deploy failure — confirmed by fetching the live bundle directly).
 
 ---
 
-## 11. Environment Variables
+## 10. Known Gaps / Things Flagged But Not Built
 
-### Backend (`.env`)
+- No UI/endpoint sets `Booking.status = 'CANCELLED'` yet, even though the schema and the Lead-status
+  permanent-lock design both anticipate it as the right place for post-confirmation cancellations.
+- No email/SMS dispatch (see §6).
+- No real-time WebSocket layer (removed with the Vercel migration; polling only).
+- The "avg follow-up delay" analytics metric (Employee Analytics tab) is a documented approximation —
+  there's no dedicated "follow-up completed at" timestamp, so it uses `Lead.updatedAt`, which a later
+  unrelated edit to the same lead would slightly inflate.
+
+---
+
+## 11. Local Dev Setup (current, Supabase-based — supersedes SETUP.md's local-Postgres instructions)
+
+```bash
+cd "Desktop/master crm/backend"
+npm install
+# Use .env for real work, or .env.supabase-test for safe experimentation
+npm run db:generate
+npm run dev            # backend on the port set in whichever env you loaded
+
+cd "Desktop/master crm/frontend"
+npm install
+npm run dev             # Vite dev server, default port 5173
 ```
-DATABASE_URL=postgresql://...
-JWT_SECRET=...
-COOKIE_SECURE=true                    # set to 'true' in production
-FRONTEND_URL=https://crm.bhatko.in
-WHATSAPP_VERIFY_TOKEN=...             # for webhook handshake
-WHATSAPP_APP_SECRET=...               # for payload signature (not yet implemented)
-UPLOAD_DIR=/app/uploads
-PORT=5000
-NODE_ENV=production
-```
-
-### Frontend (`.env`)
-```
-VITE_API_URL=https://crm.bhatko.in   # empty = same-origin proxy
-```
-
----
-
-## 12. Security Measures
-
-| Layer | Mechanism |
-|-------|-----------|
-| JWT access tokens | 15-minute expiry |
-| Refresh tokens | SHA-256 hashed in DB, rotated on every use, 7-day TTL |
-| Refresh cookie | `httpOnly`, `secure`, `sameSite: strict`, path-scoped to `/api/auth` |
-| Password hashing | bcrypt, cost 12 |
-| Password change | Revokes all active refresh tokens |
-| RBAC | `authenticate` + `requireAdmin` + `requireAdminOrSelf` middleware |
-| Org isolation | `orgFilter()` applied to every DB query |
-| Employee isolation | `assignedToId` filter auto-applied for EMPLOYEE role |
-| Rate limiting | 300/15min all API, 20/15min login endpoint |
-| Security headers | Helmet + CSP (`defaultSrc: 'self'`) |
-| CORS | Strict origin allowlist |
-| SQL injection | Structurally impossible — Prisma parameterized queries only |
-| File uploads | MIME type allowlist + 20MB limit + filename sanitization |
-| Socket.IO | JWT verified before connection accepted |
-
-### Known Security Gaps
-- No backend input sanitization (XSS payloads could be stored in text fields)
-- WhatsApp webhook doesn't verify `X-Hub-Signature-256` (anyone can POST fake leads)
-- SVG uploads allowed (can contain embedded JS — should be removed from MIME allowlist)
-- No account lockout after N failed login attempts (rate limit is IP-based only)
-- `sortBy` query param not whitelisted before being passed to Prisma `orderBy`
-- No password complexity enforcement (only 8-char minimum)
-- No audit log for sensitive operations (role changes, exports, deletions)
-
----
-
-## 13. Deployment
-
-**Deployed via:** Python SSM script at `C:\Users\kapta\deploy_travel_crm.py`  
-**Process:** SSM sends command to EC2 → EC2 runs `git pull + docker compose up --build -d`  
-**Docker:** Backend + Frontend built as separate containers  
-**Prisma:** `npx prisma generate` runs inside Docker build — this resolves any TypeScript errors about unknown models on local dev machines
-
-TypeScript note: The local Prisma client doesn't know about newer schema models (LeadComment, CampaignNote, etc.) until `prisma generate` runs. Backend TS errors on local are pre-existing and do not block deployment because `tsconfig.json` does not set `noEmitOnError: true`.
-
----
-
-## 14. Strict Rules (Never Violate)
-
-These rules were set at project inception and must always be respected:
-
-1. **DO NOT** change authentication or the JWT/refresh token flow
-2. **DO NOT** change role-based permissions (ADMIN/EMPLOYEE)
-3. **DO NOT** modify the search functionality
-4. **DO NOT** redesign the sidebar navigation
-5. **DO NOT** remove any existing features
-6. **DO NOT** break existing API contracts
-7. **DO NOT** make unnecessary database schema changes
-8. **Keep** the existing UI theme — Tailwind with `primary` (blue) and `mountain` (green) palettes
-9. All new features must integrate naturally — no orphaned pages or dead routes
-10. Follow enterprise coding standards — reusable, modular components
-11. Never display AWS credentials in code or responses
-
----
-
-## 15. Pending Improvements
-
-Features discussed but not yet implemented:
-
-- **Bulk lead actions** — select multiple leads, bulk assign / status change / export
-- **Kanban pipeline view** — leads as cards in status columns with drag-and-drop
-- **WhatsApp quick-action** — `wa.me/` link button on lead cards
-- **Lead CSV export** from the lead list (Reports CSV exists, lead list export doesn't)
-- **Dashboard widgets** — Top Campaign, Top Destination, Priority Breakdown chart, Quick Actions
-- **Mobile card layout** — tables → stacked cards on < 640px screens
-- **Skeleton loaders** — replace spinners with shimmer placeholders
-- **Period-over-period comparison** in Reports (vs last period delta)
-- **Lost reason breakdown chart** on Reports page
-- **Priority + tag filters** on Employee Leads page (columns exist, filters don't)
-- **WebSocket signature verification** on WhatsApp webhook
-- **Input sanitization** on backend text fields
-- **Account lockout** after failed login attempts
-
-### Proposed New Modules (not started)
-- **Packages & Itineraries** — structured tour package definitions
-- **Bookings** — converts confirmed leads into operational bookings
-- **Payments & Invoicing** — track advance/balance payments per booking
-- **Guides & Field Staff** — separate from office employees
-- **Expense & P&L per Trip** — revenue vs costs per departure
-- **Department Management** — Sales, Operations, Field, Marketing, Finance, Support, HR
-- **Vendors & Partners** — hotels, transport, equipment rental
-- **Marketing Broadcasts** — bulk WhatsApp/SMS to lead segments
-- **Customer Portal** — self-service for confirmed bookings
+Seeded login (test DB / seed.ts): `admin@travelcrm.com` / `admin123` (ADMIN), plus several seeded
+`EMPLOYEE` accounts (e.g. `amit@travelcrm.com`) — see `backend/src/utils/seed.ts` for the full list and
+their passwords.

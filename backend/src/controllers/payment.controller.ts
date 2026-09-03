@@ -5,6 +5,7 @@ import { notifyFinanceTeam, emitFinanceUpdated, createNotification } from '../se
 import { allocatePaymentToSchedule } from './paymentSchedule.controller.js';
 import { generateFinanceDocument } from './financeDocument.controller.js';
 import { buildUploadUrl } from '../middleware/upload.js';
+import { isWholeAmount, WHOLE_AMOUNT_ERROR } from '../utils/amountValidation.js';
 
 const orgId = (req: AuthenticatedRequest) => req.user?.organizationId ?? null;
 
@@ -72,6 +73,7 @@ export const recordPayment = async (req: AuthenticatedRequest, res: Response): P
     if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) {
       res.status(400).json({ success: false, error: 'Valid amount is required' }); return;
     }
+    if (!isWholeAmount(amount)) { res.status(400).json({ success: false, error: WHOLE_AMOUNT_ERROR }); return; }
     // Write-offs close out a balance the company has decided not to pursue —
     // restricted to Admin since, unlike every other payment type, it isn't
     // backed by real money changing hands and shouldn't be something any

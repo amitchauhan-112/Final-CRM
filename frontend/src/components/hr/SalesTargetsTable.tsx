@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Target, TrendingUp, Pencil, History } from 'lucide-react';
 import { useSalesTargets, useSetSalesTarget, SalesTargetRow } from '../../hooks/useHR';
-import { formatCurrency, cn } from '../../utils/helpers';
+import { formatCurrency, cn, blockDecimalKey, wholeNumberRule } from '../../utils/helpers';
 import { Skeleton } from '../ui/Skeleton';
 import Modal from '../ui/Modal';
 
@@ -36,7 +36,7 @@ function TargetFormModal({ row, month, year, onClose }: { row: SalesTargetRow | 
       >
         <div>
           <label className="label">Revenue Target (₹)</label>
-          <input type="number" step="0.01" {...register('targetRevenue')} className="input" />
+          <input type="number" step="1" onKeyDown={blockDecimalKey} {...register('targetRevenue', wholeNumberRule)} className="input" />
         </div>
         <div>
           <label className="label">Booking Count Target</label>

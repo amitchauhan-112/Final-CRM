@@ -1,144 +1,174 @@
-# Travel Agency CRM - Setup Guide
+# Travel CRM ("FOD Holidays") — Setup Guide
+
+> For full project understanding (architecture, deployment, roles, business rules), see `CONTEXT.md`.
+> This file covers local development setup only.
 
 ## Prerequisites
 
-1. **Node.js 18+** — Download from https://nodejs.org (LTS version)
-2. **PostgreSQL 14+** — Download from https://www.postgresql.org/download/
-3. **Git** (optional)
+1. **Node.js 18+** — https://nodejs.org (LTS version)
+2. **A Supabase project** — the database is Postgres hosted on Supabase, not local PostgreSQL. You
+   need connection strings (`DATABASE_URL`, `DIRECT_URL`) for either:
+   - The **test** Supabase project (`travelcrm-test`) — safe to experiment against, credentials in
+     `backend/.env.supabase-test`.
+   - **Production** — real customer data, only for actual deployed use, never for testing changes.
+3. **Git**
 
 ---
 
 ## Step 1: Install Node.js
 
-Download and install from: https://nodejs.org
-After install, verify: `node --version` and `npm --version`
+Download and install from https://nodejs.org. Verify: `node --version` and `npm --version`.
 
 ---
 
-## Step 2: Set Up PostgreSQL
-
-1. Install PostgreSQL
-2. Create a database:
-   ```sql
-   CREATE DATABASE travel_crm;
-   ```
-3. Note your PostgreSQL username and password (default: postgres / password)
-
----
-
-## Step 3: Configure Backend
-
-Edit `backend/.env` and update:
-```env
-DATABASE_URL="postgresql://YOUR_USER:YOUR_PASSWORD@localhost:5432/travel_crm"
-```
-
----
-
-## Step 4: Install & Run Backend
+## Step 2: Configure the Backend
 
 ```bash
-cd C:\Travel_CRM\backend
+cd "Desktop/master crm/backend"
+cp .env.example .env    # or use .env.supabase-test values directly for local testing
+```
+
+Edit `.env` (or export the equivalent vars inline) with your Supabase project's values:
+```env
+DATABASE_URL="postgresql://...supabase pooled connection..."
+DIRECT_URL="postgresql://...supabase direct connection..."
+JWT_SECRET="..."
+JWT_EXPIRES_IN="7d"
+TOKEN_ENCRYPTION_KEY="..."
+CRON_SECRET="..."
+SUPABASE_S3_ENDPOINT="..."
+SUPABASE_S3_REGION="..."
+SUPABASE_S3_ACCESS_KEY_ID="..."
+SUPABASE_S3_SECRET_ACCESS_KEY="..."
+SUPABASE_STORAGE_BUCKET="..."
+PORT=5000
+NODE_ENV=development
+FRONTEND_URL="http://localhost:5173"
+```
+Both `DATABASE_URL` (pooled, via pgbouncer) and `DIRECT_URL` (direct connection) are required — Prisma
+uses the direct one for migrations/introspection and the pooled one for normal query traffic.
+
+---
+
+## Step 3: Install & Run Backend
+
+```bash
+cd "Desktop/master crm/backend"
 npm install
 npm run db:generate    # Generate Prisma client
-npm run db:push        # Push schema to database
-npm run db:seed        # Seed sample data
-npm run dev            # Start backend (port 5000)
+npm run db:push        # Push schema to your Supabase database (only if it's not already provisioned)
+npm run db:seed        # Seed sample org, users, leads, campaigns, packages, bookings, ...
+npm run dev            # Start backend (port from .env, default 5000)
 ```
 
 ---
 
-## Step 5: Install & Run Frontend
+## Step 4: Install & Run Frontend
 
 Open a new terminal:
 ```bash
-cd C:\Travel_CRM\frontend
+cd "Desktop/master crm/frontend"
 npm install
-npm run dev            # Start frontend (port 5173)
+npm run dev            # Vite dev server, default port 5173
 ```
 
 ---
 
-## Step 6: Access the Dashboard
+## Step 5: Access the Dashboard
 
 Open browser: http://localhost:5173
 
-### Login Credentials (after seeding)
-| Role     | Email                    | Password  |
-|----------|--------------------------|-----------|
-| Admin    | admin@travelcrm.com      | admin123  |
-| Employee | rahul@travelcrm.com      | emp123    |
-| Employee | priya@travelcrm.com      | emp123    |
-| Employee | amit@travelcrm.com       | emp123    |
+### Seeded login credentials (after `npm run db:seed`)
+| Role | Email | Password |
+|------|-------|----------|
+| Admin | admin@travelcrm.com | admin123 |
+| Employee (Sales) | amit@travelcrm.com | emp123 |
+| Employee (Sales) | kaptan@travelcrm.com | emp123 |
+| Employee (Sales) | biswas@travelcrm.com | emp123 |
+
+`seed.ts` also seeds Operations/Finance-role users, departments, designations, packages, and sample
+bookings — check the file directly for the full current list, it's the source of truth (this table
+covers Sales only for brevity).
 
 ---
 
-## Meta API Integration
+## Meta (Facebook/Instagram) API Integration
 
-### WhatsApp Business API
-1. Go to https://developers.facebook.com
-2. Create an App → Select "Business" type
-3. Add "WhatsApp" product
-4. Set Webhook URL: `https://your-domain.com/api/webhooks/whatsapp`
-5. Set Verify Token (must match `WHATSAPP_VERIFY_TOKEN` in .env)
-6. Update `.env` with your tokens
+Configured per-organization from the app itself — **Admin → Settings → Integrations** — not via `.env`.
+That panel captures the Ad Account ID, Page ID, and a System User Token, and shows connection status,
+last sync time, and any sync error inline.
 
-### Instagram / Meta Graph API
-1. Same Meta App → Add "Instagram" product
-2. Set Webhook URL: `https://your-domain.com/api/webhooks/instagram`
-3. Set Verify Token (must match `INSTAGRAM_VERIFY_TOKEN` in .env)
-
-### Test Without Real API
-Use the **Webhook Simulator** in Settings page:
-- Admin → Settings → Webhook Simulator
-- Simulate incoming WhatsApp or Instagram leads instantly
+1. Go to https://developers.facebook.com, create/use a Business App.
+2. Add the **WhatsApp** and/or **Instagram/Meta Ads** products as needed.
+3. For the real-time leadgen webhook: set the webhook URL to
+   `https://<your-deployment>/api/webhooks/instagram` (production: `https://final-crm-kappa.vercel.app/api/webhooks/instagram`;
+   for local testing you'll need a tunnel like ngrok, since Meta requires a public HTTPS URL).
+4. Set the verify token to match `WHATSAPP_VERIFY_TOKEN` / the Instagram equivalent in your env.
+5. Assign the Page to the System User with at least **`leads_retrieval`** permission — without it, the
+   historical/backfill sync silently returns zero leads instead of erroring, which looks identical to
+   "genuinely no submissions yet."
+6. The periodic backfill sync (GitHub Actions cron, every 10 min in production) is a safety net that
+   catches anything the real-time webhook missed — it doesn't require any extra local setup, just a
+   working connection in Admin → Settings → Integrations.
 
 ---
 
 ## Project Structure
 
 ```
-Travel_CRM/
+Desktop\master crm\
+├── api/index.ts            # Vercel serverless entry (production only — not used by `npm run dev`)
+├── vercel.json
+├── CONTEXT.md               # Full project reference — read this for architecture/business rules
 ├── backend/
-│   ├── prisma/
-│   │   └── schema.prisma      # Database schema
-│   ├── src/
-│   │   ├── controllers/       # Route handlers
-│   │   ├── middleware/        # JWT auth middleware
-│   │   ├── routes/            # Express routes
-│   │   ├── services/          # Business logic
-│   │   ├── types/             # TypeScript types
-│   │   ├── utils/             # Logger, seeder
-│   │   └── index.ts           # Express + Socket.io server
-│   └── .env                   # Environment config
-│
+│   ├── prisma/schema.prisma # ~50 models — the DB source of truth
+│   ├── .env                 # Real credentials
+│   ├── .env.supabase-test   # Test project credentials — safe for local experimentation
+│   └── src/
+│       ├── app.ts           # Express app construction
+│       ├── index.ts         # Local dev entry (calls .listen())
+│       ├── controllers/     # ~35 files — lead, booking, payment, finance, departure, hotel,
+│       │                    #   vehicle, vendor, expense, refund, packages, campaign, user,
+│       │                    #   notification, analytics, webhook, ...
+│       ├── middleware/       # auth.ts (role guards), upload.ts
+│       ├── routes/          # index.ts mounts every sub-router under /api
+│       ├── services/        # lead.service.ts, notification.service.ts, metaSync.service.ts,
+│       │                    #   metaLeadBackfill.service.ts, automationEngine.service.ts, ...
+│       └── utils/seed.ts    # DB seeder
 └── frontend/
     └── src/
+        ├── App.tsx           # All routes: admin/*, employee/*, operations/*, finance/*
         ├── components/
-        │   ├── ui/            # Reusable UI (Badge, Modal, Table...)
-        │   ├── layout/        # AdminLayout, EmployeeLayout
-        │   ├── dashboard/     # Admin & Employee dashboards
-        │   ├── leads/         # Lead components
-        │   └── campaigns/     # Campaign components
-        ├── hooks/             # React Query hooks
+        │   ├── ui/           # Badge, Modal, DateTimePicker (custom-built), Table, Avatar, ...
+        │   ├── layout/       # AdminLayout, EmployeeLayout, FollowUpPopup, GlobalSearch, ...
+        │   ├── dashboard/    # AdminDashboard, EmployeeDashboard
+        │   ├── leads/        # LeadForm, LeadDetail, KanbanBoard, BookingConfirmModal, ...
+        │   ├── finance/      # Payment/refund/expense forms
+        │   └── operations/   # Hotel/vehicle/trip-captain widgets
+        ├── hooks/            # One file per resource — React Query wrappers
         ├── pages/
-        │   ├── admin/         # Admin pages
-        │   ├── employee/      # Employee pages
+        │   ├── admin/        # Dashboard, Leads, Campaigns, Organization, Packages, Bookings,
+        │   │                 #   Customers, Business Intelligence, Reports, Settings, ...
+        │   ├── employee/     # Dashboard, Leads, Follow-ups, My Customers, My Bookings, Tasks, ...
+        │   ├── operations/   # Dashboard, Departures, Stay Planning, Rooms Required, Vendors
+        │   ├── finance/      # Dashboard, Payment Verification, Ledger, Refunds, Payroll, ...
         │   └── LoginPage.tsx
-        ├── services/          # Axios API client
-        ├── store/             # Zustand state (auth)
-        ├── types/             # TypeScript interfaces
-        └── utils/             # Helper functions
+        ├── services/api.ts   # Axios instance + silent token-refresh interceptor
+        ├── store/            # Zustand auth state
+        └── types/index.ts    # All TypeScript interfaces/enums
 ```
 
 ---
 
 ## Key Features
 
-- **Lead Capture**: WhatsApp & Instagram webhook integration
-- **Auto Lead Routing**: Matches leads to campaigns by number/keyword/ad ID
-- **Role-Based Access**: Admin (full) vs Employee (own leads only)
-- **Real-time Notifications**: Socket.io for instant lead assignment alerts
-- **Follow-up Reminders**: Cron job checks every 30 min, sends in-app alerts
-- **Analytics Dashboard**: Recharts visualizations for leads, campaigns, performance
-- **Campaign Management**: Create campaigns, assign employees, track conversion
+- **Lead capture** — WhatsApp, Instagram, Meta Ads (real-time webhook + periodic backfill safety net), Website, Manual
+- **Auto lead routing** — matches leads to campaigns by ad/keyword/number, auto-assigns to employees
+- **Role-based access** — Admin (full), Employee/Sales (own leads only, server-enforced), Operations, Finance
+- **Forward-only lead pipeline** with a permanent lock once Confirmed (see `CONTEXT.md` §5/§6)
+- **Booking & payment workflow** — confirm bookings (with split-room support), record payments, Finance approve/reject/request-correction, dual notification to recorder + assigned Sales rep
+- **Operations** — departures, hotel/vehicle booking, rooms-required and stay-plan engines, trip captain assignment
+- **Finance** — customer ledgers, pending-balance tracker, refunds, vendor payments/ledger, expenses, payroll, reports
+- **Follow-up reminders** — in-app popup (Employee only, fires at exact scheduled time) + notification bell
+- **Business Intelligence** — package/destination/campaign/customer/employee analytics, including per-status lead breakdown and average follow-up delay per employee
+- **Packages & itineraries** — day-by-day itinerary builder, FIT/GIT tour types

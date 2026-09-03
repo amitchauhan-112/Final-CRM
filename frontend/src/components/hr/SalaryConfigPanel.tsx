@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Pencil, Check, X } from 'lucide-react';
 import { useSalaryConfig, useSetSalaryConfig } from '../../hooks/useHR';
-import { formatCurrency } from '../../utils/helpers';
+import { formatCurrency, blockDecimalKey } from '../../utils/helpers';
 import { Skeleton } from '../ui/Skeleton';
 
 export default function SalaryConfigPanel() {
@@ -36,7 +36,7 @@ export default function SalaryConfigPanel() {
               <td className="px-4 py-3">
                 {editingId === r.user.id ? (
                   <div className="flex items-center gap-1">
-                    <input type="number" step="0.01" value={value} onChange={(e) => setValue(e.target.value)} className="input py-1 text-sm w-32" autoFocus />
+                    <input type="number" step="1" onKeyDown={blockDecimalKey} value={value} onChange={(e) => setValue(e.target.value)} className="input py-1 text-sm w-32" autoFocus />
                     <button
                       onClick={() => { const n = Number(value); if (n >= 0) setSalary.mutate({ userId: r.user.id, baseSalary: n }, { onSuccess: () => setEditingId(null) }); }}
                       className="text-emerald-600 hover:text-emerald-700"

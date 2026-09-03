@@ -4,6 +4,7 @@ import { useFinanceDepartures, useFinancePackages } from '../../hooks/useExpense
 import { useFinanceVendors } from '../../hooks/useFinance';
 import { ExpenseCategory } from '../../types/index';
 import Modal from '../ui/Modal';
+import { blockDecimalKey, wholeNumberRule } from '../../utils/helpers';
 
 const CATEGORIES: ExpenseCategory[] = [
   'HOTEL', 'VEHICLE', 'DRIVER', 'GUIDE', 'MEALS', 'PERMITS', 'FUEL', 'MISCELLANEOUS',
@@ -58,7 +59,7 @@ export default function ExpenseFormModal({ open, onClose, onSubmit, isLoading }:
         </div>
         <div>
           <label className="label">Amount *</label>
-          <input type="number" step="0.01" {...register('amount', { required: true, min: 0 })} className="input" />
+          <input type="number" step="1" onKeyDown={blockDecimalKey} {...register('amount', { required: true, min: 0, ...wholeNumberRule })} className="input" />
         </div>
         <div>
           <label className="label">Trip (optional)</label>

@@ -1,6 +1,7 @@
 import { Response } from 'express';
 import prisma from '../lib/prisma.js';
 import { AuthenticatedRequest } from '../types/index.js';
+import { isWholeAmount, WHOLE_AMOUNT_ERROR } from '../utils/amountValidation.js';
 
 const orgId = (req: AuthenticatedRequest) => req.user?.organizationId ?? null;
 const userId = (req: AuthenticatedRequest) => req.user?.id ?? '';
@@ -187,6 +188,9 @@ export const createPackage = async (req: AuthenticatedRequest, res: Response): P
     if (!['GIT', 'FIT'].includes(packageType)) {
       res.status(400).json({ success: false, error: 'Invalid package type' }); return;
     }
+    if ([pricePerPerson, priceSingle, priceDouble, priceTriple, priceQuad, offerPrice].some((p) => !isWholeAmount(p))) {
+      res.status(400).json({ success: false, error: WHOLE_AMOUNT_ERROR }); return;
+    }
 
     if (!canCreatePackage(userRole(req), packageType)) {
       res.status(403).json({ success: false, error: 'Only Admin can create GIT packages' }); return;
@@ -306,6 +310,10 @@ export const updatePackage = async (req: AuthenticatedRequest, res: Response): P
       pickupLocation, dropLocation, cancellationPolicy, termsAndConditions, packageNotes,
       images, gallery, isPopular, status,
     } = req.body;
+
+    if ([pricePerPerson, priceSingle, priceDouble, priceTriple, priceQuad, offerPrice].some((p) => !isWholeAmount(p))) {
+      res.status(400).json({ success: false, error: WHOLE_AMOUNT_ERROR }); return;
+    }
 
     const oldNights = existing.nights;
     const newNights = nights !== undefined ? Number(nights) : oldNights;

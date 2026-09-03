@@ -3,6 +3,7 @@ import prisma from '../lib/prisma.js';
 import { AuthenticatedRequest } from '../types/index.js';
 import { emitFinanceUpdated } from '../services/notification.service.js';
 import { getRuleNumber } from '../services/businessRule.service.js';
+import { isWholeAmount, WHOLE_AMOUNT_ERROR } from '../utils/amountValidation.js';
 
 const orgId = (req: AuthenticatedRequest) => req.user?.organizationId ?? null;
 
@@ -124,6 +125,7 @@ export const updateScheduleItem = async (req: AuthenticatedRequest, res: Respons
     if (existing.status === 'PAID') { res.status(400).json({ success: false, error: 'Cannot edit an already-paid installment' }); return; }
 
     const { amount, dueDate, label } = req.body;
+    if (!isWholeAmount(amount)) { res.status(400).json({ success: false, error: WHOLE_AMOUNT_ERROR }); return; }
     const updated = await prisma.paymentScheduleItem.update({
       where: { id: itemId },
       data: {

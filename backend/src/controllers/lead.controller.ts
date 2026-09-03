@@ -4,6 +4,7 @@ import { AuthenticatedRequest } from '../types/index.js';
 import { createLead, getLeadStats } from '../services/lead.service.js';
 import { createNotification, emitLeadUpdated } from '../services/notification.service.js';
 import { fireEvent } from '../services/automationEngine.service.js';
+import { isWholeAmount, WHOLE_AMOUNT_ERROR } from '../utils/amountValidation.js';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -208,6 +209,7 @@ export const createLeadManual = async (req: AuthenticatedRequest, res: Response)
       res.status(400).json({ success: false, error: 'Follow-up date must be in the future' });
       return;
     }
+    if (!isWholeAmount(budget)) { res.status(400).json({ success: false, error: WHOLE_AMOUNT_ERROR }); return; }
 
     const lead = await prisma.lead.create({
       data: {
@@ -282,8 +284,9 @@ export const updateLead = async (req: AuthenticatedRequest, res: Response): Prom
       res.status(403).json({ success: false, error: 'Access denied' }); return;
     }
 
-    const { status, notes, followUpDate, followUpNotes, followUpDone, campaignId, assignedToId, priority, lostReason, lostReasonOther, tagIds, ...rest } = req.body;
-    const updateData: Record<string, unknown> = { ...rest };
+    const { status, notes, followUpDate, followUpNotes, followUpDone, campaignId, assignedToId, priority, lostReason, lostReasonOther, tagIds, budget, ...rest } = req.body;
+    if (!isWholeAmount(budget)) { res.status(400).json({ success: false, error: WHOLE_AMOUNT_ERROR }); return; }
+    const updateData: Record<string, unknown> = { ...rest, ...(budget !== undefined ? { budget: budget === null || budget === '' ? null : Number(budget) } : {}) };
 
     if (status !== undefined) {
       // Once confirmed, a lead's status is permanently locked — not even the

@@ -3,6 +3,7 @@ import { usePaymentSchedule, useUpdateScheduleItem } from '../../hooks/useFinanc
 import PaymentScheduleStepper from './PaymentScheduleStepper';
 import Modal from '../ui/Modal';
 import { PaymentScheduleItem } from '../../types/index';
+import { blockDecimalKey } from '../../utils/helpers';
 
 function EditItemModal({ item, onClose }: { item: PaymentScheduleItem | null; onClose: () => void }) {
   const update = useUpdateScheduleItem();
@@ -24,7 +25,7 @@ function EditItemModal({ item, onClose }: { item: PaymentScheduleItem | null; on
       <div className="space-y-3">
         <div>
           <label className="label">Amount</label>
-          <input type="number" step="0.01" value={amount} onChange={(e) => setAmount(Number(e.target.value))} className="input" />
+          <input type="number" step="1" onKeyDown={blockDecimalKey} value={amount} onChange={(e) => setAmount(Math.trunc(Number(e.target.value)))} className="input" />
         </div>
         <div>
           <label className="label">Due Date</label>

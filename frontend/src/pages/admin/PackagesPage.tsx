@@ -11,7 +11,7 @@ import { useDestinations, useTourCategories } from '../../hooks/useMasters';
 import { Package, PackageAuditLog, PackageItinerary, PackageType } from '../../types/index';
 import Modal from '../../components/ui/Modal';
 import { Skeleton } from '../../components/ui/Skeleton';
-import { formatCurrency, cn } from '../../utils/helpers';
+import { formatCurrency, cn, blockDecimalKey, wholeNumberRule } from '../../utils/helpers';
 import { useAuthStore } from '../../store/authStore';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -616,29 +616,29 @@ function PackageFormModal({ open, onClose, existing }: { open: boolean; onClose:
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
               <div>
                 <label className="label">Base Price (₹) *</label>
-                <input type="number" min={0} step="0.01" {...register('pricePerPerson', { required: 'Price is required', min: 0, valueAsNumber: true })} className="input" placeholder="0" />
+                <input type="number" min={0} step="1" onKeyDown={blockDecimalKey} {...register('pricePerPerson', { required: 'Price is required', min: 0, valueAsNumber: true, ...wholeNumberRule })} className="input" placeholder="0" />
                 {errors.pricePerPerson && <p className="text-red-500 text-xs mt-1">{errors.pricePerPerson.message}</p>}
               </div>
               <div>
                 <label className="label">Offer Price (₹)</label>
-                <input type="number" min={0} step="0.01" {...register('offerPrice')} className="input" placeholder="Optional" />
+                <input type="number" min={0} step="1" onKeyDown={blockDecimalKey} {...register('offerPrice', wholeNumberRule)} className="input" placeholder="Optional" />
               </div>
               <div />
               <div>
                 <label className="label">Single Occupancy</label>
-                <input type="number" min={0} step="0.01" {...register('priceSingle')} className="input" placeholder="Optional" />
+                <input type="number" min={0} step="1" onKeyDown={blockDecimalKey} {...register('priceSingle', wholeNumberRule)} className="input" placeholder="Optional" />
               </div>
               <div>
                 <label className="label">Double Sharing</label>
-                <input type="number" min={0} step="0.01" {...register('priceDouble')} className="input" placeholder="Optional" />
+                <input type="number" min={0} step="1" onKeyDown={blockDecimalKey} {...register('priceDouble', wholeNumberRule)} className="input" placeholder="Optional" />
               </div>
               <div>
                 <label className="label">Triple Sharing</label>
-                <input type="number" min={0} step="0.01" {...register('priceTriple')} className="input" placeholder="Optional" />
+                <input type="number" min={0} step="1" onKeyDown={blockDecimalKey} {...register('priceTriple', wholeNumberRule)} className="input" placeholder="Optional" />
               </div>
               <div>
                 <label className="label">Quad Sharing</label>
-                <input type="number" min={0} step="0.01" {...register('priceQuad')} className="input" placeholder="Optional" />
+                <input type="number" min={0} step="1" onKeyDown={blockDecimalKey} {...register('priceQuad', wholeNumberRule)} className="input" placeholder="Optional" />
               </div>
             </div>
           </div>

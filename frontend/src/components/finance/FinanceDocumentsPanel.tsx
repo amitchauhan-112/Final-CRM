@@ -3,7 +3,7 @@ import { FileText, Download, Plus } from 'lucide-react';
 import { useFinanceDocuments, useGenerateFinanceDocument } from '../../hooks/useFinance';
 import Modal from '../ui/Modal';
 import { FinanceDocumentType } from '../../types/index';
-import { formatCurrency, formatDate } from '../../utils/helpers';
+import { formatCurrency, formatDate, blockDecimalKey } from '../../utils/helpers';
 
 const TYPE_LABEL: Record<FinanceDocumentType, string> = {
   TAX_INVOICE: 'Tax Invoice', RECEIPT: 'Receipt', CREDIT_NOTE: 'Credit Note',
@@ -30,7 +30,7 @@ function IssueNoteModal({ type, bookingId, onClose }: { type: 'CREDIT_NOTE' | 'D
       <div className="space-y-3">
         <div>
           <label className="label">Amount *</label>
-          <input type="number" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} className="input" />
+          <input type="number" step="1" onKeyDown={blockDecimalKey} value={amount} onChange={(e) => setAmount(e.target.value)} className="input" />
         </div>
         <div>
           <label className="label">Reason *</label>

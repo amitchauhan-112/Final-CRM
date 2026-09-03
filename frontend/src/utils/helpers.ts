@@ -1,10 +1,27 @@
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import type { KeyboardEvent } from 'react';
 import { LeadStatus, LeadSource, CampaignStatus } from '../types/index.ts';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
+
+// Blocks typing '.' / ',' on a money-amount <input type="number"> — every
+// amount in this app (booking prices, payments, expenses, refunds, vendor
+// payments, salaries, budgets, package rates) is whole rupees only, never
+// paise. The browser doesn't block a decimal keystroke on its own even with
+// step="1", so this has to be wired in per-input via onKeyDown.
+export function blockDecimalKey(e: KeyboardEvent<HTMLInputElement>) {
+  if (e.key === '.' || e.key === ',') e.preventDefault();
+}
+
+// Paired react-hook-form validation rule for the same fields — belt and
+// suspenders against paste, browser autofill, or spinner-arrow edge cases
+// the keydown guard alone wouldn't catch.
+export const wholeNumberRule = {
+  validate: (v: unknown) => v === undefined || v === null || v === '' || Number.isInteger(Number(v)) || 'Whole rupees only, no decimals',
+};
 
 export const leadStatusConfig: Record<LeadStatus, { label: string; color: string; bg: string }> = {
   NEW:                  { label: 'New',               color: 'text-blue-700',   bg: 'bg-blue-100' },

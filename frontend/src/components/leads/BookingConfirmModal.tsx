@@ -8,7 +8,7 @@ import Modal from '../ui/Modal';
 import { Lead, Booking, FoodPreference, RoomSharing, TourType } from '../../types/index';
 import { useCreateBooking, useUpdateBooking } from '../../hooks/useBookings';
 import { usePackages, usePackage, useCreatePackage } from '../../hooks/usePackages';
-import { formatCurrency, cn } from '../../utils/helpers';
+import { formatCurrency, cn, blockDecimalKey, wholeNumberRule } from '../../utils/helpers';
 import toast from 'react-hot-toast';
 
 interface BookingForm {
@@ -761,8 +761,8 @@ export default function BookingConfirmModal({ open, onClose, lead, existingBooki
             <div>
               <label className="label">Price Finalised (₹) *</label>
               <input
-                type="number" min={0} step="0.01"
-                {...register('finalPrice', { required: 'Price is required', min: { value: 0, message: 'Must be ≥ 0' }, valueAsNumber: true })}
+                type="number" min={0} step="1" onKeyDown={blockDecimalKey}
+                {...register('finalPrice', { required: 'Price is required', min: { value: 0, message: 'Must be ≥ 0' }, valueAsNumber: true, ...wholeNumberRule })}
                 className="input"
               />
               {selectedPkg && (
@@ -773,12 +773,16 @@ export default function BookingConfirmModal({ open, onClose, lead, existingBooki
             <div>
               <label className="label">Amount Paid (₹){!isEdit && <span className="text-red-500"> *</span>}</label>
               <input
-                type="number" min={isEdit ? 0 : 0.01} step="0.01"
+                type="number" min={isEdit ? 0 : 1} step="1" onKeyDown={blockDecimalKey}
                 {...register('amountPaid', {
                   valueAsNumber: true,
                   required: isEdit ? false : 'An advance payment is required to confirm a booking',
-                  min: isEdit ? { value: 0, message: 'Must be ≥ 0' } : { value: 0.01, message: 'An advance payment is required to confirm a booking' },
-                  validate: (v, formValues) => !(v > Number(formValues.finalPrice || 0)) || 'Amount paid cannot exceed the final price',
+                  min: isEdit ? { value: 0, message: 'Must be ≥ 0' } : { value: 1, message: 'An advance payment is required to confirm a booking' },
+                  validate: (v, formValues) => {
+                    if (!Number.isInteger(v)) return 'Whole rupees only, no decimals';
+                    if (v > Number(formValues.finalPrice || 0)) return 'Amount paid cannot exceed the final price';
+                    return true;
+                  },
                 })}
                 className="input"
               />

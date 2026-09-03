@@ -28,6 +28,7 @@ import { useWhatsAppConversations } from '../../hooks/useWhatsAppConversations';
 import { Skeleton } from '../ui/Skeleton';
 import {
   formatDate, formatDateTime, formatRelativeTime, formatCurrency, isOverdue, cn, leadStatusConfig, buildWhatsAppLink,
+  blockDecimalKey,
 } from '../../utils/helpers';
 import { useAuthStore } from '../../store/authStore';
 import toast from 'react-hot-toast';
@@ -626,7 +627,7 @@ function PaymentsTab({ booking }: { booking: Booking }) {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div>
               <label className="label text-xs">Amount (₹) *</label>
-              <input type="number" min={1} value={form.amount} onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))} className="input text-sm" placeholder="0" />
+              <input type="number" min={1} step="1" onKeyDown={blockDecimalKey} value={form.amount} onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))} className="input text-sm" placeholder="0" />
             </div>
             <div>
               <label className="label text-xs">Type</label>

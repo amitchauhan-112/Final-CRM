@@ -6,6 +6,7 @@ import { linkBookingToDeparture, createPlaceholderTravelers, issueTravelerPortal
 import { generatePaymentSchedule } from './paymentSchedule.controller.js';
 import { notifyFinanceTeam } from '../services/notification.service.js';
 import { fireEvent } from '../services/automationEngine.service.js';
+import { isWholeAmount, WHOLE_AMOUNT_ERROR } from '../utils/amountValidation.js';
 
 const orgId = (req: AuthenticatedRequest) => req.user?.organizationId ?? null;
 
@@ -76,6 +77,8 @@ export const createBooking = async (req: AuthenticatedRequest, res: Response): P
     if (!travelerName?.trim()) { res.status(400).json({ success: false, error: 'Traveler name is required' }); return; }
     if (!numberOfTravelers || isNaN(Number(numberOfTravelers))) { res.status(400).json({ success: false, error: 'Number of travelers is required' }); return; }
     if (finalPrice === undefined || isNaN(Number(finalPrice))) { res.status(400).json({ success: false, error: 'Final price is required' }); return; }
+    if (!isWholeAmount(finalPrice)) { res.status(400).json({ success: false, error: WHOLE_AMOUNT_ERROR }); return; }
+    if (!isWholeAmount(amountPaid)) { res.status(400).json({ success: false, error: WHOLE_AMOUNT_ERROR }); return; }
     if (!foodPreference || !FOOD_PREFERENCES.includes(foodPreference)) {
       res.status(400).json({ success: false, error: 'A valid food preference is required' }); return;
     }
@@ -320,6 +323,7 @@ export const updateBooking = async (req: AuthenticatedRequest, res: Response): P
     if (aadharNumber && !/^\d{12}$/.test(String(aadharNumber).replace(/\s/g, ''))) {
       res.status(400).json({ success: false, error: 'Aadhar number must be 12 digits' }); return;
     }
+    if (!isWholeAmount(finalPrice)) { res.status(400).json({ success: false, error: WHOLE_AMOUNT_ERROR }); return; }
     if (foodPreference !== undefined && !FOOD_PREFERENCES.includes(foodPreference)) {
       res.status(400).json({ success: false, error: 'A valid food preference is required' }); return;
     }

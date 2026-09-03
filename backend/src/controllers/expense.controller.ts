@@ -3,6 +3,7 @@ import prisma from '../lib/prisma.js';
 import { AuthenticatedRequest } from '../types/index.js';
 import { emitFinanceUpdated, createNotification, notifyFinanceTeam } from '../services/notification.service.js';
 import { buildUploadUrl } from '../middleware/upload.js';
+import { isWholeAmount, WHOLE_AMOUNT_ERROR } from '../utils/amountValidation.js';
 
 const orgId = (req: AuthenticatedRequest) => req.user?.organizationId ?? null;
 const orgFilter = (req: AuthenticatedRequest) => (orgId(req) ? { organizationId: orgId(req) } : {});
@@ -44,6 +45,7 @@ export const createExpense = async (req: AuthenticatedRequest, res: Response): P
     if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) {
       res.status(400).json({ success: false, error: 'Valid amount is required' }); return;
     }
+    if (!isWholeAmount(amount)) { res.status(400).json({ success: false, error: WHOLE_AMOUNT_ERROR }); return; }
 
     const billUrl = req.file ? buildUploadUrl(req.file) : null;
 
