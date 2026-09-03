@@ -40,16 +40,24 @@ export function useFollowUpNotifications() {
 
     const check = () => {
       const now = Date.now();
-      const ADVANCE_MS = 10 * 60_000; // notify up to 10 min before due
-      const GRACE_MS   =  2 * 60_000; // also catch overdue within last 2 min
+      const ADVANCE_MS = 10 * 60_000; // pop up to 10 min before due
       const canBrowserNotif = 'Notification' in window && Notification.permission === 'granted';
 
       leads.forEach((lead) => {
-        if (!lead.followUpDate || notifiedIds.current.has(lead.id)) return;
+        if (!lead.followUpDate) return;
+        // Keyed by date, not just lead id — rescheduling (e.g. via the
+        // follow-up outcome picker) must be eligible to pop again for its
+        // new time, not stay permanently suppressed for the whole session
+        // just because the lead already popped once for an earlier date.
+        const dedupeKey = `${lead.id}:${lead.followUpDate}`;
+        if (notifiedIds.current.has(dedupeKey)) return;
         const due = new Date(lead.followUpDate).getTime();
 
-        if (due >= now - GRACE_MS && due <= now + ADVANCE_MS) {
-          notifiedIds.current.add(lead.id);
+        // No lower bound — an already-overdue follow-up (the common case:
+        // it was overdue before the tab was even opened) must still pop up,
+        // not just ones that became due in the last couple of minutes.
+        if (due <= now + ADVANCE_MS) {
+          notifiedIds.current.add(dedupeKey);
           const minsLeft = Math.round((due - now) / 60_000);
           const timeLabel = minsLeft > 1 ? `in ${minsLeft} min` : minsLeft === 1 ? 'in 1 min' : minsLeft === 0 ? 'now' : 'overdue';
 
