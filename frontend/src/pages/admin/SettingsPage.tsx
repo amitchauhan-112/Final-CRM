@@ -23,6 +23,7 @@ import {
 } from '../../hooks/useWhatsAppAccounts';
 import { useUsers } from '../../hooks/useUsers';
 import { cn } from '../../utils/helpers';
+import WhatsAppOpenModeCard from '../../components/settings/WhatsAppOpenModeCard';
 
 const TABS = [
   { key: 'account', label: 'Account', icon: Lock },
@@ -962,6 +963,7 @@ export default function AdminSettingsPage() {
               <div><label className="label">Status</label><input value={user?.isActive ? 'Active' : 'Inactive'} readOnly className="input bg-slate-50 cursor-not-allowed" /></div>
             </div>
           </div>
+          <WhatsAppOpenModeCard />
           <ChangePasswordSection />
         </div>
       )}

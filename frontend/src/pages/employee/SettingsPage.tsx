@@ -5,6 +5,7 @@ import { Eye, EyeOff, Lock } from 'lucide-react';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '../../store/authStore';
+import WhatsAppOpenModeCard from '../../components/settings/WhatsAppOpenModeCard';
 
 interface ChangePasswordForm {
   currentPassword: string;
@@ -63,6 +64,8 @@ export default function EmployeeSettingsPage() {
           </div>
         </div>
       </div>
+
+      <WhatsAppOpenModeCard />
 
       <div className="card p-5">
         <div className="flex items-center gap-3 mb-5">

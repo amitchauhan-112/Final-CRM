@@ -88,17 +88,51 @@ export const getInitials = (name: string): string => {
   return name.split(' ').map((n) => n[0]).slice(0, 2).join('').toUpperCase();
 };
 
-// Plain "click to chat" link (wa.me) — opens whatever WhatsApp is already
-// logged into the device that clicks it (the employee's own app/account).
-// No API, no Meta connection, no cost — just a deep link, same as any
-// "Chat on WhatsApp" button. Assumes Indian numbers by default since that's
-// this CRM's customer base; strips everything but digits and adds the
-// country code only if one isn't already present.
+// Per-browser preference (not per-org, not per-account — a WhatsApp Web vs
+// Desktop choice is about what's installed on *this* device) for which
+// WhatsApp buildWhatsAppLink() should target. Stored client-side only;
+// each employee sets their own on each device/browser they use — see the
+// "WhatsApp Chat" card in Settings.
+const WHATSAPP_MODE_KEY = 'whatsapp_open_mode';
+export type WhatsAppOpenMode = 'web' | 'desktop';
+
+export const getWhatsAppOpenMode = (): WhatsAppOpenMode => {
+  try {
+    return localStorage.getItem(WHATSAPP_MODE_KEY) === 'desktop' ? 'desktop' : 'web';
+  } catch {
+    return 'web';
+  }
+};
+
+export const setWhatsAppOpenMode = (mode: WhatsAppOpenMode): void => {
+  try { localStorage.setItem(WHATSAPP_MODE_KEY, mode); } catch { /* private browsing etc. — just won't persist */ }
+};
+
+// "Click to chat" link — opens whatever WhatsApp is already logged into the
+// device that clicks it (the employee's own app/account). No API, no Meta
+// connection, no cost. Two link families depending on the user's saved
+// preference:
+//  - 'web' (default): https://wa.me/... — resolves through the browser to
+//    WhatsApp Web, which needs its own logged-in session (re-scanning a QR
+//    periodically is normal there).
+//  - 'desktop': whatsapp://send?phone=... — the URI scheme the WhatsApp
+//    Desktop app registers with the OS at install time; the browser hands
+//    the click straight to the already-logged-in desktop app, no web/QR
+//    step at all. Only works if that app is actually installed on the
+//    device doing the clicking.
+// Assumes Indian numbers by default since that's this CRM's customer base;
+// strips everything but digits and adds the country code only if one isn't
+// already present.
 export const buildWhatsAppLink = (phone: string | null | undefined, message?: string): string | null => {
   if (!phone) return null;
   const digits = phone.replace(/[^0-9]/g, '');
   if (!digits) return null;
   const withCountryCode = digits.length === 10 ? `91${digits}` : digits;
+  const text = message ? encodeURIComponent(message) : undefined;
+
+  if (getWhatsAppOpenMode() === 'desktop') {
+    return text ? `whatsapp://send?phone=${withCountryCode}&text=${text}` : `whatsapp://send?phone=${withCountryCode}`;
+  }
   const base = `https://wa.me/${withCountryCode}`;
-  return message ? `${base}?text=${encodeURIComponent(message)}` : base;
+  return text ? `${base}?text=${text}` : base;
 };
