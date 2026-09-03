@@ -22,6 +22,10 @@ const orgFilter = (req: AuthenticatedRequest) => (orgId(req) ? { organizationId:
 // - Employee "response time" is approximated as time from Lead.createdAt to
 //   that lead's first ActivityLog entry — there is no explicit
 //   "first contacted at" field.
+// - Employee "follow-up delay" is approximated as Lead.updatedAt minus
+//   Lead.followUpDate for completed follow-ups — there is no explicit
+//   "follow-up completed at" field, so a later, unrelated edit to the same
+//   lead after completion would inflate this figure slightly.
 
 // ─── Package Analytics ────────────────────────────────────────────────────────
 
@@ -276,7 +280,7 @@ export const getEmployeeAnalytics = async (req: AuthenticatedRequest, res: Respo
         assignedLeads: {
           where: { deletedAt: null },
           select: {
-            status: true, createdAt: true, followUpDate: true, followUpDone: true,
+            status: true, createdAt: true, updatedAt: true, followUpDate: true, followUpDone: true,
             booking: { select: { finalPrice: true, status: true } },
             activityLogs: { select: { createdAt: true }, orderBy: { createdAt: 'asc' }, take: 1 },
           },
@@ -301,6 +305,29 @@ export const getEmployeeAnalytics = async (req: AuthenticatedRequest, res: Respo
         .map((l) => (l.activityLogs[0].createdAt.getTime() - l.createdAt.getTime()) / (1000 * 60 * 60));
       const avgResponseTimeHours = responseTimes.length ? Math.round((responseTimes.reduce((s, t) => s + t, 0) / responseTimes.length) * 10) / 10 : null;
 
+      // How overdue a follow-up was by the time it got done — checked
+      // regardless of the lead's current status (unlike pendingFollowUps/
+      // completedFollowUps above, which only look at leads still sitting at
+      // FOLLOW_UP_SCHEDULED — most completed follow-ups move the lead
+      // forward to a new status, so scoping this the same way would miss
+      // almost all of them). Only counts genuinely late completions — an
+      // early/on-time one contributes 0, not a negative number.
+      const followUpDelays = leads
+        .filter((l) => l.followUpDone && l.followUpDate)
+        .map((l) => Math.max(0, (l.updatedAt.getTime() - new Date(l.followUpDate!).getTime()) / (1000 * 60 * 60)));
+      const avgFollowUpDelayHours = followUpDelays.length
+        ? Math.round((followUpDelays.reduce((s, t) => s + t, 0) / followUpDelays.length) * 10) / 10
+        : null;
+
+      // Per-status pipeline breakdown — every LeadStatus, always present
+      // (0 when the employee has none in that status) so the table column
+      // set is consistent across employees.
+      const byStatus: Record<string, number> = {
+        NEW: 0, NOT_CONTACTED: 0, CONTACTED: 0, INTERESTED: 0,
+        FOLLOW_UP_SCHEDULED: 0, CONFIRMED: 0, LOST: 0,
+      };
+      leads.forEach((l) => { byStatus[l.status] = (byStatus[l.status] ?? 0) + 1; });
+
       const tasks = emp.assignedTasks;
       const taskCompletionRatePct = tasks.length > 0 ? Math.round((tasks.filter((t) => t.status === 'DONE').length / tasks.length) * 1000) / 10 : null;
 
@@ -308,6 +335,7 @@ export const getEmployeeAnalytics = async (req: AuthenticatedRequest, res: Respo
         id: emp.id, name: emp.name,
         assignedLeads: total, activeLeads: active, bookings: confirmed.length, revenueGenerated,
         conversionRatePct, avgResponseTimeHours, pendingFollowUps, completedFollowUps,
+        avgFollowUpDelayHours, byStatus,
         taskCompletionRatePct, customerRating: null as number | null, // not yet collected — Future Ready per spec
       };
     }).sort((a, b) => b.revenueGenerated - a.revenueGenerated);

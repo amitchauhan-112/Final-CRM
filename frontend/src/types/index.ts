@@ -1144,6 +1144,11 @@ export interface EmployeeAnalytics {
   assignedLeads: number; activeLeads: number; bookings: number; revenueGenerated: number;
   conversionRatePct: number; avgResponseTimeHours: number | null;
   pendingFollowUps: number; completedFollowUps: number;
+  // Hours late a follow-up was completed, on average (0 = never counted as
+  // early, only genuinely overdue completions raise this) — see
+  // analytics.controller.ts's "Known approximations" note for how this is derived.
+  avgFollowUpDelayHours: number | null;
+  byStatus: Record<LeadStatus, number>;
   taskCompletionRatePct: number | null; customerRating: number | null;
 }
 

@@ -3,7 +3,8 @@ import {
 } from '../../hooks/useAnalytics';
 import Tabs, { useUrlTab } from '../../components/ui/Tabs';
 import { Skeleton } from '../../components/ui/Skeleton';
-import { formatCurrency } from '../../utils/helpers';
+import { formatCurrency, leadStatusConfig, cn } from '../../utils/helpers';
+import { LeadStatus } from '../../types/index';
 
 const TABS = [
   { key: 'packages', label: 'Package Analytics' },
@@ -14,7 +15,7 @@ const TABS = [
 ] as const;
 type Tab = typeof TABS[number]['key'];
 
-function DataTable({ rows, columns }: { rows: Record<string, any>[]; columns: { key: string; label: string; format?: (v: any) => string }[] }) {
+function DataTable({ rows, columns }: { rows: Record<string, any>[]; columns: { key: string; label: string; format?: (v: any) => React.ReactNode }[] }) {
   if (rows.length === 0) return <div className="empty-state"><p className="text-sm text-slate-400">No data yet</p></div>;
   return (
     <div className="overflow-x-auto rounded-2xl border border-slate-200">
@@ -39,6 +40,25 @@ function DataTable({ rows, columns }: { rows: Record<string, any>[]; columns: { 
 const pct = (v: number | null) => v === null ? '—' : `${v}%`;
 const hrs = (v: number | null) => v === null ? '—' : `${v}h`;
 const list = (v: string[]) => v.length ? v.join(', ') : '—';
+
+// Only shows statuses the employee actually has leads in — a full 7-badge
+// row for every employee would be mostly zeros and hard to scan.
+const statusBreakdown = (byStatus: Record<LeadStatus, number>) => {
+  const entries = Object.entries(byStatus).filter(([, count]) => count > 0);
+  if (entries.length === 0) return '—';
+  return (
+    <div className="flex flex-wrap gap-1">
+      {entries.map(([status, count]) => {
+        const cfg = leadStatusConfig[status as LeadStatus];
+        return (
+          <span key={status} className={cn('text-[11px] px-1.5 py-0.5 rounded-full font-medium whitespace-nowrap', cfg?.bg, cfg?.color)}>
+            {cfg?.label ?? status} {count}
+          </span>
+        );
+      })}
+    </div>
+  );
+};
 
 export default function BusinessIntelligencePage() {
   const [tab, setTab] = useUrlTab(TABS, 'packages');
@@ -139,6 +159,7 @@ export default function BusinessIntelligencePage() {
           {tab === 'employees' && (
             <DataTable rows={employees.data?.data ?? []} columns={[
               { key: 'name', label: 'Employee' },
+              { key: 'byStatus', label: 'Lead Status Breakdown', format: statusBreakdown },
               { key: 'assignedLeads', label: 'Assigned Leads' },
               { key: 'activeLeads', label: 'Active Leads' },
               { key: 'bookings', label: 'Bookings' },
@@ -147,6 +168,7 @@ export default function BusinessIntelligencePage() {
               { key: 'avgResponseTimeHours', label: 'Avg Response Time', format: hrs },
               { key: 'pendingFollowUps', label: 'Pending Follow-ups' },
               { key: 'completedFollowUps', label: 'Completed Follow-ups' },
+              { key: 'avgFollowUpDelayHours', label: 'Avg Follow-up Delay', format: hrs },
               { key: 'taskCompletionRatePct', label: 'Task Completion %', format: pct },
             ]} />
           )}
