@@ -426,6 +426,11 @@ export default function AdminDashboard() {
 
   if (statsLoading || dashLoading) return <SkeletonDashboard />;
 
+  // Anything still in the pipeline — not yet confirmed, not yet lost.
+  const pendingLeads = stats
+    ? stats.total - (stats.byStatus?.CONFIRMED ?? 0) - (stats.byStatus?.LOST ?? 0)
+    : 0;
+
   const pieData = stats
     ? Object.entries(stats.byStatus)
         .filter(([, v]) => v > 0)
@@ -456,13 +461,21 @@ export default function AdminDashboard() {
       </div>
 
       {/* Row 1 — KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
         <StatsCard
           label="Total Leads"
           value={stats?.total ?? 0}
           icon={Users}
           iconBg="bg-primary-100"
           iconColor="text-primary-600"
+          onClick={() => navigate('/admin/leads')}
+        />
+        <StatsCard
+          label="Pending Leads"
+          value={pendingLeads}
+          icon={Clock}
+          iconBg="bg-orange-100"
+          iconColor="text-orange-600"
           onClick={() => navigate('/admin/leads')}
         />
         <StatsCard

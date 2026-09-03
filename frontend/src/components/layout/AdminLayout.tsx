@@ -10,7 +10,6 @@ import {
 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import { useNotifications, useMarkAllAsRead, useMarkAsRead } from '../../hooks/useNotifications';
-import FollowUpPopup from './FollowUpPopup';
 import Avatar from '../ui/Avatar';
 import FeedbackButton from '../feedback/FeedbackButton';
 import { formatRelativeTime, cn } from '../../utils/helpers';
@@ -468,7 +467,6 @@ export default function AdminLayout() {
       </div>
 
       <FeedbackButton />
-      <FollowUpPopup />
     </div>
   );
 }
