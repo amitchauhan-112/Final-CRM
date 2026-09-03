@@ -25,6 +25,14 @@ export interface CreateLeadInput {
   campaignId?: string;
   /** Backdate createdAt for historical imports (e.g. Meta lead backfill) — omit for real-time leads */
   createdAt?: Date;
+  /**
+   * Backdate updatedAt to match createdAt for historical imports. Without
+   * this, a backfilled lead's updatedAt defaults to the moment the sync job
+   * actually ran — which, under the "sort by last activity" default, would
+   * put a months-old backfilled lead at the very top of the list as if it
+   * had just come in. Omit for real-time leads (both should be "now").
+   */
+  updatedAt?: Date;
 }
 
 export const matchCampaign = async (input: {

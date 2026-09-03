@@ -16,7 +16,7 @@ export default function FollowUpPopup() {
   if (!current) return null;
 
   const { lead, timeLabel } = current;
-  const isOverdue = timeLabel === 'overdue' || timeLabel === 'now';
+  const isOverdue = timeLabel === 'overdue';
   const basePath = user?.role === 'ADMIN' ? '/admin' : '/employee';
 
   const handleView = () => {
@@ -44,7 +44,7 @@ export default function FollowUpPopup() {
           <div>
             <p className="text-sm font-bold text-slate-900">Follow-up Reminder</p>
             <p className={cn('text-xs font-medium', isOverdue ? 'text-red-600' : 'text-orange-600')}>
-              {isOverdue ? 'Overdue' : `Due ${timeLabel}`}
+              {isOverdue ? 'Overdue' : 'Due now'}
             </p>
           </div>
         </div>

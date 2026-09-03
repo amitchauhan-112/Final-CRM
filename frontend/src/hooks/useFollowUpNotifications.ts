@@ -40,7 +40,6 @@ export function useFollowUpNotifications() {
 
     const check = () => {
       const now = Date.now();
-      const ADVANCE_MS = 10 * 60_000; // pop up to 10 min before due
       const canBrowserNotif = 'Notification' in window && Notification.permission === 'granted';
 
       leads.forEach((lead) => {
@@ -53,13 +52,13 @@ export function useFollowUpNotifications() {
         if (notifiedIds.current.has(dedupeKey)) return;
         const due = new Date(lead.followUpDate).getTime();
 
-        // No lower bound — an already-overdue follow-up (the common case:
-        // it was overdue before the tab was even opened) must still pop up,
-        // not just ones that became due in the last couple of minutes.
-        if (due <= now + ADVANCE_MS) {
+        // Fires right at the scheduled moment — not early. Still no upper
+        // bound on lateness, so an already-overdue follow-up (the tab was
+        // closed at the scheduled time) still pops the moment it's checked.
+        if (due <= now) {
           notifiedIds.current.add(dedupeKey);
-          const minsLeft = Math.round((due - now) / 60_000);
-          const timeLabel = minsLeft > 1 ? `in ${minsLeft} min` : minsLeft === 1 ? 'in 1 min' : minsLeft === 0 ? 'now' : 'overdue';
+          const overdueMins = Math.round((now - due) / 60_000);
+          const timeLabel = overdueMins < 1 ? 'now' : 'overdue';
 
           // In-app popup — the primary, always-visible channel (works even
           // without notification permission, and can't be missed the way a
@@ -87,7 +86,10 @@ export function useFollowUpNotifications() {
     };
 
     check(); // check immediately when data loads
-    const intervalId = setInterval(check, 60_000);
+    // Checked every 5s (cheap — no network call, just scanning the already-
+    // fetched lead list) so the popup fires within a few seconds of the
+    // exact scheduled time instead of up to a full minute late.
+    const intervalId = setInterval(check, 5_000);
     return () => clearInterval(intervalId);
   }, [data, isAuthenticated]);
 

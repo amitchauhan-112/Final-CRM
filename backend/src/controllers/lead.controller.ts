@@ -23,7 +23,12 @@ export const getLeads = async (req: AuthenticatedRequest, res: Response): Promis
     const {
       status, source, campaignId, assignedToId, priority, tagId,
       search, page = 1, limit = 20,
-      sortBy = 'createdAt', sortOrder = 'desc',
+      // Sorted by last activity by default, not just creation time — a lead
+      // that was just confirmed, status-changed, or otherwise touched
+      // should surface at the top everywhere (list, Kanban, status
+      // filters), the same way the Bookings list already does, instead of
+      // staying wherever its original createdAt placed it.
+      sortBy = 'updatedAt', sortOrder = 'desc',
       dateFrom, dateTo, preferredDate,
     } = req.query;
 
@@ -71,7 +76,16 @@ export const getLeads = async (req: AuthenticatedRequest, res: Response): Promis
           assignedTo: { select: { id: true, name: true, email: true } },
           tags: { include: { tag: true } },
         },
-        orderBy: { [sortBy as string]: sortOrder },
+        // Tiebreakers make the order deterministic when the primary sort
+        // field is identical across rows (e.g. two leads confirmed in the
+        // same millisecond) — without this, tied rows can swap order
+        // unpredictably between requests, which is especially bad with
+        // pagination (a row could appear on neither or both pages).
+        orderBy: [
+          { [sortBy as string]: sortOrder },
+          { createdAt: 'desc' },
+          { id: 'desc' },
+        ],
       }),
       prisma.lead.count({ where }),
     ]);

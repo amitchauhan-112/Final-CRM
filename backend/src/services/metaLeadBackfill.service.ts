@@ -148,6 +148,11 @@ export async function backfillLeadsForOrg(orgId: string, since?: Date): Promise<
           organizationId: orgId,
           campaignId,
           createdAt: ml.created_time ? new Date(ml.created_time) : undefined,
+          // Matches createdAt — without this a backfilled lead's "last
+          // activity" would default to right now (when the sync ran),
+          // burying genuinely fresh leads under months-old backfilled ones
+          // at the top of every list sorted by updatedAt.
+          updatedAt: ml.created_time ? new Date(ml.created_time) : undefined,
         });
         result.leadsCreated++;
       }

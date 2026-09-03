@@ -120,8 +120,13 @@ export const getAllBookings = async (req: AuthenticatedRequest, res: Response): 
         // rise back to the top instead of staying wherever its original
         // createdAt placed it (a booking's own createdAt never changes, so
         // sorting by it alone left recently-touched bookings buried below
-        // newer, untouched ones).
-        orderBy: { updatedAt: 'desc' },
+        // newer, untouched ones). Tiebreakers keep the order deterministic
+        // when two bookings share the exact same updatedAt.
+        orderBy: [
+          { updatedAt: 'desc' },
+          { createdAt: 'desc' },
+          { id: 'desc' },
+        ],
         skip,
         take: Number(limit),
       }),
@@ -215,7 +220,13 @@ export const getCustomers = async (req: AuthenticatedRequest, res: Response): Pr
           assignedTo: { select: { id: true, name: true } },
           campaign: { select: { id: true, name: true, destination: true } },
         },
-        orderBy: { updatedAt: 'desc' },
+        // Tiebreakers keep the order deterministic when two customers share
+        // the exact same updatedAt.
+        orderBy: [
+          { updatedAt: 'desc' },
+          { createdAt: 'desc' },
+          { id: 'desc' },
+        ],
         skip,
         take: Number(limit),
       }),

@@ -60,11 +60,12 @@ export function useCreateBooking() {
       qc.invalidateQueries({ queryKey: ['booking', vars.leadId] });
       qc.invalidateQueries({ queryKey: ['lead', vars.leadId] });
       qc.invalidateQueries({ queryKey: ['leads'] });
-      // The Bookings list (Admin + employee My Bookings) sorts by last
-      // activity — without this it can keep showing a stale, pre-booking
-      // snapshot for up to the query's staleTime instead of putting the
-      // just-confirmed booking straight at the top.
+      // The Bookings and Customers lists both sort by last activity —
+      // without this they can keep showing a stale, pre-booking snapshot
+      // for up to the query's staleTime instead of putting the
+      // just-confirmed booking/customer straight at the top.
       qc.invalidateQueries({ queryKey: ['erp-bookings'] });
+      qc.invalidateQueries({ queryKey: ['customers'] });
       toast.success('Booking confirmed!');
     },
     onError: (e: any) => toast.error(e?.response?.data?.error || 'Failed to confirm booking'),

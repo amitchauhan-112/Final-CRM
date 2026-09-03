@@ -137,6 +137,10 @@ export function useUpdateLead() {
       qc.invalidateQueries({ queryKey: ['lead', vars.id] });
       qc.invalidateQueries({ queryKey: ['lead-stats'] });
       qc.invalidateQueries({ queryKey: ['leads-overdue'] });
+      // Both lists sort by last activity — an update to an already-confirmed
+      // lead (e.g. notes, priority) should bump it to the top there too.
+      qc.invalidateQueries({ queryKey: ['customers'] });
+      qc.invalidateQueries({ queryKey: ['erp-bookings'] });
       toast.success('Lead updated successfully');
     },
     onError: (err: any) => {
@@ -156,6 +160,7 @@ export function useTransferLead() {
       qc.invalidateQueries({ queryKey: ['leads'] });
       qc.invalidateQueries({ queryKey: ['lead', vars.id] });
       qc.invalidateQueries({ queryKey: ['lead-stats'] });
+      qc.invalidateQueries({ queryKey: ['customers'] });
       toast.success('Lead transferred successfully');
     },
     onError: (err: any) => {
