@@ -1,11 +1,21 @@
-import { useEffect, useRef } from 'react';
-import toast from 'react-hot-toast';
+import { useEffect, useRef, useState } from 'react';
 import { useAuthStore } from '../store/authStore';
 import { useLeads } from './useLeads';
+import type { Lead } from '../types/index';
 
+export interface DueFollowUp {
+  lead: Lead;
+  timeLabel: string;
+}
+
+// Drives the in-app follow-up popup (see components/layout/FollowUpPopup.tsx)
+// plus a native OS notification when the browser tab isn't focused/permission
+// is granted — the popup is the primary, always-visible channel; the native
+// notification is a bonus for when the user has switched away from the tab.
 export function useFollowUpNotifications() {
   const { user, isAuthenticated } = useAuthStore();
   const notifiedIds = useRef<Set<string>>(new Set());
+  const [dueQueue, setDueQueue] = useState<DueFollowUp[]>([]);
 
   // Request browser notification permission once
   useEffect(() => {
@@ -41,37 +51,28 @@ export function useFollowUpNotifications() {
         if (due >= now - GRACE_MS && due <= now + ADVANCE_MS) {
           notifiedIds.current.add(lead.id);
           const minsLeft = Math.round((due - now) / 60_000);
-          const timeLabel = minsLeft > 1 ? `in ${minsLeft} min` : minsLeft === 1 ? 'in 1 min' : 'now';
-          const body = lead.followUpNotes
-            ? `${timeLabel} — ${lead.followUpNotes} · ${lead.phone}`
-            : `Follow up with ${lead.name} ${timeLabel} — ${lead.phone}`;
+          const timeLabel = minsLeft > 1 ? `in ${minsLeft} min` : minsLeft === 1 ? 'in 1 min' : minsLeft === 0 ? 'now' : 'overdue';
 
+          // In-app popup — the primary, always-visible channel (works even
+          // without notification permission, and can't be missed the way a
+          // toast or a background OS notification can).
+          setDueQueue((q) => [...q, { lead, timeLabel }]);
+
+          // Native OS notification — a bonus for when the tab isn't focused.
           if (canBrowserNotif) {
             try {
               const n = new Notification(`Follow-up: ${lead.name}`, {
-                body,
+                body: lead.followUpNotes
+                  ? `${timeLabel} — ${lead.followUpNotes} · ${lead.phone}`
+                  : `Follow up with ${lead.name} ${timeLabel} — ${lead.phone}`,
                 icon: '/favicon.ico',
                 tag: `followup-${lead.id}`,
                 requireInteraction: true,
               });
               n.onclick = () => { window.focus(); n.close(); };
             } catch {
-              // fall through to toast
+              // popup above already covers this lead — nothing further to do
             }
-          }
-
-          // In-app toast fallback — works on all devices including iOS
-          if (!canBrowserNotif) {
-            toast(`⏰ Follow-up ${timeLabel}: ${lead.name}\n${lead.phone}${lead.followUpNotes ? `\n${lead.followUpNotes}` : ''}`, {
-              duration: 15000,
-              style: {
-                background: '#fff7ed',
-                border: '1px solid #fb923c',
-                color: '#9a3412',
-                maxWidth: '340px',
-                whiteSpace: 'pre-line',
-              },
-            });
           }
         }
       });
@@ -81,4 +82,8 @@ export function useFollowUpNotifications() {
     const intervalId = setInterval(check, 60_000);
     return () => clearInterval(intervalId);
   }, [data, isAuthenticated]);
+
+  const dismissCurrent = () => setDueQueue((q) => q.slice(1));
+
+  return { current: dueQueue[0] ?? null, remaining: dueQueue.length - 1, dismissCurrent };
 }

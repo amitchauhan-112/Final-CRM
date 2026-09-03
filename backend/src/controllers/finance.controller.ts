@@ -115,7 +115,13 @@ export const getAllBookings = async (req: AuthenticatedRequest, res: Response): 
             },
           },
         },
-        orderBy: { createdAt: 'desc' },
+        // Sorted by last activity, not just creation time — a booking that
+        // was just confirmed, edited, or had a new payment recorded should
+        // rise back to the top instead of staying wherever its original
+        // createdAt placed it (a booking's own createdAt never changes, so
+        // sorting by it alone left recently-touched bookings buried below
+        // newer, untouched ones).
+        orderBy: { updatedAt: 'desc' },
         skip,
         take: Number(limit),
       }),

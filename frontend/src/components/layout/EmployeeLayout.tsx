@@ -8,7 +8,7 @@ import {
 import BookingLookup from './BookingLookup';
 import { useAuthStore } from '../../store/authStore';
 import { useNotifications, useMarkAllAsRead, useMarkAsRead } from '../../hooks/useNotifications';
-import { useFollowUpNotifications } from '../../hooks/useFollowUpNotifications';
+import FollowUpPopup from './FollowUpPopup';
 import Avatar from '../ui/Avatar';
 import FeedbackButton from '../feedback/FeedbackButton';
 import { formatRelativeTime, cn } from '../../utils/helpers';
@@ -40,7 +40,6 @@ export default function EmployeeLayout() {
   const { data: notifData } = useNotifications(1, 10);
   const markAllRead = useMarkAllAsRead();
   const markOneRead = useMarkAsRead();
-  useFollowUpNotifications();
 
   const notifications = notifData?.data ?? [];
   const filteredNotifications = notifCategory ? notifications.filter((n) => n.category === notifCategory) : notifications;
@@ -253,6 +252,7 @@ export default function EmployeeLayout() {
       </div>
 
       <FeedbackButton />
+      <FollowUpPopup />
     </div>
   );
 }
