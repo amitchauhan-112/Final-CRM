@@ -50,6 +50,7 @@ export function useApprovePayment() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['finance'] });
       qc.invalidateQueries({ queryKey: ['payments'] });
+      qc.invalidateQueries({ queryKey: ['erp-bookings'] });
       toast.success('Payment approved');
     },
     onError: (e: any) => toast.error(e?.response?.data?.error || 'Failed to approve payment'),
