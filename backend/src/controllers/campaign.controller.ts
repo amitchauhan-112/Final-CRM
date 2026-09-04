@@ -3,7 +3,7 @@ import prisma from '../lib/prisma.js';
 import { AuthenticatedRequest } from '../types/index.js';
 import { buildUploadUrl, filePathFromUploadUrl, deleteUploadedFile } from '../middleware/upload.js';
 import { isWholeAmount, WHOLE_AMOUNT_ERROR } from '../utils/amountValidation.js';
-import { redistributeCampaignLeads } from '../services/lead.service.js';
+import { reconcileCampaignEmployees } from '../services/lead.service.js';
 import { createNotification } from '../services/notification.service.js';
 
 // keywords is stored as JSON string in DB; parse before sending to client
@@ -137,21 +137,35 @@ export const updateCampaign = async (req: AuthenticatedRequest, res: Response): 
     });
 
     if (employeeIds !== undefined) {
+      const oldEmployeeIds = (await prisma.campaignEmployee.findMany({
+        where: { campaignId: id },
+        orderBy: { assignedAt: 'asc' },
+        select: { userId: true },
+      })).map((a) => a.userId);
+
       await prisma.campaignEmployee.deleteMany({ where: { campaignId: id } });
       if (employeeIds.length > 0) {
-        await prisma.campaignEmployee.createMany({
-          data: employeeIds.map((uid: string) => ({ campaignId: id, userId: uid })),
-          skipDuplicates: true,
-        });
+        // Inserted one at a time (not createMany) so assignedAt is strictly
+        // increasing in the order the admin picked them — that order is
+        // what assignEmployeeForCampaign() ties-break on when leads are
+        // otherwise evenly split. Duplicate ids in the input are just
+        // skipped (already deleted above, so nothing to conflict with
+        // except a repeat within this same list).
+        const seen = new Set<string>();
+        for (const uid of employeeIds as string[]) {
+          if (seen.has(uid)) continue;
+          seen.add(uid);
+          await prisma.campaignEmployee.create({ data: { campaignId: id, userId: uid } });
+        }
+      }
 
-        // Assigning a campaign to (one or more) employees means every lead
-        // under it — past and future — belongs to them: redistribute all of
-        // this campaign's current leads across the new roster in round-robin
-        // order (1st→A, 2nd→B, 3rd→A, ... for a 2-person roster), rather than
-        // leaving existing leads stuck with whoever (or no one) had them
-        // before. New leads follow the same rotation via
-        // assignEmployeeForCampaign() in lead.service.ts.
-        const movedCounts = await redistributeCampaignLeads(id, employeeIds);
+      // Reconciles existing leads against the roster change — see
+      // reconcileCampaignEmployees() in lead.service.ts for the exact rules
+      // (first-ever assignment / employee added / employee removed). New
+      // leads follow the same spirit via assignEmployeeForCampaign()'s
+      // "since the roster last changed" rotation.
+      const movedCounts = await reconcileCampaignEmployees(id, oldEmployeeIds, employeeIds);
+      if (movedCounts.size > 0) {
         const campaignName = (await prisma.campaign.findUnique({ where: { id }, select: { name: true } }))?.name ?? 'this campaign';
         await Promise.all(
           Array.from(movedCounts.entries()).map(([employeeId, count]) =>

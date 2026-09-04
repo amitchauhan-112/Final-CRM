@@ -61,24 +61,32 @@ export const matchCampaign = async (input: {
 };
 
 // Round-robin, scoped to THIS campaign specifically — not the employee's
-// overall workload. Counts how many of this campaign's leads (any status,
-// not just currently-open ones — see the comment below) each assigned
-// employee already has, and hands the next one to whoever has the fewest,
-// ties broken by the order they were added to the campaign. This is what
-// makes a 2-employee campaign alternate 1st→A, 2nd→B, 3rd→A, 4th→B, ... —
-// counting only "open" leads would let the rotation drift once a lead
-// moves to CONFIRMED/LOST and drops out of that count.
+// overall workload, and scoped to "since the roster last changed" — not
+// all-time. CampaignEmployee.assignedAt is reset for the whole current
+// roster every time updateCampaign touches employeeIds (see
+// reconcileCampaignEmployees below), so "since the latest assignedAt among
+// current members" means: only leads that came in after the roster reached
+// its current shape count towards fairness. This is what makes a fresh
+// 2-employee campaign alternate 1st→A, 2nd→B, 3rd→A, ... while also making
+// a newcomer joining an already-busy campaign share new leads fairly from
+// here on, instead of being buried under the incumbent's head start (or
+// instead of the incumbent's history being used against them).
 export const assignEmployeeForCampaign = async (campaignId: string): Promise<string | null> => {
   const assignments = await prisma.campaignEmployee.findMany({
     where: { campaignId },
     orderBy: { assignedAt: 'asc' },
-    select: { userId: true },
+    select: { userId: true, assignedAt: true },
   });
   if (assignments.length === 0) return null;
 
+  const cutoff = assignments.reduce((max, a) => (a.assignedAt > max ? a.assignedAt : max), assignments[0].assignedAt);
+
   const counts = await prisma.lead.groupBy({
     by: ['assignedToId'],
-    where: { campaignId, deletedAt: null, assignedToId: { in: assignments.map((a) => a.userId) } },
+    where: {
+      campaignId, deletedAt: null, createdAt: { gte: cutoff },
+      assignedToId: { in: assignments.map((a) => a.userId) },
+    },
     _count: true,
   });
   const countMap = new Map(counts.map((c) => [c.assignedToId, c._count]));
@@ -92,32 +100,59 @@ export const assignEmployeeForCampaign = async (campaignId: string): Promise<str
   return best;
 };
 
-// Full redistribution of a campaign's current leads across its currently
-// assigned employees, in strict round-robin order by lead age (oldest
-// first) — called whenever the campaign's employee roster changes, so
-// "assign this campaign to an employee" means every lead under it (past
-// and future) ends up with them, split evenly if there's more than one
-// assignee. Leaves leads alone if the campaign has no employees assigned
-// (nothing to redistribute to) — never unassigns down to null.
-export const redistributeCampaignLeads = async (
+// Reconciles a campaign's leads against a change to its employee roster.
+// Three rules, per how the business actually wants this to work:
+//  1. First-ever assignment (campaign had no employees before): every
+//     existing lead is up for grabs, split round-robin by age across the
+//     whole new roster.
+//  2. An employee is added alongside employees who were already there:
+//     existing leads are left exactly where they are — the incumbent keeps
+//     what they already have. The newcomer only starts receiving leads
+//     going forward (via assignEmployeeForCampaign's "since roster changed"
+//     rotation, which naturally divides future leads between old and new).
+//  3. An employee is removed from the roster: every lead they're currently
+//     holding from this campaign (any status, unchanged otherwise) hands
+//     off to whoever remains, split round-robin by age. If nobody remains,
+//     their leads are left alone (nothing to hand off to).
+// Returns how many leads each employee received, for a summary notification.
+export const reconcileCampaignEmployees = async (
   campaignId: string,
-  employeeIds: string[]
+  oldEmployeeIds: string[],
+  newEmployeeIds: string[]
 ): Promise<Map<string, number>> => {
   const movedCountByEmployee = new Map<string, number>();
-  if (employeeIds.length === 0) return movedCountByEmployee;
+  if (newEmployeeIds.length === 0) return movedCountByEmployee;
 
-  const leads = await prisma.lead.findMany({
-    where: { campaignId, deletedAt: null },
-    select: { id: true, assignedToId: true },
-    orderBy: { createdAt: 'asc' },
-  });
+  const transfer = async (leads: { id: string }[]) => {
+    await Promise.all(leads.map((lead, i) => {
+      const targetId = newEmployeeIds[i % newEmployeeIds.length];
+      movedCountByEmployee.set(targetId, (movedCountByEmployee.get(targetId) ?? 0) + 1);
+      return prisma.lead.update({ where: { id: lead.id }, data: { assignedToId: targetId } });
+    }));
+  };
 
-  await Promise.all(leads.map((lead, i) => {
-    const targetId = employeeIds[i % employeeIds.length];
-    if (lead.assignedToId === targetId) return null;
-    movedCountByEmployee.set(targetId, (movedCountByEmployee.get(targetId) ?? 0) + 1);
-    return prisma.lead.update({ where: { id: lead.id }, data: { assignedToId: targetId } });
-  }));
+  if (oldEmployeeIds.length === 0) {
+    // Rule 1 — nobody owned this campaign's leads before; everything's in play.
+    const leads = await prisma.lead.findMany({
+      where: { campaignId, deletedAt: null },
+      select: { id: true },
+      orderBy: { createdAt: 'asc' },
+    });
+    await transfer(leads);
+    return movedCountByEmployee;
+  }
+
+  // Rule 3 — hand off each removed employee's leads to whoever remains.
+  // Employees who stayed (rule 2) are simply never touched here.
+  const removed = oldEmployeeIds.filter((id) => !newEmployeeIds.includes(id));
+  for (const removedId of removed) {
+    const leads = await prisma.lead.findMany({
+      where: { campaignId, assignedToId: removedId, deletedAt: null },
+      select: { id: true },
+      orderBy: { createdAt: 'asc' },
+    });
+    await transfer(leads);
+  }
 
   return movedCountByEmployee;
 };
