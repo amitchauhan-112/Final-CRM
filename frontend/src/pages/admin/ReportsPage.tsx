@@ -87,6 +87,7 @@ export default function ReportsPage() {
   const byStatus = leadData?.data?.byStatus ?? [];
   const bySource = leadData?.data?.bySource ?? [];
   const byPriority = leadData?.data?.byPriority ?? [];
+  const sourceStats = leadData?.data?.sourceStats ?? [];
   const employees = perfData?.data?.employees ?? [];
   const topCampaigns = perfData?.data?.topCampaigns ?? [];
   const lostReasons = lostData?.data?.reasons ?? [];
@@ -107,6 +108,9 @@ export default function ReportsPage() {
           { Metric: 'Conversion Rate %', Value: leadSummary.conversionRate },
         ] : []),
         ...byStatus.map((r: any) => ({ 'By Status': r.name, Count: r.count })),
+        ...sourceStats.map((s: any) => ({
+          Source: s.name, Total: s.total, Confirmed: s.confirmed, Lost: s.lost, 'Conversion Rate %': s.conversionRate,
+        })),
       ],
     };
     if (activeTab === 'performance') return {
@@ -273,6 +277,60 @@ export default function ReportsPage() {
                   </ResponsiveContainer>
                 )}
               </div>
+            </div>
+
+            <div className="card overflow-hidden">
+              <div className="px-5 py-4 border-b border-slate-100">
+                <h3 className="font-semibold text-slate-800 text-sm">Source Performance</h3>
+                <p className="text-xs text-slate-500 mt-0.5">Conversion rate by lead source, same period</p>
+              </div>
+              {sourceStats.length === 0 ? (
+                <div className="py-12 text-center">
+                  <TrendingUp className="w-10 h-10 text-slate-200 mx-auto mb-3" />
+                  <p className="text-slate-400 text-sm">No data for this period</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-slate-100 bg-slate-50">
+                        <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Source</th>
+                        <th className="text-right px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Total</th>
+                        <th className="text-right px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Confirmed</th>
+                        <th className="text-right px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Lost</th>
+                        <th className="text-right px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Conv. %</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {sourceStats.map((s: any, idx: number) => (
+                        <tr key={s.name} className="border-b border-slate-50 hover:bg-slate-50 transition-colors">
+                          <td className="px-5 py-3.5">
+                            <div className="flex items-center gap-3">
+                              <span className="text-xs text-slate-400 w-4 text-center font-medium">{idx + 1}</span>
+                              <span className="text-sm font-medium text-slate-800">{s.name}</span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3.5 text-right text-sm text-slate-700">{s.total}</td>
+                          <td className="px-4 py-3.5 text-right">
+                            <span className="text-sm font-semibold text-green-600">{s.confirmed}</span>
+                          </td>
+                          <td className="px-4 py-3.5 text-right">
+                            <span className="text-sm text-red-500">{s.lost}</span>
+                          </td>
+                          <td className="px-4 py-3.5 text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              <div className="w-16 h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                                <div className="h-full bg-primary-500 rounded-full" style={{ width: `${Math.min(s.conversionRate, 100)}%` }} />
+                              </div>
+                              <span className="text-sm font-medium text-slate-700 w-10 text-right">{s.conversionRate}%</span>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           </>
         )

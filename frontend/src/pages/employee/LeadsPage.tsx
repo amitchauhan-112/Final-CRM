@@ -41,12 +41,22 @@ const STATUSES = [
   { value: 'LOST', label: 'Lost' },
 ];
 
+const SOURCES = [
+  { value: '', label: 'All Sources' },
+  { value: 'WHATSAPP', label: 'WhatsApp' },
+  { value: 'INSTAGRAM', label: 'Instagram' },
+  { value: 'MANUAL', label: 'Manual' },
+  { value: 'WEBSITE', label: 'Website' },
+  { value: 'META_ADS', label: 'Meta Ads' },
+];
+
 export default function EmployeeLeadsPage() {
   const { user } = useAuthStore();
   const [searchParams] = useSearchParams();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState(searchParams.get('status') || '');
+  const [source, setSource] = useState('');
   const [preferredDate, setPreferredDate] = useState('');
   const initialRange = presetFromParams(searchParams.get('dateFrom'), searchParams.get('dateTo'));
   const [rangePreset, setRangePreset] = useState<RangePreset>(initialRange.preset);
@@ -78,6 +88,7 @@ export default function EmployeeLeadsPage() {
     assignedToId: user?.id,
     search: search || undefined,
     status: status || undefined,
+    source: source || undefined,
     dateFrom: dateRange.from,
     dateTo: dateRange.to,
     preferredDate: preferredDate || undefined,
@@ -280,6 +291,15 @@ export default function EmployeeLeadsPage() {
             className="input py-1.5 text-sm w-auto min-w-[160px]"
           >
             {STATUSES.map((s) => (
+              <option key={s.value} value={s.value}>{s.label}</option>
+            ))}
+          </select>
+          <select
+            value={source}
+            onChange={(e) => { setSource(e.target.value); setPage(1); }}
+            className="input py-1.5 text-sm w-auto min-w-[140px]"
+          >
+            {SOURCES.map((s) => (
               <option key={s.value} value={s.value}>{s.label}</option>
             ))}
           </select>

@@ -26,6 +26,7 @@ export const getLeadReport = async (req: AuthenticatedRequest, res: Response): P
       byPriority,
       confirmedLeads,
       lostLeads,
+      bySourceStatus,
     ] = await Promise.all([
       prisma.lead.count({ where: baseWhere }),
       prisma.lead.groupBy({ by: ['status'], where: baseWhere, _count: true }),
@@ -33,9 +34,29 @@ export const getLeadReport = async (req: AuthenticatedRequest, res: Response): P
       prisma.lead.groupBy({ by: ['priority' as any], where: baseWhere, _count: true }),
       prisma.lead.count({ where: { ...baseWhere, status: 'CONFIRMED' } }),
       prisma.lead.count({ where: { ...baseWhere, status: 'LOST' } }),
+      // Same shape as employee/campaign performance — total/confirmed/lost/
+      // conversionRate, just grouped by source instead. One groupBy on
+      // (source, status) rather than a query per source.
+      prisma.lead.groupBy({ by: ['source', 'status'], where: baseWhere, _count: true }),
     ]);
 
     const conversionRate = totalLeads > 0 ? ((confirmedLeads / totalLeads) * 100).toFixed(1) : '0';
+
+    const sourceMap = new Map<string, { total: number; confirmed: number; lost: number }>();
+    for (const row of bySourceStatus) {
+      const key = row.source || 'Unknown';
+      const entry = sourceMap.get(key) ?? { total: 0, confirmed: 0, lost: 0 };
+      entry.total += row._count;
+      if (row.status === 'CONFIRMED') entry.confirmed += row._count;
+      if (row.status === 'LOST') entry.lost += row._count;
+      sourceMap.set(key, entry);
+    }
+    const sourceStats = Array.from(sourceMap.entries())
+      .map(([name, s]) => ({
+        name, ...s,
+        conversionRate: s.total > 0 ? parseFloat(((s.confirmed / s.total) * 100).toFixed(1)) : 0,
+      }))
+      .sort((a, b) => b.total - a.total);
 
     res.json({
       success: true,
@@ -44,6 +65,7 @@ export const getLeadReport = async (req: AuthenticatedRequest, res: Response): P
         byStatus: byStatus.map((r) => ({ name: r.status, count: r._count })),
         bySource: bySource.map((r) => ({ name: r.source || 'Unknown', count: r._count })),
         byPriority: (byPriority as any[]).map((r) => ({ name: r.priority || 'MEDIUM', count: r._count })),
+        sourceStats,
       },
     });
   } catch (e) {
