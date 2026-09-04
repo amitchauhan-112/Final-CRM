@@ -1,7 +1,7 @@
 import { Response } from 'express';
 import prisma from '../lib/prisma.js';
 import { AuthenticatedRequest } from '../types/index.js';
-import { createLead, getLeadStats } from '../services/lead.service.js';
+import { createLead, getLeadStats, assignEmployeeForCampaign } from '../services/lead.service.js';
 import { createNotification, emitLeadUpdated } from '../services/notification.service.js';
 import { fireEvent } from '../services/automationEngine.service.js';
 import { isWholeAmount, WHOLE_AMOUNT_ERROR } from '../utils/amountValidation.js';
@@ -211,6 +211,11 @@ export const createLeadManual = async (req: AuthenticatedRequest, res: Response)
     }
     if (!isWholeAmount(budget)) { res.status(400).json({ success: false, error: WHOLE_AMOUNT_ERROR }); return; }
 
+    // A lead placed under a campaign that has employees assigned belongs to
+    // them (same round-robin rule webhook-created leads follow) — only when
+    // the creator didn't already pick someone explicitly.
+    const resolvedAssignedToId = assignedToId || (campaignId ? await assignEmployeeForCampaign(campaignId) : null);
+
     const lead = await prisma.lead.create({
       data: {
         name: name.trim(),
@@ -225,7 +230,7 @@ export const createLeadManual = async (req: AuthenticatedRequest, res: Response)
         lostReason: status === 'LOST' ? (lostReason || null) : null,
         lostReasonOther: status === 'LOST' && lostReason === 'Other' ? (lostReasonOther || null) : null,
         campaignId: campaignId || null,
-        assignedToId: assignedToId || null,
+        assignedToId: resolvedAssignedToId || null,
         groupSize: groupSize && !isNaN(Number(groupSize)) ? Number(groupSize) : null,
         budget: budget && !isNaN(Number(budget)) ? Number(budget) : null,
         preferredDate: preferredDate || null,
@@ -351,7 +356,15 @@ export const updateLead = async (req: AuthenticatedRequest, res: Response): Prom
 
     if (req.user?.role === 'ADMIN') {
       if (campaignId !== undefined) updateData.campaignId = campaignId || null;
-      if (assignedToId !== undefined) updateData.assignedToId = assignedToId || null;
+      if (assignedToId !== undefined) {
+        updateData.assignedToId = assignedToId || null;
+      } else if (campaignId !== undefined && campaignId && campaignId !== existing.campaignId) {
+        // Moving a lead onto a campaign that has employees assigned hands it
+        // to them (same round-robin rule as everywhere else), unless the
+        // admin also picked an assignee explicitly in this same request.
+        const autoAssignedToId = await assignEmployeeForCampaign(campaignId);
+        if (autoAssignedToId) updateData.assignedToId = autoAssignedToId;
+      }
     }
 
     const lead = await prisma.lead.update({
@@ -380,10 +393,13 @@ export const updateLead = async (req: AuthenticatedRequest, res: Response): Prom
       });
     }
     if (priority && priority !== existing.priority) changes.push(`Priority: ${existing.priority} → ${priority}`);
-    if (assignedToId && assignedToId !== existing.assignedToId) {
+    // Compares against the lead's actual final assignedToId (not just the
+    // request body's) so this also fires for the campaign-driven
+    // auto-assignment above, not only an explicit assignedToId in the body.
+    if (lead.assignedToId && lead.assignedToId !== existing.assignedToId) {
       changes.push('Reassigned');
       await createNotification(
-        assignedToId, 'NEW_LEAD_ASSIGNED',
+        lead.assignedToId, 'NEW_LEAD_ASSIGNED',
         'Lead Assigned to You',
         `Lead "${lead.name}" has been assigned to you.`,
         id,

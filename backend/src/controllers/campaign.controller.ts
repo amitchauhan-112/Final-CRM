@@ -3,6 +3,8 @@ import prisma from '../lib/prisma.js';
 import { AuthenticatedRequest } from '../types/index.js';
 import { buildUploadUrl, filePathFromUploadUrl, deleteUploadedFile } from '../middleware/upload.js';
 import { isWholeAmount, WHOLE_AMOUNT_ERROR } from '../utils/amountValidation.js';
+import { redistributeCampaignLeads } from '../services/lead.service.js';
+import { createNotification } from '../services/notification.service.js';
 
 // keywords is stored as JSON string in DB; parse before sending to client
 function parseCampaign(c: any) {
@@ -141,6 +143,26 @@ export const updateCampaign = async (req: AuthenticatedRequest, res: Response): 
           data: employeeIds.map((uid: string) => ({ campaignId: id, userId: uid })),
           skipDuplicates: true,
         });
+
+        // Assigning a campaign to (one or more) employees means every lead
+        // under it — past and future — belongs to them: redistribute all of
+        // this campaign's current leads across the new roster in round-robin
+        // order (1st→A, 2nd→B, 3rd→A, ... for a 2-person roster), rather than
+        // leaving existing leads stuck with whoever (or no one) had them
+        // before. New leads follow the same rotation via
+        // assignEmployeeForCampaign() in lead.service.ts.
+        const movedCounts = await redistributeCampaignLeads(id, employeeIds);
+        const campaignName = (await prisma.campaign.findUnique({ where: { id }, select: { name: true } }))?.name ?? 'this campaign';
+        await Promise.all(
+          Array.from(movedCounts.entries()).map(([employeeId, count]) =>
+            createNotification(
+              employeeId,
+              'NEW_LEAD_ASSIGNED',
+              'Campaign Leads Assigned',
+              `${count} lead${count === 1 ? '' : 's'} from campaign "${campaignName}" ${count === 1 ? 'has' : 'have'} been assigned to you`,
+            )
+          )
+        );
       }
     }
 

@@ -60,22 +60,66 @@ export const matchCampaign = async (input: {
   return null;
 };
 
+// Round-robin, scoped to THIS campaign specifically — not the employee's
+// overall workload. Counts how many of this campaign's leads (any status,
+// not just currently-open ones — see the comment below) each assigned
+// employee already has, and hands the next one to whoever has the fewest,
+// ties broken by the order they were added to the campaign. This is what
+// makes a 2-employee campaign alternate 1st→A, 2nd→B, 3rd→A, 4th→B, ... —
+// counting only "open" leads would let the rotation drift once a lead
+// moves to CONFIRMED/LOST and drops out of that count.
 export const assignEmployeeForCampaign = async (campaignId: string): Promise<string | null> => {
   const assignments = await prisma.campaignEmployee.findMany({
     where: { campaignId },
-    include: {
-      user: {
-        include: {
-          assignedLeads: {
-            where: { status: { notIn: ['CONFIRMED', 'LOST'] }, deletedAt: null },
-          },
-        },
-      },
-    },
+    orderBy: { assignedAt: 'asc' },
+    select: { userId: true },
+  });
+  if (assignments.length === 0) return null;
+
+  const counts = await prisma.lead.groupBy({
+    by: ['assignedToId'],
+    where: { campaignId, deletedAt: null, assignedToId: { in: assignments.map((a) => a.userId) } },
+    _count: true,
+  });
+  const countMap = new Map(counts.map((c) => [c.assignedToId, c._count]));
+
+  let best = assignments[0].userId;
+  let bestCount = countMap.get(best) ?? 0;
+  for (const a of assignments.slice(1)) {
+    const c = countMap.get(a.userId) ?? 0;
+    if (c < bestCount) { best = a.userId; bestCount = c; }
+  }
+  return best;
+};
+
+// Full redistribution of a campaign's current leads across its currently
+// assigned employees, in strict round-robin order by lead age (oldest
+// first) — called whenever the campaign's employee roster changes, so
+// "assign this campaign to an employee" means every lead under it (past
+// and future) ends up with them, split evenly if there's more than one
+// assignee. Leaves leads alone if the campaign has no employees assigned
+// (nothing to redistribute to) — never unassigns down to null.
+export const redistributeCampaignLeads = async (
+  campaignId: string,
+  employeeIds: string[]
+): Promise<Map<string, number>> => {
+  const movedCountByEmployee = new Map<string, number>();
+  if (employeeIds.length === 0) return movedCountByEmployee;
+
+  const leads = await prisma.lead.findMany({
+    where: { campaignId, deletedAt: null },
+    select: { id: true, assignedToId: true },
+    orderBy: { createdAt: 'asc' },
   });
 
-  if (assignments.length === 0) return null;
-  return assignments.sort((a, b) => a.user.assignedLeads.length - b.user.assignedLeads.length)[0].user.id;
+  await Promise.all(leads.map((lead, i) => {
+    const targetId = employeeIds[i % employeeIds.length];
+    if (lead.assignedToId === targetId) return null;
+    movedCountByEmployee.set(targetId, (movedCountByEmployee.get(targetId) ?? 0) + 1);
+    return prisma.lead.update({ where: { id: lead.id }, data: { assignedToId: targetId } });
+  }));
+
+  return movedCountByEmployee;
 };
 
 export const createLead = async (
