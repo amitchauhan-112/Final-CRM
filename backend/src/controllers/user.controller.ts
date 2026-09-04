@@ -407,10 +407,10 @@ export const getEmployeeProfile = async (req: AuthenticatedRequest, res: Respons
   }
 };
 
-export const getEmployeePerformance = async (_req: AuthenticatedRequest, res: Response): Promise<void> => {
+export const getEmployeePerformance = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const employees = await prisma.user.findMany({
-      where: { role: 'EMPLOYEE', isActive: true },
+      where: { role: 'EMPLOYEE', isActive: true, organizationId: req.user?.organizationId ?? null },
       select: {
         id: true, name: true, email: true,
         assignedLeads: {

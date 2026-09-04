@@ -31,7 +31,7 @@ export function useEmployeePerformance() {
   return useQuery<ApiResponse<EmployeePerformance[]>>({
     queryKey: ['employee-performance'],
     queryFn: async () => {
-      const { data } = await api.get('/users/performance');
+      const { data } = await api.get('/users/performance/employees');
       return data;
     },
   });
