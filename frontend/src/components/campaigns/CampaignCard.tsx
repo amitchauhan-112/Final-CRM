@@ -96,6 +96,21 @@ export default function CampaignCard({ campaign, onEdit, onDelete, onView }: Cam
 
       {/* ── Body ─────────────────────────────────────────────────────── */}
       <div className="px-5 pt-7 pb-5">
+        {/* Assigned employee(s) — shown by name, right up top, so it's
+            scannable across a whole grid of cards without opening any of
+            them. Unassigned is called out just as visibly (amber), since a
+            campaign nobody's assigned to needs to stand out just as much. */}
+        <div className="flex items-center gap-1.5 mb-3">
+          <Users className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+          {campaign.employees.length > 0 ? (
+            <span className="text-xs font-medium text-slate-600 truncate">
+              {campaign.employees.map((ce) => ce.user.name).join(', ')}
+            </span>
+          ) : (
+            <span className="text-xs font-medium text-amber-600">Unassigned</span>
+          )}
+        </div>
+
         {campaign.description && (
           <p className="text-xs text-slate-500 line-clamp-2 mb-4">{campaign.description}</p>
         )}
