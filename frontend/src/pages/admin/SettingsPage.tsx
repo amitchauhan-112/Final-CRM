@@ -5,7 +5,7 @@ import {
   Eye, EyeOff, Send, Lock, Globe, Smartphone, Instagram,
   Tag, MapPin, AlertCircle, Plus, Trash2, Edit2, Building2,
   Check, Palette, Link2, RefreshCw, Unlink, Clock, AlertTriangle,
-  MessageCircle,
+  MessageCircle, Zap,
 } from 'lucide-react';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
@@ -19,11 +19,13 @@ import {
 } from '../../hooks/useMetaConnection';
 import {
   useWhatsAppAccounts, useSaveWhatsAppAccount, useDeactivateWhatsAppAccount,
+  useCompleteEmbeddedSignup,
   WhatsAppAccountInput,
 } from '../../hooks/useWhatsAppAccounts';
 import { useUsers } from '../../hooks/useUsers';
 import { cn } from '../../utils/helpers';
 import WhatsAppOpenModeCard from '../../components/settings/WhatsAppOpenModeCard';
+import { launchWhatsAppEmbeddedSignup } from '../../utils/metaEmbeddedSignup';
 
 const TABS = [
   { key: 'account', label: 'Account', icon: Lock },
@@ -753,10 +755,13 @@ function WhatsAppAccountsSection() {
   const { data: accounts = [], isLoading } = useWhatsAppAccounts();
   const { data: usersData } = useUsers({ limit: 200, isActive: true });
   const saveAccount = useSaveWhatsAppAccount();
+  const completeEmbeddedSignup = useCompleteEmbeddedSignup();
   const deactivateAccount = useDeactivateWhatsAppAccount();
   const [formOpen, setFormOpen] = useState(false);
   const [showToken, setShowToken] = useState(false);
   const [confirmDeactivate, setConfirmDeactivate] = useState<string | null>(null);
+  const [metaEmployeeId, setMetaEmployeeId] = useState('');
+  const [metaConnecting, setMetaConnecting] = useState(false);
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<WhatsAppAccountInput>();
 
@@ -772,6 +777,21 @@ function WhatsAppAccountsSection() {
       setFormOpen(false);
     } catch (err: any) {
       toast.error(err?.response?.data?.error || 'Failed to connect account');
+    }
+  };
+
+  const onConnectViaMeta = async () => {
+    if (!metaEmployeeId) { toast.error('Select an employee first'); return; }
+    setMetaConnecting(true);
+    try {
+      const result = await launchWhatsAppEmbeddedSignup();
+      await completeEmbeddedSignup.mutateAsync({ userId: metaEmployeeId, ...result });
+      toast.success('Connected — WhatsApp Business app + CRM are now linked');
+      setMetaEmployeeId('');
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error || err?.message || 'Failed to connect via Meta');
+    } finally {
+      setMetaConnecting(false);
     }
   };
 
@@ -799,8 +819,39 @@ function WhatsAppAccountsSection() {
         </div>
         <button onClick={() => setFormOpen(!formOpen)} className="btn-secondary text-sm py-1.5 flex items-center gap-1.5 flex-shrink-0">
           <Plus className="w-3.5 h-3.5" />
-          Connect Employee
+          Connect Manually (Advanced)
         </button>
+      </div>
+
+      <div className="p-4 bg-green-50/60 rounded-xl border border-green-100 flex flex-col sm:flex-row sm:items-center gap-3">
+        <div className="flex-1">
+          <p className="text-sm font-semibold text-slate-800 flex items-center gap-1.5">
+            <Zap className="w-4 h-4 text-green-600" />
+            Connect via Meta (Recommended)
+          </p>
+          <p className="text-xs text-slate-500 mt-0.5">
+            Keeps the employee's WhatsApp Business app working on their phone exactly as before, while mirroring messages here. Opens Meta's official signup popup.
+          </p>
+        </div>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <select
+            value={metaEmployeeId}
+            onChange={(e) => setMetaEmployeeId(e.target.value)}
+            className="input py-1.5 text-sm max-w-[200px]"
+          >
+            <option value="">Select employee...</option>
+            {availableEmployees.map((e) => (
+              <option key={e.id} value={e.id}>{e.name}</option>
+            ))}
+          </select>
+          <button
+            onClick={onConnectViaMeta}
+            disabled={metaConnecting || !metaEmployeeId}
+            className="btn-primary text-sm py-1.5 whitespace-nowrap disabled:opacity-50"
+          >
+            {metaConnecting ? 'Connecting...' : 'Connect via Meta'}
+          </button>
+        </div>
       </div>
 
       {formOpen && (

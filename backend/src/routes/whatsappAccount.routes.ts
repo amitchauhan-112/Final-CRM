@@ -3,6 +3,7 @@ import {
   listWhatsAppAccounts,
   saveWhatsAppAccount,
   deactivateWhatsAppAccount,
+  completeEmbeddedSignup,
 } from '../controllers/whatsappAccount.controller.js';
 import { authenticate, requireAdmin } from '../middleware/auth.js';
 
@@ -13,6 +14,7 @@ router.use(requireAdmin);
 
 router.get('/', listWhatsAppAccounts);
 router.post('/', saveWhatsAppAccount);
+router.post('/embedded-signup', completeEmbeddedSignup);
 router.delete('/:userId', deactivateWhatsAppAccount);
 
 export default router;

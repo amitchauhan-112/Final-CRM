@@ -41,6 +41,22 @@ export function useSaveWhatsAppAccount() {
   });
 }
 
+export interface EmbeddedSignupInput {
+  userId: string;
+  code: string;
+  phoneNumberId: string;
+  wabaId: string;
+}
+
+export function useCompleteEmbeddedSignup() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: EmbeddedSignupInput) =>
+      api.post('/whatsapp-accounts/embedded-signup', data).then((r) => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: QK }),
+  });
+}
+
 export function useDeactivateWhatsAppAccount() {
   const qc = useQueryClient();
   return useMutation({
