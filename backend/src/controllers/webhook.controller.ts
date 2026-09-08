@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 
 import { createLead } from '../services/lead.service.js';
-import { WebhookWhatsAppEntry, WebhookInstagramEntry } from '../types/index.js';
+import { WebhookWhatsAppEntry, WebhookInstagramEntry, AuthenticatedRequest } from '../types/index.js';
 import logger from '../utils/logger.js';
 import { getAdEntry } from '../services/adMap.service.js';
 import { processInboundWhatsAppMessage, processWhatsAppStatusUpdate } from '../services/whatsapp.service.js';
@@ -144,6 +144,62 @@ export const simulateLead = async (req: Request, res: Response): Promise<void> =
 
     res.status(201).json({ success: true, data: lead, message: 'Lead simulated successfully' });
   } catch {
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+};
+
+// One-time (safe to re-run) backfill for leads captured before CTWA
+// referral attribution was added — every inbound WhatsApp webhook payload
+// is logged raw regardless of how it was processed at the time, so a
+// message's `referral` data (which ad it came from) is still recoverable
+// even for old leads. Matches back to a Lead via the WhatsApp message ID,
+// only touches leads that don't already have an adId (never overwrites
+// anything, so re-running this is harmless).
+export const backfillCtwaAttribution = async (_req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const logs = await prisma.webhookLog.findMany({ where: { source: 'WHATSAPP' } });
+
+    let scanned = 0;
+    let updated = 0;
+    let noMatch = 0;
+
+    for (const log of logs) {
+      let body: any;
+      try { body = JSON.parse(log.payload); } catch { continue; }
+      if (body?.object !== 'whatsapp_business_account') continue;
+
+      for (const entry of (body.entry || []) as WebhookWhatsAppEntry[]) {
+        for (const change of entry.changes || []) {
+          if (change.field !== 'messages') continue;
+          for (const msg of change.value.messages || []) {
+            if (!msg.referral?.source_id) continue;
+            scanned++;
+
+            const lead = await prisma.lead.findFirst({ where: { whatsappMsgId: msg.id } });
+            if (!lead || lead.adId) { noMatch++; continue; } // no matching lead, or already attributed
+
+            const adEntry = await getAdEntry(msg.referral.source_id);
+            await prisma.lead.update({
+              where: { id: lead.id },
+              data: {
+                adId: msg.referral.source_id,
+                adName: msg.referral.headline || msg.referral.body || undefined,
+                campaignId: lead.campaignId ?? adEntry?.campaignId ?? undefined,
+              },
+            });
+            updated++;
+          }
+        }
+      }
+    }
+
+    res.json({
+      success: true,
+      message: `Scanned ${scanned} CTWA message(s) across ${logs.length} logged webhook payload(s) — updated ${updated} lead(s), ${noMatch} already attributed or had no matching lead`,
+      data: { scanned, updated, noMatch, logsScanned: logs.length },
+    });
+  } catch (e) {
+    logger.error('[admin] backfillCtwaAttribution error', e);
     res.status(500).json({ success: false, error: 'Internal server error' });
   }
 };
