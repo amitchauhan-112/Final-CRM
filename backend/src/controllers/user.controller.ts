@@ -119,15 +119,20 @@ export const createUser = async (req: AuthenticatedRequest, res: Response): Prom
 export const updateUser = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    const { name, phone, isActive, departmentId, designationId } = req.body;
+    const { name, email, phone, isActive, departmentId, designationId } = req.body;
 
     if (phone !== undefined && !phone?.trim()) {
       res.status(400).json({ success: false, error: 'Mobile number is required' });
       return;
     }
+    if (email !== undefined && !email?.trim()) {
+      res.status(400).json({ success: false, error: 'Email is required' });
+      return;
+    }
 
     const updateData: any = {};
     if (name !== undefined) updateData.name = name;
+    if (email !== undefined) updateData.email = email.trim().toLowerCase();
     if (phone !== undefined) updateData.phone = phone;
     if (isActive !== undefined) updateData.isActive = isActive;
     if (departmentId !== undefined) updateData.departmentId = departmentId || null;
@@ -144,7 +149,11 @@ export const updateUser = async (req: AuthenticatedRequest, res: Response): Prom
       },
     });
     res.json({ success: true, data: user });
-  } catch {
+  } catch (e: any) {
+    if (e?.code === 'P2002') {
+      res.status(400).json({ success: false, error: 'That email is already in use by another account' });
+      return;
+    }
     res.status(500).json({ success: false, error: 'Internal server error' });
   }
 };
