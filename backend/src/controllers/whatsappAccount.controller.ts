@@ -112,10 +112,11 @@ export const saveWhatsAppAccount = async (req: AuthenticatedRequest, res: Respon
 // it only exists inside the Embedded Signup popup itself).
 export const completeEmbeddedSignup = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
-    const { userId, code, phoneNumberId, wabaId } = req.body;
+    const { userId, code, wabaId } = req.body;
+    let { phoneNumberId } = req.body as { phoneNumberId?: string };
 
-    if (!userId || !code?.trim() || !phoneNumberId?.trim() || !wabaId?.trim()) {
-      res.status(400).json({ success: false, error: 'userId, code, phoneNumberId and wabaId are all required' });
+    if (!userId || !code?.trim() || !wabaId?.trim()) {
+      res.status(400).json({ success: false, error: 'userId, code and wabaId are all required' });
       return;
     }
 
@@ -178,18 +179,33 @@ export const completeEmbeddedSignup = async (req: AuthenticatedRequest, res: Res
       return;
     }
 
-    // 4. Look up the actual display number for this phoneNumberId (shown in
-    //    the UI table) rather than trusting anything from the client.
-    let displayPhoneNumber = phoneNumberId.trim();
+    // 4. Coexistence's completion event routinely doesn't hand back a
+    //    phoneNumberId at all — resolve it from the WABA's own phone number
+    //    list instead of trusting (or requiring) anything from the client.
+    let resolvedPhoneNumberId = phoneNumberId?.trim();
+    let displayPhoneNumber = resolvedPhoneNumberId ?? '';
     try {
-      const { data } = await axios.get(`${META_BASE}/${phoneNumberId.trim()}`, {
-        params: { fields: 'display_phone_number', access_token: longLivedToken },
+      const { data } = await axios.get(`${META_BASE}/${wabaId.trim()}/phone_numbers`, {
+        params: { fields: 'id,display_phone_number', access_token: longLivedToken },
         timeout: 15000,
       });
-      if (data.display_phone_number) displayPhoneNumber = data.display_phone_number;
+      const numbers: Array<{ id: string; display_phone_number?: string }> = data?.data ?? [];
+      const match = resolvedPhoneNumberId
+        ? numbers.find((n) => n.id === resolvedPhoneNumberId)
+        : numbers[0]; // Coexistence WABAs have exactly one number
+      if (match) {
+        resolvedPhoneNumberId = match.id;
+        if (match.display_phone_number) displayPhoneNumber = match.display_phone_number;
+      }
     } catch (err: any) {
-      logger.warn('[whatsappAccount] could not fetch display_phone_number', err?.response?.data || err.message);
+      logger.warn('[whatsappAccount] could not list phone_numbers for WABA', err?.response?.data || err.message);
     }
+
+    if (!resolvedPhoneNumberId) {
+      res.status(502).json({ success: false, error: 'Connected, but could not find a phone number on this WhatsApp Business Account' });
+      return;
+    }
+    phoneNumberId = resolvedPhoneNumberId;
 
     const encryptedToken = encrypt(longLivedToken);
 

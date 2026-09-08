@@ -44,7 +44,9 @@ export function useSaveWhatsAppAccount() {
 export interface EmbeddedSignupInput {
   userId: string;
   code: string;
-  phoneNumberId: string;
+  // Coexistence's completion event routinely omits this — the backend
+  // resolves it from the WABA's phone_numbers list when not provided.
+  phoneNumberId?: string;
   wabaId: string;
 }
 

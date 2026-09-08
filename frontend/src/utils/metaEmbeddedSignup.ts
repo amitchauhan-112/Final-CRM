@@ -45,15 +45,29 @@ function loadFacebookSdk(): Promise<void> {
 
 export interface EmbeddedSignupResult {
   code: string;
-  phoneNumberId: string;
+  // phoneNumberId is deliberately optional — Meta's Coexistence completion
+  // event (FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING) routinely omits it; the
+  // backend looks it up from the WABA instead of trusting the popup for it.
+  phoneNumberId?: string;
   wabaId: string;
 }
+
+// The set of "this session is done, here's what was picked" events Meta
+// sends. Coexistence's completion event is FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING
+// — NOT the plain "FINISH" used by the full-migration signup flow. Missing
+// this was the actual bug: the popup was completing successfully the whole
+// time, this listener just never recognized it.
+const FINISH_EVENTS = new Set([
+  'FINISH',
+  'FINISH_ONLY_WABA',
+  'FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING',
+]);
 
 /**
  * Opens the Embedded Signup popup and resolves once the employee has
  * finished picking their WhatsApp Business app number and Meta has handed
  * back both the OAuth `code` and (via a postMessage the popup sends while
- * it's still open) the phoneNumberId/wabaId they selected.
+ * it's still open) the wabaId they selected.
  */
 export async function launchWhatsAppEmbeddedSignup(): Promise<EmbeddedSignupResult> {
   await loadFacebookSdk();
@@ -68,12 +82,13 @@ export async function launchWhatsAppEmbeddedSignup(): Promise<EmbeddedSignupResu
       try { data = JSON.parse(event.data); } catch { return; }
       if (data?.type !== 'WA_EMBEDDED_SIGNUP') return;
 
-      if (data.event === 'FINISH' || data.event === 'FINISH_ONLY_WABA') {
+      const evt = String(data.event ?? '').toUpperCase();
+      if (FINISH_EVENTS.has(evt)) {
         sessionData = {
           phoneNumberId: data.data?.phone_number_id,
           wabaId: data.data?.waba_id,
         };
-      } else if (data.event === 'CANCEL' || data.event === 'ERROR') {
+      } else if (evt === 'CANCEL' || evt === 'ERROR') {
         cleanup();
         if (!settled) { settled = true; reject(new Error(data.data?.error_message || 'Signup was cancelled')); }
       }
@@ -87,7 +102,7 @@ export async function launchWhatsAppEmbeddedSignup(): Promise<EmbeddedSignupResu
         cleanup();
         if (settled) return;
         const code = response?.authResponse?.code;
-        if (!code || !sessionData.phoneNumberId || !sessionData.wabaId) {
+        if (!code || !sessionData.wabaId) {
           settled = true;
           reject(new Error('Signup did not complete — no number was selected, or the popup was closed early'));
           return;
