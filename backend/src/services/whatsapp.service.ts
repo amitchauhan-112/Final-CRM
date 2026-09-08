@@ -12,6 +12,7 @@ import logger from '../utils/logger.js';
 import { decrypt } from '../utils/encryption.js';
 import { createLead } from './lead.service.js';
 import { createNotification } from './notification.service.js';
+import { getAdEntry } from './adMap.service.js';
 import { WebhookWhatsAppEntry } from '../types/index.js';
 
 const META_VERSION = process.env.META_API_VERSION || 'v19.0';
@@ -23,6 +24,25 @@ type Contact = NonNullable<WebhookWhatsAppEntry['changes'][number]['value']['con
 
 function normalizePhone(raw: string): string {
   return raw.replace(/[^0-9]/g, '');
+}
+
+// Click-to-WhatsApp (CTWA) ad attribution — Meta attaches a `referral`
+// object to the first inbound message of a conversation that started from
+// someone clicking an ad's "Send Message" button. Without reading it, every
+// CTWA lead looks like a generic organic WhatsApp message: no ad/campaign
+// attribution, and — if the shared number isn't tied to any one campaign —
+// nothing for matchCampaign() to match against, so the lead silently lands
+// with no campaign instead of the one that actually drove it.
+async function resolveCtwaAttribution(referral: InboundMessage['referral']): Promise<{
+  campaignId?: string; adId?: string; adName?: string;
+}> {
+  if (!referral?.source_id) return {};
+  const adEntry = await getAdEntry(referral.source_id);
+  return {
+    campaignId: adEntry?.campaignId,
+    adId: referral.source_id,
+    adName: referral.headline || referral.body || undefined,
+  };
 }
 
 /**
@@ -62,11 +82,16 @@ export async function processInboundWhatsAppMessage(
     if (msg.type !== 'text') return;
     const contact = contacts.find((c) => c.wa_id === msg.from);
     const name = contact?.profile?.name || `WhatsApp User ${msg.from}`;
+    const ctwa = await resolveCtwaAttribution(msg.referral);
     await createLead(
-      { name, phone: msg.from, source: 'WHATSAPP', message: msg.text?.body || '', whatsappMsgId: msg.id, metaPageId: phoneNumberId },
+      {
+        name, phone: msg.from, source: 'WHATSAPP', message: msg.text?.body || '',
+        whatsappMsgId: msg.id, metaPageId: phoneNumberId,
+        ...ctwa,
+      },
       { whatsappNumber: `+${msg.from}` },
     );
-    logger.info(`[whatsapp] no account for phoneNumberId=${phoneNumberId} — used legacy lead-capture path`);
+    logger.info(`[whatsapp] no account for phoneNumberId=${phoneNumberId} — used legacy lead-capture path${ctwa.adId ? ` (CTWA ad ${ctwa.adId})` : ''}`);
     return;
   }
 
@@ -130,6 +155,7 @@ export async function processInboundWhatsAppMessage(
     } else {
       const contact = contacts.find((c) => c.wa_id === msg.from);
       const name = contact?.profile?.name || `WhatsApp User ${msg.from}`;
+      const ctwa = await resolveCtwaAttribution(msg.referral);
       const lead = await createLead(
         {
           name,
@@ -139,6 +165,7 @@ export async function processInboundWhatsAppMessage(
           whatsappMsgId: msg.id,
           metaPageId: phoneNumberId,
           organizationId: account.organizationId,
+          ...ctwa,
         },
         { whatsappNumber: `+${customerPhone}` },
       );

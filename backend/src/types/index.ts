@@ -33,6 +33,20 @@ export interface WebhookWhatsAppEntry {
         timestamp: string;
         text?: { body: string };
         type: string;
+        // Present on the first inbound message of a Click-to-WhatsApp (CTWA)
+        // ad conversation — Meta's only signal that this message came from
+        // an ad click rather than an organic chat. source_id is the Meta ad
+        // ID, same ID space as Instagram leadgen's ad_id (see
+        // adMap.service.ts) — that's how it resolves back to a CRM campaign.
+        referral?: {
+          source_id?: string;
+          source_type?: string;   // "ad" | "post" | ...
+          source_url?: string;
+          headline?: string;
+          body?: string;
+          media_type?: string;
+          ctwa_clid?: string;
+        };
       }>;
       // Delivery/read receipts for messages sent via the API — a separate
       // `field: 'statuses'` change, sibling to the `messages` one above.

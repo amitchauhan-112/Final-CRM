@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Plus, Target, CheckCircle, Megaphone, FileText, Users, MapPin, Calendar, TrendingUp, StickyNote, Paperclip, Archive, ChevronDown, ChevronUp, Download, Link2, FileSpreadsheet } from 'lucide-react';
 import { useCampaigns, useCampaign, useCampaignStats, useCreateCampaign, useUpdateCampaign, useDeleteCampaign } from '../../hooks/useCampaigns';
 import { useArchivedCampaigns, useArchiveDownload } from '../../hooks/useMetaConnection';
@@ -233,12 +233,21 @@ function CampaignDetailModal({
 
 export default function AdminCampaignsPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState<CampaignStatus | 'ALL'>('ALL');
   const [createOpen, setCreateOpen] = useState(false);
   const [editCampaign, setEditCampaign] = useState<Campaign | null>(null);
   const [deleteCampaign, setDeleteCampaign] = useState<Campaign | null>(null);
   const [detailCampaignId, setDetailCampaignId] = useState<string | null>(null);
   const [archivedOpen, setArchivedOpen] = useState(false);
+
+  // Deep-linked from elsewhere (e.g. the "Active Campaigns" stat card on the
+  // Admin Dashboard) — land straight on that status tab instead of "All".
+  useEffect(() => {
+    const status = searchParams.get('status');
+    const valid = STATUS_TABS.some((t) => t.value === status);
+    if (status && valid) setActiveTab(status as CampaignStatus);
+  }, [searchParams]);
 
   const filters = activeTab === 'ALL' ? {} : { status: activeTab };
   const { data, isLoading } = useCampaigns({ ...filters, limit: 50 });

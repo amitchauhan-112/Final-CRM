@@ -484,7 +484,7 @@ export default function AdminDashboard() {
           icon={Megaphone}
           iconBg="bg-mountain-100"
           iconColor="text-mountain-600"
-          onClick={() => navigate('/admin/campaigns')}
+          onClick={() => navigate('/admin/campaigns?status=ACTIVE')}
         />
         <StatsCard
           label="Confirmed Bookings"
