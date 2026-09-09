@@ -431,6 +431,10 @@ export const getEmployeePerformance = async (req: AuthenticatedRequest, res: Res
     const performance = employees.map((emp) => {
       const leads = emp.assignedLeads;
       const total = leads.length;
+      const fresh = leads.filter((l) => l.status === 'NEW').length;
+      const contacted = leads.filter((l) => l.status === 'CONTACTED').length;
+      const interested = leads.filter((l) => l.status === 'INTERESTED').length;
+      const followUpScheduled = leads.filter((l) => l.status === 'FOLLOW_UP_SCHEDULED').length;
       const confirmed = leads.filter((l) => l.status === 'CONFIRMED').length;
       const lost = leads.filter((l) => l.status === 'LOST').length;
       const active = leads.filter((l) => !['CONFIRMED', 'LOST'].includes(l.status)).length;
@@ -439,7 +443,11 @@ export const getEmployeePerformance = async (req: AuthenticatedRequest, res: Res
       ).length;
       const conversionRate = total > 0 ? ((confirmed / total) * 100).toFixed(1) : '0';
 
-      return { id: emp.id, name: emp.name, email: emp.email, total, confirmed, lost, active, overdue, conversionRate };
+      return {
+        id: emp.id, name: emp.name, email: emp.email, total,
+        fresh, contacted, interested, followUpScheduled, confirmed, lost, active, overdue,
+        conversionRate,
+      };
     });
 
     res.json({ success: true, data: performance });

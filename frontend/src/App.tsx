@@ -23,6 +23,7 @@ import AdminSettingsPage from './pages/admin/SettingsPage';
 import AdminFeedbackPage from './pages/admin/FeedbackPage';
 import AdminActivityFeedPage from './pages/admin/ActivityFeedPage';
 import AdminReportsPage from './pages/admin/ReportsPage';
+import EmployeeMonitoringPage from './pages/admin/EmployeeMonitoringPage';
 import MastersPage from './pages/admin/MastersPage';
 import PackagesPage from './pages/admin/PackagesPage';
 import BookingsPage from './pages/admin/BookingsPage';
@@ -99,6 +100,7 @@ export default function App() {
         <Route path="system-health" element={<SystemHealthPage />} />
         <Route path="leads" element={<AdminLeadsPage />} />
         <Route path="campaigns" element={<AdminCampaignsPage />} />
+        <Route path="employee-monitoring" element={<EmployeeMonitoringPage />} />
         <Route path="employees" element={<Navigate to="/admin/organization" replace />} />
         <Route path="organization" element={<OrganizationPage />} />
         <Route path="settings" element={<AdminSettingsPage />} />

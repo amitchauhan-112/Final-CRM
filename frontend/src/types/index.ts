@@ -268,6 +268,10 @@ export interface EmployeePerformance {
   name: string;
   email: string;
   total: number;
+  fresh: number;
+  contacted: number;
+  interested: number;
+  followUpScheduled: number;
   confirmed: number;
   lost: number;
   active: number;
