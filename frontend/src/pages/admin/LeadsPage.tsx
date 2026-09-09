@@ -55,7 +55,15 @@ export default function AdminLeadsPage() {
     setPage(1);
   }, [searchParams]);
   const [campaignId, setCampaignId] = useState('');
-  const [assignedToId, setAssignedToId] = useState('');
+  const [assignedToId, setAssignedToId] = useState(searchParams.get('assignedToId') || '');
+
+  // Deep-linked from Employee Monitoring — e.g. clicking a lead-count cell
+  // for a specific employee/status combination.
+  useEffect(() => {
+    const a = searchParams.get('assignedToId') || '';
+    setAssignedToId(a);
+    setPage(1);
+  }, [searchParams]);
   const [createOpen, setCreateOpen] = useState(false);
   const [editLead, setEditLead] = useState<Lead | null>(null);
   const [detailLeadId, setDetailLeadId] = useState<string | null>(searchParams.get('id'));

@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Search, Users, Radar } from 'lucide-react';
 import { useEmployeePerformance } from '../../hooks/useUsers';
 import { Skeleton } from '../../components/ui/Skeleton';
@@ -7,19 +8,24 @@ import { cn } from '../../utils/helpers';
 
 type SortKey = 'total' | 'fresh' | 'contacted' | 'interested' | 'followUpScheduled' | 'confirmed' | 'lost' | 'overdue' | 'conversionRate';
 
-const COLUMNS: { key: SortKey; label: string }[] = [
+// Maps each column to the Lead status its cell should filter the Leads page
+// by when clicked — undefined means "no status filter" (just this employee).
+// Overdue has no dedicated status of its own; it reuses FOLLOW_UP_SCHEDULED,
+// the same convention the Dashboard's "Overdue Follow-ups" card already uses.
+const COLUMNS: { key: SortKey; label: string; status?: string }[] = [
   { key: 'total', label: 'Assigned' },
-  { key: 'fresh', label: 'Fresh' },
-  { key: 'contacted', label: 'Contacted' },
-  { key: 'interested', label: 'Interested' },
-  { key: 'followUpScheduled', label: 'Follow-up' },
-  { key: 'confirmed', label: 'Confirmed' },
-  { key: 'lost', label: 'Lost' },
-  { key: 'overdue', label: 'Overdue' },
+  { key: 'fresh', label: 'Fresh', status: 'NEW' },
+  { key: 'contacted', label: 'Contacted', status: 'CONTACTED' },
+  { key: 'interested', label: 'Interested', status: 'INTERESTED' },
+  { key: 'followUpScheduled', label: 'Follow-up', status: 'FOLLOW_UP_SCHEDULED' },
+  { key: 'confirmed', label: 'Confirmed', status: 'CONFIRMED' },
+  { key: 'lost', label: 'Lost', status: 'LOST' },
+  { key: 'overdue', label: 'Overdue', status: 'FOLLOW_UP_SCHEDULED' },
   { key: 'conversionRate', label: 'Conv. %' },
 ];
 
 export default function EmployeeMonitoringPage() {
+  const navigate = useNavigate();
   const { data, isLoading } = useEmployeePerformance();
   const [search, setSearch] = useState('');
   const [sortKey, setSortKey] = useState<SortKey>('total');
@@ -38,6 +44,12 @@ export default function EmployeeMonitoringPage() {
     return acc;
   }, {} as Record<string, number>), [employees]);
 
+  const goToLeads = (employeeId: string, status?: string) => {
+    const params = new URLSearchParams({ assignedToId: employeeId });
+    if (status) params.set('status', status);
+    navigate(`/admin/leads?${params.toString()}`);
+  };
+
   return (
     <div className="space-y-5">
       <div>
@@ -46,7 +58,7 @@ export default function EmployeeMonitoringPage() {
           Employee Monitoring
         </h1>
         <p className="text-sm text-slate-500 mt-0.5">
-          Every active employee's lead pipeline, broken down by status — spot who's overloaded, who has stale leads, and who's converting.
+          Every active employee's lead pipeline, broken down by status — spot who's overloaded, who has stale leads, and who's converting. Click any number to see those leads.
         </p>
       </div>
 
@@ -92,30 +104,51 @@ export default function EmployeeMonitoringPage() {
                 {filtered.map((emp) => {
                   const rate = parseFloat(emp.conversionRate);
                   const rateColor = rate >= 50 ? 'text-green-600' : rate >= 25 ? 'text-yellow-600' : 'text-red-500';
+
+                  const Cell = ({ value, status, className }: { value: number; status?: string; className?: string }) => (
+                    <td className="px-4 py-3.5 text-right">
+                      <button
+                        onClick={() => goToLeads(emp.id, status)}
+                        className={cn('text-sm hover:underline hover:opacity-80 transition-opacity', className)}
+                        title={`View ${emp.name}'s ${status ? status.replace(/_/g, ' ').toLowerCase() : 'assigned'} leads`}
+                      >
+                        {value}
+                      </button>
+                    </td>
+                  );
+
                   return (
                     <tr key={emp.id} className="border-b border-slate-50 hover:bg-slate-50 transition-colors">
                       <td className="px-5 py-3.5">
-                        <div className="flex items-center gap-3 min-w-[180px]">
+                        <button
+                          onClick={() => goToLeads(emp.id)}
+                          className="flex items-center gap-3 min-w-[180px] text-left hover:opacity-80 transition-opacity"
+                        >
                           <Avatar name={emp.name} size="sm" />
                           <div className="min-w-0">
-                            <p className="text-sm font-medium text-slate-800 truncate">{emp.name}</p>
+                            <p className="text-sm font-medium text-slate-800 truncate hover:underline">{emp.name}</p>
                             <p className="text-xs text-slate-400 truncate">{emp.email}</p>
                           </div>
-                        </div>
+                        </button>
                       </td>
-                      <td className="px-4 py-3.5 text-right text-sm font-semibold text-slate-800">{emp.total}</td>
-                      <td className="px-4 py-3.5 text-right text-sm text-blue-600">{emp.fresh}</td>
-                      <td className="px-4 py-3.5 text-right text-sm text-slate-600">{emp.contacted}</td>
-                      <td className="px-4 py-3.5 text-right text-sm text-purple-600">{emp.interested}</td>
-                      <td className="px-4 py-3.5 text-right text-sm text-amber-600">{emp.followUpScheduled}</td>
-                      <td className="px-4 py-3.5 text-right text-sm font-semibold text-green-600">{emp.confirmed}</td>
-                      <td className="px-4 py-3.5 text-right text-sm text-red-500">{emp.lost}</td>
+                      <Cell value={emp.total} className="font-semibold text-slate-800" />
+                      <Cell value={emp.fresh} status="NEW" className="text-blue-600" />
+                      <Cell value={emp.contacted} status="CONTACTED" className="text-slate-600" />
+                      <Cell value={emp.interested} status="INTERESTED" className="text-purple-600" />
+                      <Cell value={emp.followUpScheduled} status="FOLLOW_UP_SCHEDULED" className="text-amber-600" />
+                      <Cell value={emp.confirmed} status="CONFIRMED" className="font-semibold text-green-600" />
+                      <Cell value={emp.lost} status="LOST" className="text-red-500" />
                       <td className="px-4 py-3.5 text-right">
-                        {emp.overdue > 0 ? (
-                          <span className="badge badge-danger text-xs">{emp.overdue}</span>
-                        ) : (
-                          <span className="text-sm text-slate-300">0</span>
-                        )}
+                        <button
+                          onClick={() => goToLeads(emp.id, 'FOLLOW_UP_SCHEDULED')}
+                          title={`View ${emp.name}'s follow-up leads`}
+                        >
+                          {emp.overdue > 0 ? (
+                            <span className="badge badge-danger text-xs hover:opacity-80 transition-opacity">{emp.overdue}</span>
+                          ) : (
+                            <span className="text-sm text-slate-300">0</span>
+                          )}
+                        </button>
                       </td>
                       <td className="px-4 py-3.5 text-right">
                         <span className={cn('text-sm font-semibold', rateColor)}>{emp.conversionRate}%</span>
