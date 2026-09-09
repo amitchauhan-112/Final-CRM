@@ -4,6 +4,7 @@ import {
   TrendingUp, Calendar, Download, Star, Clock, Target,
   ArrowUp, ArrowDown, Minus, Trophy, Zap, Plus,
   ChevronRight, Flag, BarChart2,
+  Sparkles, PhoneOff, Phone, CalendarCheck, XCircle,
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -502,6 +503,69 @@ export default function AdminDashboard() {
           iconColor="text-red-600"
           onClick={() => navigate('/admin/leads?status=FOLLOW_UP_SCHEDULED')}
         />
+      </div>
+
+      {/* Row 1.5 — By Status (mirrors the same breakdown shown on the Employee Dashboard) */}
+      <div>
+        <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">By Status</p>
+        <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-7 gap-3">
+          <StatsCard
+            label="Fresh"
+            value={stats?.byStatus?.NEW ?? 0}
+            icon={Sparkles}
+            iconBg="bg-sky-100"
+            iconColor="text-sky-600"
+            onClick={() => navigate('/admin/leads?status=NEW')}
+          />
+          <StatsCard
+            label="Not Contacted"
+            value={stats?.byStatus?.NOT_CONTACTED ?? 0}
+            icon={PhoneOff}
+            iconBg="bg-slate-100"
+            iconColor="text-slate-500"
+            onClick={() => navigate('/admin/leads?status=NOT_CONTACTED')}
+          />
+          <StatsCard
+            label="Contacted"
+            value={stats?.byStatus?.CONTACTED ?? 0}
+            icon={Phone}
+            iconBg="bg-amber-100"
+            iconColor="text-amber-600"
+            onClick={() => navigate('/admin/leads?status=CONTACTED')}
+          />
+          <StatsCard
+            label="Interested"
+            value={stats?.byStatus?.INTERESTED ?? 0}
+            icon={TrendingUp}
+            iconBg="bg-violet-100"
+            iconColor="text-violet-600"
+            onClick={() => navigate('/admin/leads?status=INTERESTED')}
+          />
+          <StatsCard
+            label="Follow-up Sched."
+            value={stats?.byStatus?.FOLLOW_UP_SCHEDULED ?? 0}
+            icon={CalendarCheck}
+            iconBg="bg-orange-100"
+            iconColor="text-orange-600"
+            onClick={() => navigate('/admin/leads?status=FOLLOW_UP_SCHEDULED')}
+          />
+          <StatsCard
+            label="Confirmed"
+            value={stats?.byStatus?.CONFIRMED ?? 0}
+            icon={CheckCircle}
+            iconBg="bg-green-100"
+            iconColor="text-green-600"
+            onClick={() => navigate('/admin/leads?status=CONFIRMED')}
+          />
+          <StatsCard
+            label="Lost"
+            value={stats?.byStatus?.LOST ?? 0}
+            icon={XCircle}
+            iconBg="bg-red-100"
+            iconColor="text-red-600"
+            onClick={() => navigate('/admin/leads?status=LOST')}
+          />
+        </div>
       </div>
 
       {/* Row 2 — Quick Actions */}
