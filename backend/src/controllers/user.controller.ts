@@ -423,6 +423,7 @@ export const getEmployeePerformance = async (req: AuthenticatedRequest, res: Res
       select: {
         id: true, name: true, email: true,
         assignedLeads: {
+          where: { deletedAt: null }, // exclude soft-deleted leads, same as every other query in this file
           select: { status: true, createdAt: true, followUpDate: true, followUpDone: true },
         },
       },
