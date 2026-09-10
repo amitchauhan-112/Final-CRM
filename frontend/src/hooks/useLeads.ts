@@ -128,7 +128,7 @@ export function useCreateLead() {
 export function useUpdateLead() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, ...payload }: Partial<Lead> & { id: string }) => {
+    mutationFn: async ({ id, ...payload }: Partial<Lead> & { id: string; statusNote?: string }) => {
       const { data } = await api.put(`/leads/${id}`, payload);
       return data;
     },

@@ -123,7 +123,9 @@ export default function AdminLeadsPage() {
       toast.error('All selected leads are confirmed bookings — they cannot be bulk-updated.');
       return;
     }
-    Promise.all(eligibleIds.map((id) => updateLead.mutateAsync({ id, status: bulkStatus }))).then(() => {
+    const note = window.prompt(`Add a note for moving ${eligibleIds.length} lead(s) to "${bulkStatus.replace(/_/g, ' ')}":`)?.trim();
+    if (!note) { toast.error('A note is required to change status.'); return; }
+    Promise.all(eligibleIds.map((id) => updateLead.mutateAsync({ id, status: bulkStatus, statusNote: note }))).then(() => {
       setBulkSelected([]);
       if (skipped > 0) {
         toast.success(`Updated ${eligibleIds.length} lead${eligibleIds.length !== 1 ? 's' : ''}. ${skipped} confirmed booking${skipped !== 1 ? 's' : ''} skipped.`);
@@ -432,7 +434,11 @@ export default function AdminLeadsPage() {
         <KanbanBoard
           leads={leads}
           onOpenDetail={(id) => setDetailLeadId(id)}
-          onStatusChange={(id, s) => updateLead.mutate({ id, status: s })}
+          onStatusChange={(id, s) => {
+            const note = window.prompt(`Add a note for moving this lead to "${s.replace(/_/g, ' ')}":`)?.trim();
+            if (!note) { toast.error('A note is required to change status.'); return; }
+            updateLead.mutate({ id, status: s, statusNote: note });
+          }}
         />
       ) : (
         <>

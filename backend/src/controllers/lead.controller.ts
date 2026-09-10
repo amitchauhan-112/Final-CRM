@@ -289,9 +289,23 @@ export const updateLead = async (req: AuthenticatedRequest, res: Response): Prom
       res.status(403).json({ success: false, error: 'Access denied' }); return;
     }
 
-    const { status, notes, followUpDate, followUpNotes, followUpDone, campaignId, assignedToId, priority, lostReason, lostReasonOther, tagIds, budget, ...rest } = req.body;
+    const { status, notes, followUpDate, followUpNotes, followUpDone, campaignId, assignedToId, priority, lostReason, lostReasonOther, tagIds, budget, statusNote, ...rest } = req.body;
     if (!isWholeAmount(budget)) { res.status(400).json({ success: false, error: WHOLE_AMOUNT_ERROR }); return; }
     const updateData: Record<string, unknown> = { ...rest, ...(budget !== undefined ? { budget: budget === null || budget === '' ? null : Number(budget) } : {}) };
+
+    // Every status change must be documented. Two flows are exempt because
+    // they already capture their own context: CONFIRMED goes through the
+    // booking-confirmation wizard, and FOLLOW_UP_SCHEDULED carries its own
+    // follow-up notes (used as the note here).
+    const isStatusChange = status !== undefined && status !== existing.status;
+    const followUpNote = (followUpNotes || '').trim();
+    const providedStatusNote = (statusNote || '').trim();
+    const resolvedStatusNote =
+      status === 'FOLLOW_UP_SCHEDULED' && followUpNote ? followUpNote : providedStatusNote;
+    if (isStatusChange && status !== 'CONFIRMED' && !resolvedStatusNote) {
+      res.status(400).json({ success: false, error: 'A note is required when changing a lead\'s status' });
+      return;
+    }
 
     // "First response" — set exactly once, on this lead's first-ever
     // employee/admin-initiated update (any field), never touched again.
@@ -395,12 +409,14 @@ export const updateLead = async (req: AuthenticatedRequest, res: Response): Prom
       // Auto-posted into the same merged Notes/Comments feed everyone already
       // reads — so a status change made today is visible with its own date,
       // right alongside any manual notes, without anyone needing to type the
-      // date themselves or go dig through the separate Activity tab.
+      // date themselves or go dig through the separate Activity tab. The
+      // mandatory note the user typed is appended so the "why" lives with it.
+      const header = `🔄 Status changed: ${existing.status.replace(/_/g, ' ')} → ${status.replace(/_/g, ' ')}`;
       await prisma.leadComment.create({
         data: {
           leadId: id,
           authorId: req.user!.id,
-          content: `🔄 Status changed: ${existing.status.replace(/_/g, ' ')} → ${status.replace(/_/g, ' ')}`,
+          content: resolvedStatusNote ? `${header}\n${resolvedStatusNote}` : header,
         },
       });
     }

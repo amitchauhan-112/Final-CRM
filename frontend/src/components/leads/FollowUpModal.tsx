@@ -24,7 +24,8 @@ export default function FollowUpModal({ open, onConfirm, onCancel }: Props) {
   const handleConfirm = () => {
     if (!date) { setError('Please pick a follow-up date and time'); return; }
     if (new Date(date) <= new Date()) { setError('Follow-up must be in the future'); return; }
-    onConfirm(new Date(date).toISOString(), notes.trim() || undefined);
+    if (!notes.trim()) { setError('Add a note describing this follow-up'); return; }
+    onConfirm(new Date(date).toISOString(), notes.trim());
     setDate('');
     setNotes('');
     setError('');
@@ -59,12 +60,12 @@ export default function FollowUpModal({ open, onConfirm, onCancel }: Props) {
         </div>
 
         <div>
-          <label className="label">Notes (optional)</label>
+          <label className="label">Note <span className="text-red-500">*</span></label>
           <input
             value={notes}
-            onChange={(e) => setNotes(e.target.value)}
+            onChange={(e) => { setNotes(e.target.value); setError(''); }}
             className="input"
-            placeholder="Reminder note..."
+            placeholder="Why schedule a follow-up? (e.g. wants a call back next week to discuss dates)"
           />
         </div>
 

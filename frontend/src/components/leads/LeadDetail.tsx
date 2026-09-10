@@ -866,6 +866,7 @@ export default function LeadDetail({ leadId, open, onClose, isStarred, onToggleS
   const [transferReason, setTransferReason] = useState('');
   const [bookingOpen, setBookingOpen] = useState(false);
   const [pendingStatus, setPendingStatus] = useState<LeadStatus | null>(null);
+  const [statusNote, setStatusNote] = useState('');
   const [followUpModalOpen, setFollowUpModalOpen] = useState(false);
   const [outcomeModalOpen, setOutcomeModalOpen] = useState(false);
 
@@ -903,7 +904,14 @@ export default function LeadDetail({ leadId, open, onClose, isStarred, onToggleS
 
   const handleSaveStatus = () => {
     if (!lead || !pendingStatus) return;
-    updateLead.mutate({ id: lead.id, status: pendingStatus }, { onSuccess: () => setPendingStatus(null) });
+    if (!statusNote.trim()) {
+      toast.error('Add a note describing this status change.');
+      return;
+    }
+    updateLead.mutate(
+      { id: lead.id, status: pendingStatus, statusNote: statusNote.trim() },
+      { onSuccess: () => { setPendingStatus(null); setStatusNote(''); } },
+    );
   };
 
   // Closing (X button, Escape key, or backdrop click) is blocked while a
@@ -937,7 +945,7 @@ export default function LeadDetail({ leadId, open, onClose, isStarred, onToggleS
   const handleOutcomeInterested = () => {
     if (!lead) return;
     updateLead.mutate(
-      { id: lead.id, status: 'INTERESTED', followUpDone: true },
+      { id: lead.id, status: 'INTERESTED', followUpDone: true, statusNote: 'Follow-up completed — lead still interested, no concrete date yet.' },
       { onSuccess: () => setOutcomeModalOpen(false) }
     );
   };
@@ -953,7 +961,11 @@ export default function LeadDetail({ leadId, open, onClose, isStarred, onToggleS
   const handleOutcomeLost = (reason: string, otherText?: string) => {
     if (!lead) return;
     updateLead.mutate(
-      { id: lead.id, status: 'LOST', followUpDone: true, lostReason: reason, lostReasonOther: otherText },
+      {
+        id: lead.id, status: 'LOST', followUpDone: true,
+        lostReason: reason, lostReasonOther: otherText,
+        statusNote: `Marked lost — ${otherText?.trim() || reason}`,
+      },
       { onSuccess: () => setOutcomeModalOpen(false) }
     );
   };
@@ -962,6 +974,7 @@ export default function LeadDetail({ leadId, open, onClose, isStarred, onToggleS
   // lead's real status changes underneath us.
   useEffect(() => {
     setPendingStatus(null);
+    setStatusNote('');
   }, [leadId, lead?.status]);
 
   const handleEdit = (formData: any) => {
@@ -1108,18 +1121,29 @@ export default function LeadDetail({ leadId, open, onClose, isStarred, onToggleS
                     isEmployee={user?.role === 'EMPLOYEE'}
                   />
                   {pendingStatus && (
-                    <div className="flex items-center justify-between gap-3 mt-2.5 px-3 py-2 bg-amber-50 border border-amber-200 rounded-xl">
+                    <div className="mt-2.5 px-3 py-2.5 bg-amber-50 border border-amber-200 rounded-xl space-y-2">
                       <p className="text-xs text-amber-700">
-                        Status set to <strong>{leadStatusConfig[pendingStatus].label}</strong> — not saved yet.
+                        Status set to <strong>{leadStatusConfig[pendingStatus].label}</strong> — add a note to save.
                       </p>
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        <button onClick={() => setPendingStatus(null)} className="text-xs font-medium text-slate-500 hover:text-slate-700">
+                      <textarea
+                        value={statusNote}
+                        onChange={(e) => setStatusNote(e.target.value)}
+                        rows={2}
+                        autoFocus
+                        placeholder="Why is the status changing? (e.g. called, no answer — will retry tomorrow)"
+                        className="input text-sm w-full resize-none"
+                      />
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => { setPendingStatus(null); setStatusNote(''); }}
+                          className="text-xs font-medium text-slate-500 hover:text-slate-700"
+                        >
                           Discard
                         </button>
                         <button
                           onClick={handleSaveStatus}
-                          disabled={updateLead.isPending}
-                          className="btn-primary py-1 px-3 text-xs gap-1.5"
+                          disabled={updateLead.isPending || !statusNote.trim()}
+                          className="btn-primary py-1 px-3 text-xs gap-1.5 disabled:opacity-50"
                         >
                           <Save className="w-3 h-3" />
                           {updateLead.isPending ? 'Saving…' : 'Save Changes'}

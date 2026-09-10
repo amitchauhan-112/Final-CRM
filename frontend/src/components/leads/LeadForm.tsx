@@ -311,7 +311,7 @@ export default function LeadForm({ defaultValues, onSubmit, isLoading, onCancel 
           </div>
           <div>
             <label className="label">Status <span className="text-red-500">*</span></label>
-            <select {...register('status', { required: true })} className="input" disabled={isConfirmedLead}>
+            <select {...register('status', { required: true })} className="input" disabled={isConfirmedLead || isEditMode}>
               {statusOptions.map((s) => (
                 <option key={s} value={s}>
                   {s === 'NEW' ? 'New'
@@ -324,12 +324,11 @@ export default function LeadForm({ defaultValues, onSubmit, isLoading, onCancel 
                 </option>
               ))}
             </select>
-            {isConfirmedLead && (
+            {isConfirmedLead ? (
               <p className="text-xs text-amber-600 mt-1">Confirmed — status is permanently locked and can never change again.</p>
-            )}
-            {isEmployee && isEditMode && !isConfirmedLead && (
-              <p className="text-xs text-slate-400 mt-1">Status can only move forward in the workflow.</p>
-            )}
+            ) : isEditMode ? (
+              <p className="text-xs text-slate-400 mt-1">Change status from the lead's detail view — it requires a note.</p>
+            ) : null}
           </div>
           <div>
             <label className="label">Priority</label>
