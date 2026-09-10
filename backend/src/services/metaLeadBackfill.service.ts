@@ -76,6 +76,24 @@ function buildFormResponsesBlock(fieldData: FieldDatum[], formName: string): str
   return lines.length ? `${headerLine}\n\n${lines.join('\n')}` : headerLine;
 }
 
+// Extracts a field only if it's a clean, specific answer — skips catch-all
+// questions ("destination, date, or vibe...") and paragraph-length free text,
+// which belong in the message block, not a structured field.
+function extractShortField(fieldData: FieldDatum[], patterns: string[]): string | undefined {
+  for (const p of patterns) {
+    const match = fieldData.find((f) => f.name?.toLowerCase().includes(p));
+    if (!match?.values?.length) continue;
+    const q = (match.name || '').toLowerCase();
+    // A question mentioning several of these is a catch-all, not a single field.
+    const catchAllHits = ['destination', 'date', 'vibe', 'requirement', 'anything else', 'drop your']
+      .filter((k) => q.includes(k)).length;
+    if (catchAllHits >= 2) continue;
+    const val = tidy(match.values[0]);
+    if (val && val.length <= 60) return val;
+  }
+  return undefined;
+}
+
 // "just_me" → 1; "5–8_travellers" → 8; "2-4 travellers" → 4. Best-effort
 // planning number, undefined if nothing numeric.
 function parseGroupSize(raw?: string): number | undefined {
@@ -156,8 +174,8 @@ export async function backfillLeadsForOrg(orgId: string, since?: Date): Promise<
 
         // Pull the rest of the form answers into structured fields + a
         // readable block, so sales isn't stuck with just name/phone/email.
-        const destination = extractField(fieldData, ['destination', 'where_do_you', 'which_place', 'location']);
-        const preferredDate = extractField(fieldData, ['date', 'when_are_you', 'travel_month', 'preferred_dates']);
+        const destination = extractShortField(fieldData, ['destination', 'where_do_you', 'which_place', 'location']);
+        const preferredDate = extractShortField(fieldData, ['when_are_you', 'travel_month', 'preferred_dates', 'departure', 'travel_date']);
         const groupSize = parseGroupSize(extractField(fieldData, ['travel', 'traveller', 'traveler', 'how_many', 'group', 'people']));
         const formResponses = buildFormResponsesBlock(fieldData, form.name);
 
@@ -242,7 +260,7 @@ export interface EnrichResult {
   errors: string[];
 }
 
-export async function enrichExistingMetaLeads(orgId: string): Promise<EnrichResult> {
+export async function enrichExistingMetaLeads(orgId: string, opts?: { rerun?: boolean }): Promise<EnrichResult> {
   const result: EnrichResult = { scanned: 0, enriched: 0, skipped: 0, errors: [] };
 
   const conn = await (prisma as any).metaConnection.findUnique({ where: { organizationId: orgId } });
@@ -264,7 +282,8 @@ export async function enrichExistingMetaLeads(orgId: string): Promise<EnrichResu
 
   for (const lead of leads) {
     result.scanned++;
-    if (lead.message?.startsWith('Meta Lead Ad — form "')) { result.skipped++; continue; }
+    const alreadyEnriched = lead.message?.startsWith('Meta Lead Ad — form "');
+    if (alreadyEnriched && !opts?.rerun) { result.skipped++; continue; }
 
     try {
       const { data } = await axios.get(`${META_BASE}/${lead.instagramLeadId}`, {
@@ -275,18 +294,19 @@ export async function enrichExistingMetaLeads(orgId: string): Promise<EnrichResu
       if (!fieldData.length) { result.skipped++; continue; }
 
       const formName: string = data?.campaign_name || 'Meta Lead Ad';
-      const destination = extractField(fieldData, ['destination', 'where_do_you', 'which_place', 'location']);
-      const preferredDate = extractField(fieldData, ['date', 'when_are_you', 'travel_month', 'preferred_dates']);
+      const destination = extractShortField(fieldData, ['destination', 'where_do_you', 'which_place', 'location']);
+      const preferredDate = extractShortField(fieldData, ['when_are_you', 'travel_month', 'preferred_dates', 'departure', 'travel_date']);
       const groupSize = parseGroupSize(extractField(fieldData, ['travel', 'traveller', 'traveler', 'how_many', 'group', 'people']));
 
+      // On a re-run we re-derive the structured fields (fixing earlier
+      // over-eager matches); on a first pass we only fill blanks.
       await prisma.lead.update({
         where: { id: lead.id },
         data: {
           message: buildFormResponsesBlock(fieldData, formName),
-          // Only fill blanks — never overwrite something sales already set.
-          destination: lead.destination || (destination ? tidy(destination) : undefined),
-          preferredDate: lead.preferredDate || (preferredDate ? tidy(preferredDate) : undefined),
-          groupSize: lead.groupSize ?? groupSize,
+          destination: opts?.rerun ? (destination ?? null) : (lead.destination || destination),
+          preferredDate: opts?.rerun ? (preferredDate ?? null) : (lead.preferredDate || preferredDate),
+          groupSize: opts?.rerun ? (groupSize ?? null) : (lead.groupSize ?? groupSize),
         },
       });
       result.enriched++;

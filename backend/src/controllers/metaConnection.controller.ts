@@ -163,7 +163,8 @@ export const enrichExistingLeads = async (req: AuthenticatedRequest, res: Respon
     const orgId = req.user?.organizationId;
     if (!orgId) { res.status(400).json({ success: false, error: 'No organization attached to user' }); return; }
 
-    const result = await enrichExistingMetaLeads(orgId);
+    const rerun = req.query.rerun === '1' || req.query.rerun === 'true';
+    const result = await enrichExistingMetaLeads(orgId, { rerun });
     res.json({
       success: true,
       message: `Scanned ${result.scanned} Meta lead(s) — enriched ${result.enriched}, ${result.skipped} already had form data or none available${result.errors.length ? `, ${result.errors.length} error(s)` : ''}`,
