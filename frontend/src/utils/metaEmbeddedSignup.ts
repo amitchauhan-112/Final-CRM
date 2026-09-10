@@ -82,17 +82,6 @@ export async function launchWhatsAppEmbeddedSignup(): Promise<EmbeddedSignupResu
       try { data = JSON.parse(event.data); } catch { return; }
       if (data?.type !== 'WA_EMBEDDED_SIGNUP') return;
 
-      // Diagnostic — persists every raw message this listener ever receives,
-      // independent of the resolve/reject flow below, so it survives even if
-      // the tab loses its in-memory state (backgrounded/discarded) before the
-      // rest of the flow finishes. Check via DevTools console:
-      //   JSON.parse(localStorage.getItem('wa_embedded_signup_debug'))
-      try {
-        const log = JSON.parse(localStorage.getItem('wa_embedded_signup_debug') || '[]');
-        log.push({ at: new Date().toISOString(), data });
-        localStorage.setItem('wa_embedded_signup_debug', JSON.stringify(log.slice(-20)));
-      } catch { /* ignore */ }
-
       const evt = String(data.event ?? '').toUpperCase();
       if (FINISH_EVENTS.has(evt)) {
         sessionData = {
