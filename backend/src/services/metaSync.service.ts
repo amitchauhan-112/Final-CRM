@@ -164,6 +164,22 @@ export async function runMetaSync(): Promise<void> {
           ? existingCrmCampaigns.find((c) => c.metaCampaignId === mc.id)
           : null;
 
+        // Meta keeps returning deleted campaigns in the list (just flagged
+        // DELETED) — without this they'd get re-saved forever as an "ENDED"
+        // campaign that never leaves the CRM. Treat DELETED the same as
+        // "gone from Meta": archive it if we have it, skip it if we don't.
+        if (effective.toUpperCase() === 'DELETED') {
+          if (existing && !(existing as any).archivedAt) {
+            const org = await prisma.organization.findUnique({
+              where: { id: orgId },
+              select: { slug: true },
+            });
+            await archiveCampaign(existing.id, orgId, org?.slug ?? 'unknown');
+            logger.info(`[metaSync] Campaign "${mc.name}" (${mc.id}) deleted on Meta — archived in CRM`);
+          }
+          continue;
+        }
+
         if (!existing) {
           // New campaign — create in CRM
           const created = await prisma.campaign.create({

@@ -272,6 +272,9 @@ model Lead {
 
   lostReason      String?
   lostReasonOther String?
+  // Set when status becomes LOST, cleared if the lead is ever moved back
+  // out of LOST — so it always reads as "lost since X" or null.
+  lostAt          DateTime?
 
   destination String?
   campaign    Campaign? @relation(fields: [campaignId], references: [id])

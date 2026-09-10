@@ -324,6 +324,14 @@ export const updateLead = async (req: AuthenticatedRequest, res: Response): Prom
       if (status === 'LOST') {
         updateData.lostReason = lostReason || existing.lostReason || null;
         updateData.lostReasonOther = lostReason === 'Other' ? (lostReasonOther || null) : null;
+        // Stamp when it was marked lost — but don't reset it if it was
+        // already LOST and is just being re-saved.
+        if (existing.status !== 'LOST') updateData.lostAt = new Date();
+      } else if (existing.status === 'LOST') {
+        // Moved back out of LOST — clear the marker so it doesn't read stale.
+        updateData.lostAt = null;
+        updateData.lostReason = null;
+        updateData.lostReasonOther = null;
       }
     }
     if (priority !== undefined) updateData.priority = priority;

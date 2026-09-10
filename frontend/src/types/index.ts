@@ -157,6 +157,7 @@ export interface Lead {
   updatedAt: string;
   capturedAt: string;
   firstRespondedAt?: string | null;
+  lostAt?: string | null;
   deletedAt?: string;
   deletedReason?: string;
   deletedById?: string;

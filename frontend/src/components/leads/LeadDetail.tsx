@@ -847,6 +847,7 @@ function OverviewTab({ lead, canAct, onUpdateLead, onFollowUpDoneClick, booking,
           <InfoCell icon={Calendar} label="Lead Created" value={formatDateTime(lead.createdAt)} />
           <InfoCell icon={Clock} label="Captured in CRM" value={formatDateTime(lead.capturedAt)} />
           <InfoCell icon={CheckCircle} label="First Response" value={lead.firstRespondedAt ? formatDateTime(lead.firstRespondedAt) : 'Not yet responded'} />
+          <InfoCell icon={X} label="Marked Lost" value={lead.lostAt ? formatDateTime(lead.lostAt) : undefined} />
           <InfoCell icon={Calendar} label="Last Updated" value={formatDateTime(lead.updatedAt)} />
         </div>
       </div>
