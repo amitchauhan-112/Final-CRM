@@ -51,12 +51,19 @@ export const campaignStatusConfig: Record<CampaignStatus, { label: string; color
 
 export const formatDate = (date: string | Date | undefined | null): string => {
   if (!date) return '—';
-  return new Intl.DateTimeFormat('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(date));
+  const d = new Date(date);
+  // Free-text values sometimes land in date fields (e.g. a lead's
+  // preferredDate) — Intl.format() THROWS on an invalid Date, so guard it
+  // and fall back to showing the raw text.
+  if (isNaN(d.getTime())) return String(date);
+  return new Intl.DateTimeFormat('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }).format(d);
 };
 
 export const formatDateTime = (date: string | Date | undefined | null): string => {
   if (!date) return '—';
-  return new Intl.DateTimeFormat('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(date));
+  const d = new Date(date);
+  if (isNaN(d.getTime())) return String(date);
+  return new Intl.DateTimeFormat('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(d);
 };
 
 export const formatRelativeTime = (date: string | Date): string => {

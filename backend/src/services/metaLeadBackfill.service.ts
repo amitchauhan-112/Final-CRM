@@ -76,24 +76,6 @@ function buildFormResponsesBlock(fieldData: FieldDatum[], formName: string): str
   return lines.length ? `${headerLine}\n\n${lines.join('\n')}` : headerLine;
 }
 
-// Extracts a field only if it's a clean, specific answer — skips catch-all
-// questions ("destination, date, or vibe...") and paragraph-length free text,
-// which belong in the message block, not a structured field.
-function extractShortField(fieldData: FieldDatum[], patterns: string[]): string | undefined {
-  for (const p of patterns) {
-    const match = fieldData.find((f) => f.name?.toLowerCase().includes(p));
-    if (!match?.values?.length) continue;
-    const q = (match.name || '').toLowerCase();
-    // A question mentioning several of these is a catch-all, not a single field.
-    const catchAllHits = ['destination', 'date', 'vibe', 'requirement', 'anything else', 'drop your']
-      .filter((k) => q.includes(k)).length;
-    if (catchAllHits >= 2) continue;
-    const val = tidy(match.values[0]);
-    if (val && val.length <= 60) return val;
-  }
-  return undefined;
-}
-
 // "just_me" → 1; "5–8_travellers" → 8; "2-4 travellers" → 4. Best-effort
 // planning number, undefined if nothing numeric.
 function parseGroupSize(raw?: string): number | undefined {
@@ -172,10 +154,9 @@ export async function backfillLeadsForOrg(orgId: string, since?: Date): Promise<
         const phone = extractField(fieldData, ['phone', 'whatsapp', 'mobile', 'contact_number']);
         const email = extractField(fieldData, ['email']);
 
-        // Pull the rest of the form answers into structured fields + a
-        // readable block, so sales isn't stuck with just name/phone/email.
-        const destination = extractShortField(fieldData, ['destination', 'where_do_you', 'which_place', 'location']);
-        const preferredDate = extractShortField(fieldData, ['when_are_you', 'travel_month', 'preferred_dates', 'departure', 'travel_date']);
+        // Full readable block of every answer + a best-effort group size
+        // (the only field that parses cleanly). destination/preferredDate
+        // answers are too free-text across forms to trust structurally.
         const groupSize = parseGroupSize(extractField(fieldData, ['travel', 'traveller', 'traveler', 'how_many', 'group', 'people']));
         const formResponses = buildFormResponsesBlock(fieldData, form.name);
 
@@ -196,8 +177,6 @@ export async function backfillLeadsForOrg(orgId: string, since?: Date): Promise<
           name,
           phone,
           email,
-          destination: destination ? tidy(destination) : undefined,
-          preferredDate: preferredDate ? tidy(preferredDate) : undefined,
           groupSize,
           source: 'META_ADS',
           message: formResponses,
@@ -294,19 +273,20 @@ export async function enrichExistingMetaLeads(orgId: string, opts?: { rerun?: bo
       if (!fieldData.length) { result.skipped++; continue; }
 
       const formName: string = data?.campaign_name || 'Meta Lead Ad';
-      const destination = extractShortField(fieldData, ['destination', 'where_do_you', 'which_place', 'location']);
-      const preferredDate = extractShortField(fieldData, ['when_are_you', 'travel_month', 'preferred_dates', 'departure', 'travel_date']);
+      // Only groupSize is safe to map — it parses to a clean integer or
+      // nothing. destination/preferredDate answers across forms are too
+      // free-text ("Ggg", "How much is the package", "Himachal") to trust
+      // in a structured field; that detail stays in the message block.
       const groupSize = parseGroupSize(extractField(fieldData, ['travel', 'traveller', 'traveler', 'how_many', 'group', 'people']));
 
-      // On a re-run we re-derive the structured fields (fixing earlier
-      // over-eager matches); on a first pass we only fill blanks.
       await prisma.lead.update({
         where: { id: lead.id },
         data: {
           message: buildFormResponsesBlock(fieldData, formName),
-          destination: opts?.rerun ? (destination ?? null) : (lead.destination || destination),
-          preferredDate: opts?.rerun ? (preferredDate ?? null) : (lead.preferredDate || preferredDate),
           groupSize: opts?.rerun ? (groupSize ?? null) : (lead.groupSize ?? groupSize),
+          // A re-run also clears the free-text garbage an earlier pass wrote
+          // into preferredDate (which broke date formatting on the list).
+          ...(opts?.rerun ? { preferredDate: null } : {}),
         },
       });
       result.enriched++;
