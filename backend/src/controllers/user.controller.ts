@@ -436,6 +436,7 @@ export const getEmployeePerformance = async (req: AuthenticatedRequest, res: Res
       const leads = emp.assignedLeads;
       const total = leads.length;
       const fresh = leads.filter((l) => l.status === 'NEW').length;
+      const notContacted = leads.filter((l) => l.status === 'NOT_CONTACTED').length;
       const contacted = leads.filter((l) => l.status === 'CONTACTED').length;
       const interested = leads.filter((l) => l.status === 'INTERESTED').length;
       const followUpScheduled = leads.filter((l) => l.status === 'FOLLOW_UP_SCHEDULED').length;
@@ -449,7 +450,7 @@ export const getEmployeePerformance = async (req: AuthenticatedRequest, res: Res
 
       return {
         id: emp.id, name: emp.name, email: emp.email, total,
-        fresh, contacted, interested, followUpScheduled, confirmed, lost, active, overdue,
+        fresh, notContacted, contacted, interested, followUpScheduled, confirmed, lost, active, overdue,
         conversionRate,
       };
     });

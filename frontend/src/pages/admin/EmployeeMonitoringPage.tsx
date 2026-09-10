@@ -6,7 +6,7 @@ import { Skeleton } from '../../components/ui/Skeleton';
 import Avatar from '../../components/ui/Avatar';
 import { cn } from '../../utils/helpers';
 
-type SortKey = 'total' | 'fresh' | 'contacted' | 'interested' | 'followUpScheduled' | 'confirmed' | 'lost' | 'overdue' | 'conversionRate';
+type SortKey = 'total' | 'fresh' | 'notContacted' | 'contacted' | 'interested' | 'followUpScheduled' | 'confirmed' | 'lost' | 'overdue' | 'conversionRate';
 
 // Maps each column to the Lead status its cell should filter the Leads page
 // by when clicked — undefined means "no status filter" (just this employee).
@@ -15,6 +15,7 @@ type SortKey = 'total' | 'fresh' | 'contacted' | 'interested' | 'followUpSchedul
 const COLUMNS: { key: SortKey; label: string; status?: string }[] = [
   { key: 'total', label: 'Assigned' },
   { key: 'fresh', label: 'Fresh', status: 'NEW' },
+  { key: 'notContacted', label: 'Not Contacted', status: 'NOT_CONTACTED' },
   { key: 'contacted', label: 'Contacted', status: 'CONTACTED' },
   { key: 'interested', label: 'Interested', status: 'INTERESTED' },
   { key: 'followUpScheduled', label: 'Follow-up', status: 'FOLLOW_UP_SCHEDULED' },
@@ -133,6 +134,7 @@ export default function EmployeeMonitoringPage() {
                       </td>
                       <Cell value={emp.total} className="font-semibold text-slate-800" />
                       <Cell value={emp.fresh} status="NEW" className="text-blue-600" />
+                      <Cell value={emp.notContacted} status="NOT_CONTACTED" className="text-slate-500" />
                       <Cell value={emp.contacted} status="CONTACTED" className="text-slate-600" />
                       <Cell value={emp.interested} status="INTERESTED" className="text-purple-600" />
                       <Cell value={emp.followUpScheduled} status="FOLLOW_UP_SCHEDULED" className="text-amber-600" />

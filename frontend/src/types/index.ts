@@ -276,6 +276,7 @@ export interface EmployeePerformance {
   email: string;
   total: number;
   fresh: number;
+  notContacted: number;
   contacted: number;
   interested: number;
   followUpScheduled: number;
