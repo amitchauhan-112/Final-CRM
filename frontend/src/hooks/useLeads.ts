@@ -172,17 +172,59 @@ export function useTransferLead() {
 export function useDeleteLead() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (id: string) => {
-      const { data } = await api.delete(`/leads/${id}`);
+    mutationFn: async ({ id, reason, otherText }: { id: string; reason: string; otherText?: string }) => {
+      const { data } = await api.delete(`/leads/${id}`, { data: { reason, otherText } });
       return data;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['leads'] });
       qc.invalidateQueries({ queryKey: ['lead-stats'] });
+      qc.invalidateQueries({ queryKey: ['deleted-leads'] });
       toast.success('Lead deleted successfully');
     },
     onError: (err: any) => {
       toast.error(err?.response?.data?.error || 'Failed to delete lead');
+    },
+  });
+}
+
+// ─── Deleted Leads (Admin-only) ──────────────────────────────────────────────
+
+export interface DeletedLeadFilters {
+  page?: number;
+  limit?: number;
+  search?: string;
+}
+
+export function useDeletedLeads(filters: DeletedLeadFilters = {}) {
+  return useQuery<PaginatedResponse<Lead>>({
+    queryKey: ['deleted-leads', filters],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      Object.entries(filters).forEach(([k, v]) => {
+        if (v !== undefined && v !== '') params.append(k, String(v));
+      });
+      const { data } = await api.get(`/leads/deleted?${params}`);
+      return data;
+    },
+  });
+}
+
+export function useRestoreLead() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { data } = await api.put(`/leads/${id}/restore`);
+      return data;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['deleted-leads'] });
+      qc.invalidateQueries({ queryKey: ['leads'] });
+      qc.invalidateQueries({ queryKey: ['lead-stats'] });
+      toast.success('Lead restored');
+    },
+    onError: (err: any) => {
+      toast.error(err?.response?.data?.error || 'Failed to restore lead');
     },
   });
 }

@@ -49,6 +49,7 @@ export default function OperationsDashboardPage() {
 
   const todaysOpsCards = stats
     ? [
+        { label: "Today's Field Bookings", value: stats.todaysFieldBookings, icon: Users2, iconBg: 'bg-primary-100', iconColor: 'text-primary-600', onClick: () => navigate(`${base}/departures`) },
         { label: 'Total Travelers Today', value: stats.totalTravelersToday, icon: Users, iconBg: 'bg-primary-100', iconColor: 'text-primary-600', onClick: () => navigate(`${base}/departures`) },
         { label: "Today's Check-ins", value: stats.todaysCheckins, icon: LogIn, iconBg: 'bg-mountain-100', iconColor: 'text-mountain-600', onClick: () => navigate(`${base}/departures`) },
         { label: "Today's Check-outs", value: stats.todaysCheckouts, icon: LogOut, iconBg: 'bg-mountain-100', iconColor: 'text-mountain-600', onClick: () => navigate(`${base}/departures`) },
@@ -62,6 +63,16 @@ export default function OperationsDashboardPage() {
         { label: 'Hotels Pending', value: stats.pendingHotelBookings, icon: Building2, iconBg: 'bg-amber-100', iconColor: 'text-amber-600', onClick: () => navigate(`${base}/departures`) },
         { label: 'Vehicles Booked', value: stats.bookedVehicleBookings, icon: CheckSquare, iconBg: 'bg-emerald-100', iconColor: 'text-emerald-600', onClick: () => navigate(`${base}/departures`) },
         { label: 'Vehicles Pending', value: stats.pendingVehicleBookings, icon: Truck, iconBg: 'bg-amber-100', iconColor: 'text-amber-600', onClick: () => navigate(`${base}/departures`) },
+      ]
+    : [];
+
+  // Auto-calculated by the FIT/GIT-aware room-requirement engine — never
+  // manually tallied by Ops. See roomRequirement.service.ts (backend).
+  const roomCards = stats
+    ? [
+        { label: 'Rooms Required', value: stats.roomsRequired, icon: BedDouble, iconBg: 'bg-primary-100', iconColor: 'text-primary-600', onClick: () => navigate(`${base}/rooms-required`) },
+        { label: 'Rooms Booked', value: stats.roomsBooked, icon: CheckSquare, iconBg: 'bg-emerald-100', iconColor: 'text-emerald-600', onClick: () => navigate(`${base}/rooms-required`) },
+        { label: 'Rooms Pending', value: stats.roomsPending, icon: BedDouble, iconBg: 'bg-amber-100', iconColor: 'text-amber-600', onClick: () => navigate(`${base}/rooms-required`) },
       ]
     : [];
 
@@ -138,6 +149,15 @@ export default function OperationsDashboardPage() {
             <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Hotels & Vehicles</h3>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               {hotelCards.map((c) => (
+                <StatsCard key={c.label} label={c.label} value={c.value} icon={c.icon} iconBg={c.iconBg} iconColor={c.iconColor} onClick={c.onClick} />
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Hotel Rooms</h3>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              {roomCards.map((c) => (
                 <StatsCard key={c.label} label={c.label} value={c.value} icon={c.icon} iconBg={c.iconBg} iconColor={c.iconColor} onClick={c.onClick} />
               ))}
             </div>

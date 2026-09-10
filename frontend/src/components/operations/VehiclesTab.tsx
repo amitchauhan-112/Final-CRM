@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { Truck, Plus, Pencil, Trash2, MapPin, Phone, User, IndianRupee, Info } from 'lucide-react';
+import { useForm, useWatch } from 'react-hook-form';
+import { Truck, Bus, Plus, Pencil, Trash2, MapPin, Phone, User, IndianRupee, Info } from 'lucide-react';
 import { useCreateVehicle, useUpdateVehicle, useDeleteVehicle } from '../../hooks/useOperations';
 import { useVendorAllocation } from '../../hooks/useVendorAllocation';
 import { VendorAllocationFields, VendorDivergenceConfirm } from './VendorAllocationFields';
@@ -67,8 +67,10 @@ function VehicleRequirements({ totalTravelers }: { totalTravelers: number }) {
 // ─── Form ─────────────────────────────────────────────────────────────────────
 
 interface VehicleForm {
+  transportType: 'CAB' | 'VOLVO';
   vehicleType?: string; vehicleNumber?: string; driverName?: string; driverMobile?: string;
   pickupTime?: string; pickupLocation?: string; status: string;
+  operatorName?: string; ticketReference?: string; numberOfTickets?: number; volvoDepartureTime?: string;
 }
 
 type VehicleSubmitData = VehicleForm & { vendorId?: string; vendorName?: string; vendorContact?: string; contactPerson?: string; rate?: number };
@@ -77,8 +79,9 @@ function VehicleFormModal({ open, onClose, defaultValues, onSubmit, isLoading }:
   open: boolean; onClose: () => void; defaultValues?: Partial<Vehicle>;
   onSubmit: (data: VehicleSubmitData) => void; isLoading: boolean;
 }) {
-  const { register, handleSubmit } = useForm<VehicleForm>({
+  const { register, handleSubmit, control, setValue } = useForm<VehicleForm>({
     defaultValues: {
+      transportType: defaultValues?.transportType ?? 'CAB',
       vehicleType: defaultValues?.vehicleType ?? '',
       vehicleNumber: defaultValues?.vehicleNumber ?? '',
       driverName: defaultValues?.driverName ?? '',
@@ -86,8 +89,15 @@ function VehicleFormModal({ open, onClose, defaultValues, onSubmit, isLoading }:
       pickupTime: defaultValues?.pickupTime ? defaultValues.pickupTime.slice(0, 16) : '',
       pickupLocation: defaultValues?.pickupLocation ?? '',
       status: defaultValues?.status ?? 'PENDING',
+      operatorName: defaultValues?.operatorName ?? '',
+      ticketReference: defaultValues?.ticketReference ?? '',
+      numberOfTickets: defaultValues?.numberOfTickets,
+      volvoDepartureTime: defaultValues?.volvoDepartureTime ? defaultValues.volvoDepartureTime.slice(0, 16) : '',
     },
   });
+
+  const transportType = useWatch({ control, name: 'transportType' });
+  const isVolvo = transportType === 'VOLVO';
 
   const alloc = useVendorAllocation('VEHICLE', {
     vendorId: defaultValues?.vendorId,
@@ -122,10 +132,26 @@ function VehicleFormModal({ open, onClose, defaultValues, onSubmit, isLoading }:
       </>}
     >
       <form id="vehicle-form" onSubmit={handleSubmit(handleFormSubmit)} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div>
-          <label className="label">Vehicle Type</label>
-          <input {...register('vehicleType')} className="input" placeholder="e.g. Tempo Traveller" />
+        <div className="sm:col-span-2">
+          <label className="label">Transport Type</label>
+          <div className="grid grid-cols-2 gap-3">
+            {(['CAB', 'VOLVO'] as const).map((t) => (
+              <button
+                key={t}
+                type="button"
+                onClick={() => setValue('transportType', t)}
+                className={cn(
+                  'flex items-center justify-center gap-2 p-2.5 rounded-xl border text-sm font-semibold transition-all',
+                  transportType === t ? 'border-primary-400 bg-primary-50 text-primary-700 ring-1 ring-primary-300' : 'border-slate-200 text-slate-500 hover:border-slate-300'
+                )}
+              >
+                {t === 'CAB' ? <Truck className="w-4 h-4" /> : <Bus className="w-4 h-4" />}
+                {t === 'CAB' ? 'Cab' : 'Volvo'}
+              </button>
+            ))}
+          </div>
         </div>
+
         <div>
           <label className="label">Status</label>
           <select {...register('status')} className="input">
@@ -134,26 +160,62 @@ function VehicleFormModal({ open, onClose, defaultValues, onSubmit, isLoading }:
             <option value="CANCELLED">Cancelled</option>
           </select>
         </div>
-        <div>
-          <label className="label">Vehicle Number</label>
-          <input {...register('vehicleNumber')} className="input" />
-        </div>
-        <div>
-          <label className="label">Pickup Time</label>
-          <input type="datetime-local" {...register('pickupTime')} className="input" />
-        </div>
-        <div>
-          <label className="label">Driver Name</label>
-          <input {...register('driverName')} className="input" />
-        </div>
-        <div>
-          <label className="label">Driver Mobile</label>
-          <input {...register('driverMobile')} className="input" />
-        </div>
-        <div className="sm:col-span-2">
-          <label className="label">Pickup Location</label>
-          <input {...register('pickupLocation')} className="input" />
-        </div>
+
+        {!isVolvo ? (
+          <>
+            <div>
+              <label className="label">Vehicle Type</label>
+              <input {...register('vehicleType')} className="input" placeholder="e.g. Tempo Traveller" />
+            </div>
+            <div>
+              <label className="label">Vehicle Number</label>
+              <input {...register('vehicleNumber')} className="input" />
+            </div>
+            <div>
+              <label className="label">Pickup Time</label>
+              <input type="datetime-local" {...register('pickupTime')} className="input" />
+            </div>
+            <div>
+              <label className="label">Driver Name</label>
+              <input {...register('driverName')} className="input" />
+            </div>
+            <div>
+              <label className="label">Driver Mobile</label>
+              <input {...register('driverMobile')} className="input" />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="label">Pickup Location</label>
+              <input {...register('pickupLocation')} className="input" />
+            </div>
+          </>
+        ) : (
+          <>
+            <div>
+              <label className="label">Operator</label>
+              <input {...register('operatorName')} className="input" placeholder="e.g. SRS Travels" />
+            </div>
+            <div>
+              <label className="label">Ticket / Booking Reference</label>
+              <input {...register('ticketReference')} className="input" />
+            </div>
+            <div>
+              <label className="label">Number of Tickets</label>
+              <input type="number" {...register('numberOfTickets')} className="input" />
+            </div>
+            <div>
+              <label className="label">Departure Time</label>
+              <input type="datetime-local" {...register('volvoDepartureTime')} className="input" />
+            </div>
+            <div>
+              <label className="label">Contact Person</label>
+              <input {...register('driverName')} className="input" placeholder="Operator's contact person" />
+            </div>
+            <div>
+              <label className="label">Contact Number</label>
+              <input {...register('driverMobile')} className="input" placeholder="Operator's contact number" />
+            </div>
+          </>
+        )}
 
         <VendorAllocationFields alloc={alloc} />
       </form>
@@ -205,15 +267,24 @@ export default function VehiclesTab({
             <div key={v.id} className="card p-4 space-y-2">
               <div className="flex items-start justify-between">
                 <div>
-                  <p className="font-semibold text-slate-800 text-sm">{v.vehicleType || 'Vehicle'}</p>
-                  {v.vehicleNumber && <p className="text-xs text-slate-400">{v.vehicleNumber}</p>}
+                  <p className="font-semibold text-slate-800 text-sm flex items-center gap-1.5">
+                    {v.transportType === 'VOLVO' ? <Bus className="w-3.5 h-3.5 text-slate-400" /> : <Truck className="w-3.5 h-3.5 text-slate-400" />}
+                    {v.transportType === 'VOLVO' ? (v.operatorName || 'Volvo') : (v.vehicleType || 'Cab')}
+                  </p>
+                  {v.transportType === 'VOLVO' ? (
+                    v.ticketReference && <p className="text-xs text-slate-400">{v.ticketReference}</p>
+                  ) : (
+                    v.vehicleNumber && <p className="text-xs text-slate-400">{v.vehicleNumber}</p>
+                  )}
                 </div>
                 <span className={cn('badge', STATUS_BADGE[v.status])}>{v.status}</span>
               </div>
               <div className="text-xs text-slate-500 space-y-1">
+                {v.transportType === 'VOLVO' && v.numberOfTickets != null && <p>{v.numberOfTickets} ticket(s)</p>}
+                {v.transportType === 'VOLVO' && v.volvoDepartureTime && <p>Departs: {new Date(v.volvoDepartureTime).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</p>}
                 {v.driverName && <p className="flex items-center gap-1"><User className="w-3 h-3" />{v.driverName} {v.driverMobile && `· ${v.driverMobile}`}</p>}
-                {v.pickupLocation && <p className="flex items-center gap-1"><MapPin className="w-3 h-3" />{v.pickupLocation}</p>}
-                {v.pickupTime && <p>Pickup: {new Date(v.pickupTime).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</p>}
+                {v.transportType !== 'VOLVO' && v.pickupLocation && <p className="flex items-center gap-1"><MapPin className="w-3 h-3" />{v.pickupLocation}</p>}
+                {v.transportType !== 'VOLVO' && v.pickupTime && <p>Pickup: {new Date(v.pickupTime).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</p>}
                 {v.vendorName && <p className="flex items-center gap-1"><Phone className="w-3 h-3" />{v.vendorName} {v.vendorContact && `· ${v.vendorContact}`}</p>}
                 {v.contactPerson && <p className="flex items-center gap-1"><User className="w-3 h-3" />{v.contactPerson}</p>}
                 {v.rate != null && <p className="flex items-center gap-1"><IndianRupee className="w-3 h-3" />{v.rate.toLocaleString('en-IN')}</p>}

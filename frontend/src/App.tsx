@@ -24,6 +24,7 @@ import AdminFeedbackPage from './pages/admin/FeedbackPage';
 import AdminActivityFeedPage from './pages/admin/ActivityFeedPage';
 import AdminReportsPage from './pages/admin/ReportsPage';
 import EmployeeMonitoringPage from './pages/admin/EmployeeMonitoringPage';
+import DeletedLeadsPage from './pages/admin/DeletedLeadsPage';
 import MastersPage from './pages/admin/MastersPage';
 import PackagesPage from './pages/admin/PackagesPage';
 import BookingsPage from './pages/admin/BookingsPage';
@@ -99,6 +100,7 @@ export default function App() {
         <Route path="automation-builder" element={<AutomationBuilderPage />} />
         <Route path="system-health" element={<SystemHealthPage />} />
         <Route path="leads" element={<AdminLeadsPage />} />
+        <Route path="leads/deleted" element={<DeletedLeadsPage />} />
         <Route path="campaigns" element={<AdminCampaignsPage />} />
         <Route path="employee-monitoring" element={<EmployeeMonitoringPage />} />
         <Route path="employees" element={<Navigate to="/admin/organization" replace />} />

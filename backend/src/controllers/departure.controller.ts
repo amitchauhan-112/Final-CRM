@@ -6,6 +6,7 @@ import { emitOperationsUpdated, notifyOperationsTeam, createNotification } from 
 import { generateOpsTasksFromItinerary, generateStandardOpsTasks } from './departureTask.controller.js';
 import { computeJourney } from './journey.controller.js';
 import { validateTravelerInput } from '../utils/travelerValidation.js';
+import { roomsForBookingList, computeFitGitRoomRequirement, emptyRoomCounts, addRoomCounts, ROOM_CAPACITY } from '../services/roomRequirement.service.js';
 
 const orgId = (req: AuthenticatedRequest) => req.user?.organizationId ?? null;
 const orgFilter = (req: AuthenticatedRequest) => (orgId(req) ? { organizationId: orgId(req) } : {});
@@ -276,7 +277,7 @@ export const getDashboardStats = async (req: AuthenticatedRequest, res: Response
     const in7 = addDays(today, 7);
     const in30 = addDays(today, 30);
 
-    const activeUpcomingFilter = { ...orgFilter(req), status: { in: ['UPCOMING', 'ACTIVE'] } } as const;
+    const activeUpcomingFilter = { ...orgFilter(req), status: { in: ['UPCOMING', 'ACTIVE'] } };
 
     const [
       todaysDepartures,
@@ -344,16 +345,13 @@ export const getDashboardStats = async (req: AuthenticatedRequest, res: Response
     }).length;
 
     const totalTravelersToday = todaysBookings.reduce((s, b) => s + b.numberOfTravelers, 0);
+    const todaysFieldBookings = todaysBookings.length;
     const totalTravelersOnTour = activeTripBookings.reduce((s, b) => s + b.numberOfTravelers, 0);
     const checklistProgressAvg = checklistDepartures.length
       ? Math.round(checklistDepartures.reduce((s, d) => s + computeChecklist(d as any).progress, 0) / checklistDepartures.length)
       : 0;
 
-    const CAP: Record<string, number> = { SINGLE: 1, DOUBLE: 2, TRIPLE: 3, QUAD: 4 };
-    const roomsRequired = activeUpcomingBookings.reduce((sum, b) => {
-      const cap = CAP[b.roomSharing] ?? 2;
-      return sum + Math.ceil(b.numberOfTravelers / cap);
-    }, 0);
+    const roomsRequired = roomsForBookingList(activeUpcomingBookings).total;
     const roomsBooked = bookedRoomsAgg._sum.numberOfRooms ?? 0;
     const roomsPending = Math.max(0, roomsRequired - roomsBooked);
 
@@ -361,7 +359,7 @@ export const getDashboardStats = async (req: AuthenticatedRequest, res: Response
       success: true,
       data: {
         todaysDepartures, upcomingDepartures, activeTrips, completedTrips,
-        totalTravelersToday,
+        totalTravelersToday, todaysFieldBookings,
         pendingHotelBookings: pendingHotels,
         bookedHotelBookings: bookedHotels,
         pendingVehicleBookings: pendingVehicles,
@@ -607,7 +605,6 @@ export const getDepartureActivity = async (req: AuthenticatedRequest, res: Respo
 // assumed to be one travelling party), then bucketed by room-sharing
 // preference and gender within that booking — children stay bucketed with
 // the rest of their booking's party rather than split out by gender.
-const ROOM_CAPACITY: Record<string, number> = { SINGLE: 1, DOUBLE: 2, TRIPLE: 3, QUAD: 4 };
 
 export const suggestRoomAllocation = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
@@ -673,7 +670,22 @@ export const updateDeparture = async (req: AuthenticatedRequest, res: Response):
     const existing = await prisma.departure.findFirst({ where: { id, ...orgFilter(req) } });
     if (!existing) { res.status(404).json({ success: false, error: 'Departure not found' }); return; }
 
-    const { status, tripCaptainName, tripCaptainPhone, tripCaptainStatus, returnDate } = req.body;
+    const { status, tripCaptainName, tripCaptainPhone, tripCaptainStatus, tripCaptainUserId, returnDate } = req.body;
+
+    // Assigning a real TRIP_CAPTAIN-role account is now the preferred path —
+    // tripCaptainName/tripCaptainPhone are kept synced from it so every
+    // existing display of those two fields keeps working unchanged.
+    let resolvedCaptainName = tripCaptainName;
+    let resolvedCaptainPhone = tripCaptainPhone;
+    if (tripCaptainUserId !== undefined && tripCaptainUserId !== null && tripCaptainUserId !== '') {
+      const captainUser = await prisma.user.findFirst({
+        where: { id: tripCaptainUserId, role: 'TRIP_CAPTAIN', ...orgFilter(req) },
+        select: { name: true, phone: true },
+      });
+      if (!captainUser) { res.status(400).json({ success: false, error: 'Selected Trip Captain not found' }); return; }
+      resolvedCaptainName = captainUser.name;
+      resolvedCaptainPhone = captainUser.phone ?? undefined;
+    }
 
     // A trip can't start until every applicable checklist item is done —
     // otherwise "Trip Started" becomes meaningless as a signal to the rest of
@@ -704,9 +716,10 @@ export const updateDeparture = async (req: AuthenticatedRequest, res: Response):
       where: { id },
       data: {
         status: status ?? existing.status,
-        tripCaptainName: tripCaptainName !== undefined ? tripCaptainName?.trim() || null : existing.tripCaptainName,
-        tripCaptainPhone: tripCaptainPhone !== undefined ? tripCaptainPhone?.trim() || null : existing.tripCaptainPhone,
+        tripCaptainName: resolvedCaptainName !== undefined ? resolvedCaptainName?.trim() || null : existing.tripCaptainName,
+        tripCaptainPhone: resolvedCaptainPhone !== undefined ? resolvedCaptainPhone?.trim() || null : existing.tripCaptainPhone,
         tripCaptainStatus: tripCaptainStatus ?? existing.tripCaptainStatus,
+        tripCaptainUserId: tripCaptainUserId !== undefined ? (tripCaptainUserId || null) : existing.tripCaptainUserId,
         returnDate: returnDate !== undefined ? (returnDate ? new Date(returnDate) : null) : existing.returnDate,
       },
     });
@@ -1019,35 +1032,9 @@ export const regenerateTravelerPortalLink = async (req: AuthenticatedRequest, re
 // bookings. Each STAY night in the package itinerary is mapped to its actual
 // calendar date using: departureDate + Math.floor(dayOffset / 2).
 
-const ROOM_CAP: Record<string, number> = { SINGLE: 1, DOUBLE: 2, TRIPLE: 3, QUAD: 4 };
-
-function calcRoomsForBookings(bookings: {
-  numberOfTravelers: number;
-  roomSharing: string;
-  travelers?: { roomSharing: string | null }[];
-}[]) {
-  const rooms = { SINGLE: 0, DOUBLE: 0, TRIPLE: 0, QUAD: 0 };
-  for (const b of bookings) {
-    if (b.travelers && b.travelers.length > 0) {
-      // Split-room booking (or any booking with per-traveler overrides) —
-      // tally travelers per room type, then round each type up to whole
-      // rooms, rather than treating the whole group as one room type.
-      const perType = { SINGLE: 0, DOUBLE: 0, TRIPLE: 0, QUAD: 0 };
-      for (const t of b.travelers) {
-        const type = (t.roomSharing || b.roomSharing || 'DOUBLE') as keyof typeof perType;
-        perType[(type in perType ? type : 'DOUBLE') as keyof typeof perType]++;
-      }
-      for (const type of Object.keys(perType) as (keyof typeof perType)[]) {
-        if (perType[type] > 0) rooms[type] += Math.ceil(perType[type] / (ROOM_CAP[type] ?? 2));
-      }
-    } else {
-      const type = (b.roomSharing || 'DOUBLE') as keyof typeof rooms;
-      const cap = ROOM_CAP[type] ?? 2;
-      rooms[type] += Math.ceil(b.numberOfTravelers / cap);
-    }
-  }
-  return { ...rooms, total: rooms.SINGLE + rooms.DOUBLE + rooms.TRIPLE + rooms.QUAD };
-}
+// Thin wrapper kept so call sites below don't change shape — the actual
+// calculation now lives in the shared roomRequirement.service.ts.
+const calcRoomsForBookings = roomsForBookingList;
 
 function calcVehiclesForPax(pax: number) {
   const SIZES = [54, 40, 26, 20, 12];
@@ -1080,6 +1067,12 @@ type BookingInfo = {
   salesExecutive: { id: string; name: string } | null;
 };
 
+// FIT/GIT-aware room split (spec: GIT consolidates, FIT never merges) — see
+// roomRequirement.service.ts. Attached alongside the existing combined
+// `rooms` total on both PkgBreakdown and DestEntry so nothing that already
+// reads `.rooms`/`.guestCount` breaks; `.git`/`.fit` are additive.
+type FitBookingEntry = BookingInfo & { rooms: { SINGLE: number; DOUBLE: number; TRIPLE: number; QUAD: number; total: number } };
+
 type PkgBreakdown = {
   packageId: string;
   packageName: string;
@@ -1090,6 +1083,8 @@ type PkgBreakdown = {
   checkOutDate: string;
   nights: number;
   bookings: BookingInfo[];
+  git: { SINGLE: number; DOUBLE: number; TRIPLE: number; QUAD: number; total: number };
+  fit: FitBookingEntry[];
 };
 
 type DestEntry = {
@@ -1101,6 +1096,8 @@ type DestEntry = {
   checkOutDate: string;
   nights: number;
   breakdown: Record<string, PkgBreakdown>;
+  git: { SINGLE: number; DOUBLE: number; TRIPLE: number; QUAD: number; total: number };
+  fit: FitBookingEntry[];
 };
 
 function addDaysStr(dateStr: string, days: number): string {
@@ -1110,7 +1107,7 @@ function addDaysStr(dateStr: string, days: number): string {
 }
 
 async function buildStayDateMap(req: AuthenticatedRequest) {
-  const activeUpcomingFilter = { ...orgFilter(req), status: { in: ['UPCOMING', 'ACTIVE'] } } as const;
+  const activeUpcomingFilter = { ...orgFilter(req), status: { in: ['UPCOMING', 'ACTIVE'] } };
   const departures = await prisma.departure.findMany({
     where: activeUpcomingFilter,
     include: {
@@ -1118,7 +1115,7 @@ async function buildStayDateMap(req: AuthenticatedRequest) {
         where: { status: { not: 'CANCELLED' } },
         select: {
           id: true, bookingNumber: true, travelerName: true, numberOfTravelers: true,
-          roomSharing: true, specialRequest: true, salesExecutiveId: true,
+          roomSharing: true, specialRequest: true, salesExecutiveId: true, tourType: true,
           travelers: { select: { roomSharing: true } },
         },
       },
@@ -1157,6 +1154,25 @@ async function buildStayDateMap(req: AuthenticatedRequest) {
     if (totalGuests === 0) continue;
 
     const rooms = calcRoomsForBookings(dep.bookings);
+
+    // FIT/GIT-aware split for this departure's bookings — GIT bookings
+    // consolidate (with a per-package breakdown), FIT bookings each stay
+    // their own separate entry. Merged into every pb/entry this departure
+    // touches below, same as the combined `rooms` total already is.
+    const fitGitForDep = computeFitGitRoomRequirement(dep.bookings.map((b) => ({
+      id: b.id,
+      bookingId: b.id,
+      numberOfTravelers: b.numberOfTravelers,
+      roomSharing: b.roomSharing,
+      travelers: b.travelers,
+      tourType: b.tourType,
+      packageId: dep.package?.id ?? null,
+      packageName: dep.package?.name ?? dep.destination,
+      bookingNumber: b.bookingNumber,
+      travelerName: b.travelerName,
+      specialRequest: b.specialRequest,
+      salesExecutive: b.salesExecutiveId ? (salesExecById.get(b.salesExecutiveId) ?? null) : null,
+    })));
 
     // Turn each STAY night into its calendar date, then collapse consecutive
     // nights at the SAME location into one stay block (checkIn → checkOut).
@@ -1205,6 +1221,8 @@ async function buildStayDateMap(req: AuthenticatedRequest) {
           checkOutDate: block.checkOut,
           nights: block.nights,
           breakdown: {},
+          git: { SINGLE: 0, DOUBLE: 0, TRIPLE: 0, QUAD: 0, total: 0 },
+          fit: [],
         };
       }
       const entry = dateMap[dateStr][dest];
@@ -1241,6 +1259,8 @@ async function buildStayDateMap(req: AuthenticatedRequest) {
           checkOutDate: block.checkOut,
           nights: block.nights,
           bookings: [],
+          git: { SINGLE: 0, DOUBLE: 0, TRIPLE: 0, QUAD: 0, total: 0 },
+          fit: [],
         };
       }
       const pb = entry.breakdown[pkgKey];
@@ -1264,7 +1284,22 @@ async function buildStayDateMap(req: AuthenticatedRequest) {
             salesExecutive: b.salesExecutiveId ? (salesExecById.get(b.salesExecutiveId) ?? null) : null,
           });
         }
+        // FIT/GIT split, merged once per departure (same dedup as .bookings
+        // above) — GIT consolidates into pb.git, FIT bookings are appended
+        // individually to pb.fit and never summed together.
+        pb.git = addRoomCounts(pb.git, fitGitForDep.git.rooms);
+        pb.fit.push(...(fitGitForDep.fit as unknown as FitBookingEntry[]));
       }
+    }
+  }
+
+  // Roll the per-package git/fit split up to the date+destination level —
+  // done as a post-pass (rather than incrementally above) so it can't drift
+  // from entry.breakdown, which remains the single source of truth.
+  for (const destMap of Object.values(dateMap)) {
+    for (const entry of Object.values(destMap)) {
+      entry.git = Object.values(entry.breakdown).reduce((sum, pb) => addRoomCounts(sum, pb.git), emptyRoomCounts());
+      entry.fit = Object.values(entry.breakdown).flatMap((pb) => pb.fit);
     }
   }
 

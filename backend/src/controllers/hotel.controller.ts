@@ -2,6 +2,8 @@ import { Response } from 'express';
 import prisma from '../lib/prisma.js';
 import { AuthenticatedRequest } from '../types/index.js';
 import { emitOperationsUpdated, notifyOperationsTeam } from '../services/notification.service.js';
+import { roomsForBookingList } from '../services/roomRequirement.service.js';
+import { syncVendorPayment } from '../services/vendorPaymentSync.service.js';
 
 const orgId = (req: AuthenticatedRequest) => req.user?.organizationId ?? null;
 
@@ -12,8 +14,6 @@ async function assertDepartureAccess(req: AuthenticatedRequest, departureId: str
   return departure;
 }
 
-const ROOM_CAP: Record<string, number> = { SINGLE: 1, DOUBLE: 2, TRIPLE: 3, QUAD: 4 };
-
 // Confirmed hotel rooms must never exceed what the departure's bookings
 // actually require — PENDING entries (still shopping around for a rate) are
 // exempt, since they're not a commitment yet.
@@ -22,21 +22,7 @@ async function roomsRequiredForDeparture(departureId: string): Promise<number> {
     where: { departureId, status: { not: 'CANCELLED' } },
     select: { numberOfTravelers: true, roomSharing: true, travelers: { select: { roomSharing: true } } },
   });
-  return bookings.reduce((sum, b) => {
-    // Split-room booking — count each traveler's own room type (falling back
-    // to the booking's default), rounding each type up to whole rooms,
-    // instead of treating the whole group as one uniform room type.
-    if (b.travelers.length > 0) {
-      const perType: Record<string, number> = {};
-      for (const t of b.travelers) {
-        const type = t.roomSharing || b.roomSharing || 'DOUBLE';
-        perType[type] = (perType[type] ?? 0) + 1;
-      }
-      return sum + Object.entries(perType).reduce((s, [type, count]) => s + Math.ceil(count / (ROOM_CAP[type] ?? 2)), 0);
-    }
-    const cap = ROOM_CAP[b.roomSharing] ?? 2;
-    return sum + Math.ceil(b.numberOfTravelers / cap);
-  }, 0);
+  return roomsForBookingList(bookings).total;
 }
 
 export const createHotel = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
@@ -86,9 +72,27 @@ export const createHotel = async (req: AuthenticatedRequest, res: Response): Pro
     await prisma.activityLog.create({
       data: { action: 'Hotel Added', details: `Hotel "${hotel.name}" added for ${departure.destination}`, entityType: 'HOTEL', entityId: hotel.id, userId: req.user!.id },
     });
+
+    // Operations → Finance auto-sync: a vendor + rate here means Finance
+    // shouldn't need Ops to re-key the same bill by hand.
+    let finalHotel = hotel;
+    const vendorPaymentId = await syncVendorPayment({
+      organizationId: departure.organizationId,
+      vendorId: hotel.vendorId,
+      departureId,
+      serviceType: 'HOTEL',
+      totalAmount: hotel.rate && hotel.numberOfRooms ? hotel.rate * hotel.numberOfRooms : null,
+      existingVendorPaymentId: hotel.vendorPaymentId,
+      createdById: req.user!.id,
+      label: hotel.name,
+    });
+    if (vendorPaymentId && vendorPaymentId !== hotel.vendorPaymentId) {
+      finalHotel = await prisma.hotel.update({ where: { id: hotel.id }, data: { vendorPaymentId } });
+    }
+
     emitOperationsUpdated(departureId);
 
-    res.status(201).json({ success: true, data: hotel });
+    res.status(201).json({ success: true, data: finalHotel });
   } catch (e) {
     console.error('[operations] createHotel error:', e);
     res.status(500).json({ success: false, error: 'Internal server error' });
@@ -150,12 +154,28 @@ export const updateHotel = async (req: AuthenticatedRequest, res: Response): Pro
     await prisma.activityLog.create({
       data: { action: 'Hotel Updated', details: `Hotel "${hotel.name}" updated by ${req.user?.name}`, entityType: 'HOTEL', entityId: id, userId: req.user!.id },
     });
+
+    let finalHotel = hotel;
+    const vendorPaymentId = await syncVendorPayment({
+      organizationId: existing.departure.organizationId,
+      vendorId: hotel.vendorId,
+      departureId: hotel.departureId,
+      serviceType: 'HOTEL',
+      totalAmount: hotel.rate && hotel.numberOfRooms ? hotel.rate * hotel.numberOfRooms : null,
+      existingVendorPaymentId: hotel.vendorPaymentId,
+      createdById: req.user!.id,
+      label: hotel.name,
+    });
+    if (vendorPaymentId !== hotel.vendorPaymentId) {
+      finalHotel = await prisma.hotel.update({ where: { id: hotel.id }, data: { vendorPaymentId } });
+    }
+
     emitOperationsUpdated(existing.departureId);
     if (wasPending && hotel.status === 'CONFIRMED') {
       await notifyOperationsTeam(existing.departure.organizationId, 'HOTEL_CONFIRMED', 'Hotel Confirmed', `Hotel "${hotel.name}" confirmed for ${existing.departure.destination}`, existing.departureId);
     }
 
-    res.json({ success: true, data: hotel });
+    res.json({ success: true, data: finalHotel });
   } catch (e) {
     console.error('[operations] updateHotel error:', e);
     res.status(500).json({ success: false, error: 'Internal server error' });

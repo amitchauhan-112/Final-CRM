@@ -23,8 +23,11 @@ export const getUsers = async (req: AuthenticatedRequest, res: Response): Promis
         ];
       }
     } else {
-      // Non-admins: only see active employees (for lead transfer dropdown)
-      where.role = 'EMPLOYEE';
+      // Non-admins: only see active employees (for lead transfer dropdown),
+      // except Operations looking up active Trip Captains specifically (for
+      // departure assignment) — still scoped to isActive:true either way,
+      // never the full unrestricted user list.
+      where.role = req.user?.role === 'OPERATIONS' && role === 'TRIP_CAPTAIN' ? 'TRIP_CAPTAIN' : 'EMPLOYEE';
       where.isActive = true;
     }
 

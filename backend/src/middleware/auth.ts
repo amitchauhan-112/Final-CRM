@@ -43,6 +43,22 @@ export const requireFinanceOrAdmin = (req: AuthenticatedRequest, res: Response, 
   next();
 };
 
+export const requireTripCaptain = (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
+  if (req.user?.role !== 'TRIP_CAPTAIN') {
+    res.status(403).json({ success: false, error: 'Trip Captain access required' });
+    return;
+  }
+  next();
+};
+
+export const requireTripCaptainOrAdmin = (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
+  if (req.user?.role !== 'ADMIN' && req.user?.role !== 'TRIP_CAPTAIN') {
+    res.status(403).json({ success: false, error: 'Trip Captain or Admin access required' });
+    return;
+  }
+  next();
+};
+
 export const requireAdminOrSelf = (userIdParam: string) =>
   (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
     const targetId = req.params[userIdParam];

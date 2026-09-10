@@ -2,6 +2,7 @@ import { Response } from 'express';
 import prisma from '../lib/prisma.js';
 import { AuthenticatedRequest } from '../types/index.js';
 import { emitOperationsUpdated, notifyOperationsTeam } from '../services/notification.service.js';
+import { syncVendorPayment } from '../services/vendorPaymentSync.service.js';
 
 const orgId = (req: AuthenticatedRequest) => req.user?.organizationId ?? null;
 
@@ -13,11 +14,16 @@ export const createVehicle = async (req: AuthenticatedRequest, res: Response): P
     });
     if (!departure) { res.status(404).json({ success: false, error: 'Departure not found' }); return; }
 
-    const { vehicleType, vehicleNumber, driverName, driverMobile, pickupTime, pickupLocation, vendorName, vendorContact, contactPerson, rate, vendorId, status } = req.body;
+    const {
+      transportType, vehicleType, vehicleNumber, driverName, driverMobile, pickupTime, pickupLocation,
+      vendorName, vendorContact, contactPerson, rate, vendorId, status,
+      operatorName, ticketReference, numberOfTickets, volvoDepartureTime,
+    } = req.body;
 
     const vehicle = await prisma.vehicle.create({
       data: {
         departureId,
+        transportType: transportType === 'VOLVO' ? 'VOLVO' : 'CAB',
         vehicleType: vehicleType?.trim() || null,
         vehicleNumber: vehicleNumber?.trim() || null,
         driverName: driverName?.trim() || null,
@@ -30,15 +36,37 @@ export const createVehicle = async (req: AuthenticatedRequest, res: Response): P
         rate: rate !== undefined && rate !== '' && rate !== null ? Number(rate) : null,
         vendorId: vendorId?.trim() || null,
         status: status || 'PENDING',
+        operatorName: operatorName?.trim() || null,
+        ticketReference: ticketReference?.trim() || null,
+        numberOfTickets: numberOfTickets !== undefined && numberOfTickets !== '' ? Number(numberOfTickets) : null,
+        volvoDepartureTime: volvoDepartureTime ? new Date(volvoDepartureTime) : null,
       },
     });
 
     await prisma.activityLog.create({
       data: { action: 'Vehicle Added', details: `Vehicle added for ${departure.destination}`, entityType: 'VEHICLE', entityId: vehicle.id, userId: req.user!.id },
     });
+
+    // Operations → Finance auto-sync: a vendor + rate here means Finance
+    // shouldn't need Ops to re-key the same bill by hand.
+    let finalVehicle = vehicle;
+    const vendorPaymentId = await syncVendorPayment({
+      organizationId: departure.organizationId,
+      vendorId: vehicle.vendorId,
+      departureId,
+      serviceType: 'VEHICLE',
+      totalAmount: vehicle.rate,
+      existingVendorPaymentId: vehicle.vendorPaymentId,
+      createdById: req.user!.id,
+      label: vehicle.vehicleType || vehicle.transportType,
+    });
+    if (vendorPaymentId && vendorPaymentId !== vehicle.vendorPaymentId) {
+      finalVehicle = await prisma.vehicle.update({ where: { id: vehicle.id }, data: { vendorPaymentId } });
+    }
+
     emitOperationsUpdated(departureId);
 
-    res.status(201).json({ success: true, data: vehicle });
+    res.status(201).json({ success: true, data: finalVehicle });
   } catch (e) {
     console.error('[operations] createVehicle error:', e);
     res.status(500).json({ success: false, error: 'Internal server error' });
@@ -57,6 +85,7 @@ export const updateVehicle = async (req: AuthenticatedRequest, res: Response): P
     const vehicle = await prisma.vehicle.update({
       where: { id },
       data: {
+        transportType: b.transportType !== undefined ? (b.transportType === 'VOLVO' ? 'VOLVO' : 'CAB') : existing.transportType,
         vehicleType: b.vehicleType !== undefined ? b.vehicleType?.trim() || null : existing.vehicleType,
         vehicleNumber: b.vehicleNumber !== undefined ? b.vehicleNumber?.trim() || null : existing.vehicleNumber,
         driverName: b.driverName !== undefined ? b.driverName?.trim() || null : existing.driverName,
@@ -69,18 +98,38 @@ export const updateVehicle = async (req: AuthenticatedRequest, res: Response): P
         rate: b.rate !== undefined ? (b.rate === '' || b.rate === null ? null : Number(b.rate)) : existing.rate,
         vendorId: b.vendorId !== undefined ? b.vendorId?.trim() || null : existing.vendorId,
         status: b.status ?? existing.status,
+        operatorName: b.operatorName !== undefined ? b.operatorName?.trim() || null : existing.operatorName,
+        ticketReference: b.ticketReference !== undefined ? b.ticketReference?.trim() || null : existing.ticketReference,
+        numberOfTickets: b.numberOfTickets !== undefined ? (b.numberOfTickets === '' || b.numberOfTickets === null ? null : Number(b.numberOfTickets)) : existing.numberOfTickets,
+        volvoDepartureTime: b.volvoDepartureTime !== undefined ? (b.volvoDepartureTime ? new Date(b.volvoDepartureTime) : null) : existing.volvoDepartureTime,
       },
     });
 
     await prisma.activityLog.create({
       data: { action: 'Vehicle Updated', details: `Vehicle updated by ${req.user?.name}`, entityType: 'VEHICLE', entityId: id, userId: req.user!.id },
     });
+
+    let finalVehicle = vehicle;
+    const vendorPaymentId = await syncVendorPayment({
+      organizationId: existing.departure.organizationId,
+      vendorId: vehicle.vendorId,
+      departureId: vehicle.departureId,
+      serviceType: 'VEHICLE',
+      totalAmount: vehicle.rate,
+      existingVendorPaymentId: vehicle.vendorPaymentId,
+      createdById: req.user!.id,
+      label: vehicle.vehicleType || vehicle.transportType,
+    });
+    if (vendorPaymentId !== vehicle.vendorPaymentId) {
+      finalVehicle = await prisma.vehicle.update({ where: { id: vehicle.id }, data: { vendorPaymentId } });
+    }
+
     emitOperationsUpdated(existing.departureId);
     if (wasPending && vehicle.status === 'CONFIRMED') {
       await notifyOperationsTeam(existing.departure.organizationId, 'VEHICLE_CONFIRMED', 'Vehicle Confirmed', `Vehicle confirmed for ${existing.departure.destination}`, existing.departureId);
     }
 
-    res.json({ success: true, data: vehicle });
+    res.json({ success: true, data: finalVehicle });
   } catch (e) {
     console.error('[operations] updateVehicle error:', e);
     res.status(500).json({ success: false, error: 'Internal server error' });

@@ -32,7 +32,7 @@ interface UserForm {
   email: string;
   password?: string;
   phone?: string;
-  role: 'ADMIN' | 'EMPLOYEE' | 'OPERATIONS' | 'FINANCE';
+  role: 'ADMIN' | 'EMPLOYEE' | 'OPERATIONS' | 'FINANCE' | 'TRIP_CAPTAIN';
   departmentId?: string;
   designationId?: string;
 }
@@ -67,7 +67,7 @@ function EmployeeFormModal({
   // backend/src/utils/seed.ts). Matched by department code, not name, since
   // codes are stable identifiers while names could be relabeled later.
   const ROLE_DEPARTMENT_CODE: Record<UserForm['role'], string> = {
-    EMPLOYEE: 'SALES', OPERATIONS: 'OPS', FINANCE: 'FINANCE', ADMIN: 'ADMIN',
+    EMPLOYEE: 'SALES', OPERATIONS: 'OPS', FINANCE: 'FINANCE', ADMIN: 'ADMIN', TRIP_CAPTAIN: 'OPS',
   };
 
   const handleRoleChange = (role: UserForm['role']) => {
@@ -139,6 +139,7 @@ function EmployeeFormModal({
               <option value="EMPLOYEE">Sales</option>
               <option value="OPERATIONS">Operations</option>
               <option value="FINANCE">Finance</option>
+              <option value="TRIP_CAPTAIN">Trip Captain</option>
               <option value="ADMIN">Admin</option>
             </select>
           </div>

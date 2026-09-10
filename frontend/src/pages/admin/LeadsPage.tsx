@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Plus, Search, Trash2, Eye, Edit, RefreshCw, LayoutGrid, List } from 'lucide-react';
-import { useSearchParams } from 'react-router-dom';
+import { Plus, Search, Trash2, Eye, Edit, RefreshCw, LayoutGrid, List, Archive } from 'lucide-react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useLeads, useCreateLead, useUpdateLead, useDeleteLead, usePreferredDateSummary } from '../../hooks/useLeads';
+import DeleteLeadReasonModal from '../../components/leads/DeleteLeadReasonModal';
 import { useCampaigns } from '../../hooks/useCampaigns';
 import { useUsers } from '../../hooks/useUsers';
 import { Lead, LeadStatus } from '../../types/index';
@@ -39,6 +40,7 @@ const SOURCES: { value: string; label: string }[] = [
 ];
 
 export default function AdminLeadsPage() {
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
@@ -104,9 +106,9 @@ export default function AdminLeadsPage() {
     updateLead.mutate({ id: editLead.id, ...formData }, { onSuccess: () => setEditLead(null) });
   };
 
-  const handleDelete = () => {
+  const handleDelete = (reason: string, otherText?: string) => {
     if (!deleteLeadId) return;
-    deleteLead.mutate(deleteLeadId, { onSuccess: () => setDeleteLeadId(null) });
+    deleteLead.mutate({ id: deleteLeadId, reason, otherText }, { onSuccess: () => setDeleteLeadId(null) });
   };
 
   const handleBulkUpdate = () => {
@@ -300,6 +302,10 @@ export default function AdminLeadsPage() {
           <button onClick={() => refetch()} className="btn-secondary p-2" title="Refresh">
             <RefreshCw className="w-4 h-4" />
           </button>
+          <button onClick={() => navigate('/admin/leads/deleted')} className="btn-secondary gap-2" title="Deleted Leads">
+            <Archive className="w-4 h-4" />
+            <span className="hidden sm:inline">Deleted Leads</span>
+          </button>
           <button onClick={() => setCreateOpen(true)} className="btn-primary gap-2">
             <Plus className="w-4 h-4" />
             <span className="hidden sm:inline">New Lead</span>
@@ -476,16 +482,13 @@ export default function AdminLeadsPage() {
         )}
       </Modal>
 
-      {/* Delete confirm */}
-      <Modal open={!!deleteLeadId} onClose={() => setDeleteLeadId(null)} title="Delete Lead" size="sm">
-        <p className="text-slate-600">Are you sure you want to delete this lead? This action cannot be undone.</p>
-        <div className="flex justify-end gap-3 mt-4">
-          <button onClick={() => setDeleteLeadId(null)} className="btn-secondary">Cancel</button>
-          <button onClick={handleDelete} disabled={deleteLead.isPending} className="btn-danger">
-            {deleteLead.isPending ? 'Deleting...' : 'Delete'}
-          </button>
-        </div>
-      </Modal>
+      {/* Delete confirm — mandatory reason, Admin-only (route already guards this whole page) */}
+      <DeleteLeadReasonModal
+        open={!!deleteLeadId}
+        onCancel={() => setDeleteLeadId(null)}
+        onConfirm={handleDelete}
+        isLoading={deleteLead.isPending}
+      />
 
       {/* Detail modal */}
       <LeadDetail

@@ -68,6 +68,8 @@ model User {
   updatedAt DateTime @updatedAt
 
   assignedLeads       Lead[]             @relation("AssignedTo")
+  deletedLeads        Lead[]             @relation("LeadDeletedBy")
+  tripCaptainDepartures Departure[]      @relation("TripCaptainDepartures")
   campaignAssignments CampaignEmployee[]
   notifications       Notification[]
   activityLogs        ActivityLog[]
@@ -306,8 +308,23 @@ model Lead {
   isRead    Boolean   @default(false)
   deletedAt DateTime? // soft delete — null means active
 
+  // Captured on every delete (Admin-only, mandatory reason) — surfaced on
+  // the Deleted Leads screen so it's clear why and by whom a lead was removed.
+  deletedReason String?
+  deletedById   String?
+  deletedByUser User?   @relation("LeadDeletedBy", fields: [deletedById], references: [id], onDelete: SetNull)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  // createdAt gets deliberately backdated to Meta's real submission time for
+  // historical backfilled leads (see metaLeadBackfill.service.ts) — so it's
+  // NOT reliable for "when did this actually land in our CRM". capturedAt
+  // always reflects the real DB insert moment; never manually overridden.
+  capturedAt DateTime @default(now())
+  // Set exactly once, the first time an employee/admin updates this lead
+  // (any field) — never touched again after that.
+  firstRespondedAt DateTime?
 
   notifications Notification[]
   activityLogs  ActivityLog[]
@@ -324,6 +341,7 @@ model Lead {
   @@index([campaignId])
   @@index([createdAt])
   @@index([deletedAt])
+  @@index([deletedById])
   @@index([followUpDate])
   @@map("leads")
 }
@@ -1096,6 +1114,12 @@ model Departure {
   tripCaptainPhone  String?
   tripCaptainStatus String  @default("UNASSIGNED") // UNASSIGNED | ASSIGNED | CONFIRMED
 
+  // Authoritative link once a real TRIP_CAPTAIN-role user is assigned —
+  // tripCaptainName/Phone above stay in sync for display/notification
+  // purposes but this is what actually scopes what a captain can see.
+  tripCaptainUserId String?
+  tripCaptainUser   User?   @relation("TripCaptainDepartures", fields: [tripCaptainUserId], references: [id], onDelete: SetNull)
+
   // Checklist Engine — only holds the handful of items with no natural backing
   // field (welcome kit, passenger list printed, emergency contacts, medical kit).
   // Every other checklist item is computed live from existing fields.
@@ -1118,6 +1142,7 @@ model Departure {
   @@index([packageId])
   @@index([departureDate])
   @@index([status])
+  @@index([tripCaptainUserId])
   @@map("departures")
 }
 
@@ -1141,6 +1166,13 @@ model Hotel {
   confirmationNumber String?
   status             String  @default("PENDING")  // PENDING | CONFIRMED | CANCELLED
   voucherUrl         String?
+
+  // Set once a vendorId+rate(+numberOfRooms) is present — Operations→Finance
+  // auto-sync creates/updates this VendorPayment instead of Finance having
+  // to re-enter the bill by hand. One-to-one, so later edits update the
+  // same payment record rather than creating duplicates.
+  vendorPaymentId String?        @unique
+  vendorPayment   VendorPayment? @relation(fields: [vendorPaymentId], references: [id], onDelete: SetNull)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1168,6 +1200,21 @@ model Vehicle {
   vendorId       String?                          // optional FK to the Vendor master list (Vendor Workspace)
   vendor         Vendor? @relation("VendorVehicles", fields: [vendorId], references: [id], onDelete: SetNull)
   status         String  @default("PENDING")      // PENDING | CONFIRMED | CANCELLED
+
+  // Cab vs Volvo — vehicleType above stays the free-text model/description
+  // field underneath this coarse toggle (e.g. "Tempo Traveller 17-seater"
+  // for CAB, blank for VOLVO).
+  transportType String @default("CAB") // CAB | VOLVO
+
+  // Volvo-only fields — null for CAB rows.
+  operatorName       String?
+  ticketReference    String?
+  numberOfTickets    Int?
+  volvoDepartureTime DateTime?
+
+  // Same Operations→Finance auto-sync as Hotel.vendorPaymentId above.
+  vendorPaymentId String?        @unique
+  vendorPayment   VendorPayment? @relation(fields: [vendorPaymentId], references: [id], onDelete: SetNull)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1496,6 +1543,12 @@ model VendorPayment {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  // Back-relations for the Operations→Finance auto-sync — the Hotel/Vehicle
+  // row that this payment was generated from, if any (manually-entered
+  // Finance bills have neither).
+  hotel   Hotel?
+  vehicle Vehicle?
 
   @@index([vendorId])
   @@index([departureId])

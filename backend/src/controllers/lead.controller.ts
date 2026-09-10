@@ -293,6 +293,10 @@ export const updateLead = async (req: AuthenticatedRequest, res: Response): Prom
     if (!isWholeAmount(budget)) { res.status(400).json({ success: false, error: WHOLE_AMOUNT_ERROR }); return; }
     const updateData: Record<string, unknown> = { ...rest, ...(budget !== undefined ? { budget: budget === null || budget === '' ? null : Number(budget) } : {}) };
 
+    // "First response" — set exactly once, on this lead's first-ever
+    // employee/admin-initiated update (any field), never touched again.
+    if (!existing.firstRespondedAt) updateData.firstRespondedAt = new Date();
+
     if (status !== undefined) {
       // Once confirmed, a lead's status is permanently locked — not even the
       // usual LOST exit is allowed anymore. A confirmed lead has already
@@ -487,17 +491,84 @@ export const transferLead = async (req: AuthenticatedRequest, res: Response): Pr
 export const deleteLead = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
+    const { reason, otherText } = req.body;
+    const resolvedReason = reason === 'Other' ? (otherText || '').trim() : (reason || '').trim();
+    if (!resolvedReason) {
+      res.status(400).json({ success: false, error: 'A reason is required to delete a lead' });
+      return;
+    }
 
     const existing = await prisma.lead.findFirst({ where: { id, deletedAt: null, ...orgFilter(req) } });
     if (!existing) { res.status(404).json({ success: false, error: 'Lead not found' }); return; }
 
-    await prisma.lead.update({ where: { id }, data: { deletedAt: new Date() } });
+    await prisma.lead.update({
+      where: { id },
+      data: { deletedAt: new Date(), deletedReason: resolvedReason, deletedById: req.user!.id },
+    });
 
     await prisma.activityLog.create({
-      data: { action: 'Lead Deleted', details: `Deleted by ${req.user?.name}`, userId: req.user!.id, leadId: id },
+      data: { action: 'Lead Deleted', details: `Deleted by ${req.user?.name} — ${resolvedReason}`, userId: req.user!.id, leadId: id },
     });
 
     res.json({ success: true, message: 'Lead deleted' });
+  } catch {
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+};
+
+// ─── Deleted Leads (Admin-only recovery view) ────────────────────────────────
+
+export const getDeletedLeads = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const { search, page = '1', limit = '20' } = req.query;
+    const skip = (Number(page) - 1) * Number(limit);
+
+    const where: Record<string, unknown> = { ...orgFilter(req), deletedAt: { not: null } };
+    if (search) {
+      where.OR = [
+        { name: { contains: search as string } },
+        { phone: { contains: search as string } },
+        { email: { contains: search as string } },
+      ];
+    }
+
+    const [leads, total] = await Promise.all([
+      prisma.lead.findMany({
+        where,
+        include: {
+          campaign: { select: { id: true, name: true } },
+          assignedTo: { select: { id: true, name: true } },
+          deletedByUser: { select: { id: true, name: true } },
+        },
+        orderBy: { deletedAt: 'desc' },
+        skip,
+        take: Number(limit),
+      }),
+      prisma.lead.count({ where }),
+    ]);
+
+    res.json({ success: true, data: leads, meta: { total, page: Number(page), limit: Number(limit), totalPages: Math.ceil(total / Number(limit)) } });
+  } catch {
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+};
+
+export const restoreLead = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const existing = await prisma.lead.findFirst({ where: { id, deletedAt: { not: null }, ...orgFilter(req) } });
+    if (!existing) { res.status(404).json({ success: false, error: 'Deleted lead not found' }); return; }
+
+    await prisma.lead.update({
+      where: { id },
+      data: { deletedAt: null, deletedReason: null, deletedById: null },
+    });
+
+    await prisma.activityLog.create({
+      data: { action: 'Lead Restored', details: `Restored by ${req.user?.name}`, userId: req.user!.id, leadId: id },
+    });
+
+    res.json({ success: true, message: 'Lead restored' });
   } catch {
     res.status(500).json({ success: false, error: 'Internal server error' });
   }

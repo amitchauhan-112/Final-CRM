@@ -5,6 +5,7 @@ import {
   ArrowLeft, Map, Calendar, Users2, UserCog, Pencil, Phone,
 } from 'lucide-react';
 import { useDeparture, useUpdateDeparture } from '../../hooks/useOperations';
+import { useUsers } from '../../hooks/useUsers';
 import { Skeleton } from '../../components/ui/Skeleton';
 import Modal from '../../components/ui/Modal';
 import Tabs, { useUrlTab } from '../../components/ui/Tabs';
@@ -46,14 +47,19 @@ const TABS = [
 ] as const;
 type Tab = (typeof TABS)[number]['key'];
 
-interface CaptainForm { tripCaptainName?: string; tripCaptainPhone?: string; tripCaptainStatus: string; }
+interface CaptainForm { tripCaptainUserId?: string; tripCaptainStatus: string; }
 
 function TripCaptainModal({ open, onClose, departure }: { open: boolean; onClose: () => void; departure: NonNullable<ReturnType<typeof useDeparture>['data']>['data'] }) {
   const update = useUpdateDeparture(departure.id);
+  // TRIP_CAPTAIN-role accounts only (created the same way Employees are, from
+  // Organization → Employees) — replaces the old free-text name/phone entry
+  // so a departure's captain is always a real, logged-in account.
+  const { data: captainsData } = useUsers({ role: 'TRIP_CAPTAIN', isActive: true, limit: 200 });
+  const captains = captainsData?.data ?? [];
+
   const { register, handleSubmit } = useForm<CaptainForm>({
     defaultValues: {
-      tripCaptainName: departure.tripCaptainName ?? '',
-      tripCaptainPhone: departure.tripCaptainPhone ?? '',
+      tripCaptainUserId: departure.tripCaptainUserId ?? '',
       tripCaptainStatus: departure.tripCaptainStatus,
     },
   });
@@ -70,12 +76,18 @@ function TripCaptainModal({ open, onClose, departure }: { open: boolean; onClose
     >
       <form id="captain-form" onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         <div>
-          <label className="label">Trip Captain Name</label>
-          <input {...register('tripCaptainName')} className="input" />
-        </div>
-        <div>
-          <label className="label">Contact Number</label>
-          <input {...register('tripCaptainPhone')} className="input" />
+          <label className="label">Trip Captain</label>
+          <select {...register('tripCaptainUserId')} className="input">
+            <option value="">Not assigned</option>
+            {captains.map((c) => (
+              <option key={c.id} value={c.id}>{c.name}{c.phone ? ` — ${c.phone}` : ''}</option>
+            ))}
+          </select>
+          {captains.length === 0 && (
+            <p className="text-xs text-slate-400 mt-1">
+              No Trip Captain accounts yet — create one from Organization → Employees (role: Trip Captain).
+            </p>
+          )}
         </div>
         <div>
           <label className="label">Status</label>

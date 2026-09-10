@@ -155,6 +155,12 @@ export interface Lead {
   activityLogs?: ActivityLog[];
   createdAt: string;
   updatedAt: string;
+  capturedAt: string;
+  firstRespondedAt?: string | null;
+  deletedAt?: string;
+  deletedReason?: string;
+  deletedById?: string;
+  deletedByUser?: Pick<User, 'id' | 'name'>;
 }
 
 export interface LeadComment {
@@ -693,6 +699,11 @@ export interface Vehicle {
   rate?: number;
   vendorId?: string;
   status: OpsBookingStatus;
+  transportType: 'CAB' | 'VOLVO';
+  operatorName?: string;
+  ticketReference?: string;
+  numberOfTickets?: number;
+  volvoDepartureTime?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -841,6 +852,7 @@ export interface Departure {
   tripCaptainName?: string;
   tripCaptainPhone?: string;
   tripCaptainStatus: TripCaptainStatus;
+  tripCaptainUserId?: string;
   bookings: DepartureBooking[];
   hotels: Hotel[];
   vehicles: Vehicle[];
@@ -906,6 +918,7 @@ export interface DepartureListItem {
 
 export interface OpsDashboardStats {
   todaysDepartures: number;
+  todaysFieldBookings: number;
   upcomingDepartures: number;
   activeTrips: number;
   completedTrips: number;
