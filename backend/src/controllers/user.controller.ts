@@ -421,12 +421,24 @@ export const getEmployeeProfile = async (req: AuthenticatedRequest, res: Respons
 
 export const getEmployeePerformance = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
+    // Optional date window — scopes the breakdown to leads that came in
+    // during the period (createdAt), matching the Reports page convention.
+    // No dates → all-time.
+    const { from, to } = req.query as { from?: string; to?: string };
+    const createdAt =
+      from || to
+        ? {
+            ...(from ? { gte: new Date(`${from}T00:00:00.000Z`) } : {}),
+            ...(to ? { lte: new Date(`${to}T23:59:59.999Z`) } : {}),
+          }
+        : undefined;
+
     const employees = await prisma.user.findMany({
       where: { role: 'EMPLOYEE', isActive: true, organizationId: req.user?.organizationId ?? null },
       select: {
         id: true, name: true, email: true,
         assignedLeads: {
-          where: { deletedAt: null }, // exclude soft-deleted leads, same as every other query in this file
+          where: { deletedAt: null, ...(createdAt ? { createdAt } : {}) },
           select: { status: true, createdAt: true, followUpDate: true, followUpDone: true },
         },
       },

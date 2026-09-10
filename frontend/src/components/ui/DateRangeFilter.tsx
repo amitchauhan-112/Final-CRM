@@ -1,23 +1,28 @@
 import { RANGE_PRESETS, RangePreset, DateRange, todayStr } from '../../utils/dateRange';
 import { cn } from '../../utils/helpers';
 
-interface DateRangeFilterProps {
-  preset: RangePreset;
-  onPresetChange: (preset: RangePreset) => void;
+interface DateRangeFilterProps<P extends string = RangePreset> {
+  preset: P;
+  onPresetChange: (preset: P) => void;
   customRange: DateRange;
   onCustomRangeChange: (range: DateRange) => void;
   label?: string;
+  // Override the button set — defaults to the 30/60/90-day presets.
+  presets?: { value: P; label: string }[];
 }
 
 // Shared date-range control — used on the Sales dashboard KPI row and again
 // on the Leads list, so a stat card's date scope carries through to the
 // filtered list it links to instead of resetting once you click in.
-export default function DateRangeFilter({ preset, onPresetChange, customRange, onCustomRangeChange, label = 'Showing:' }: DateRangeFilterProps) {
+export default function DateRangeFilter<P extends string = RangePreset>({
+  preset, onPresetChange, customRange, onCustomRangeChange, label = 'Showing:',
+  presets = RANGE_PRESETS as unknown as { value: P; label: string }[],
+}: DateRangeFilterProps<P>) {
   return (
     <div className="flex items-center gap-2 flex-wrap">
       <span className="text-xs font-medium text-slate-500 mr-1">{label}</span>
       <div className="tab-strip">
-        {RANGE_PRESETS.map((p) => (
+        {presets.map((p) => (
           <button
             key={p.value}
             onClick={() => {

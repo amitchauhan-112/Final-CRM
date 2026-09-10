@@ -14,6 +14,8 @@ import { useNavigate } from 'react-router-dom';
 import { useLeadStats, useRecentActivity, useLeads } from '../../hooks/useLeads';
 import { useCampaignStats } from '../../hooks/useCampaigns';
 import { useEmployeePerformance } from '../../hooks/useUsers';
+import DateRangeFilter from '../ui/DateRangeFilter';
+import { MONITORING_PRESETS, MonitoringPreset, monitoringRange, rangeForDays } from '../../utils/dateRange';
 import { useDashboardStats } from '../../hooks/useDashboard';
 import StatsCard from '../ui/StatsCard';
 import Avatar from '../ui/Avatar';
@@ -238,18 +240,33 @@ function RecentConfirmedWidget({ bookings }: { bookings: { id: string; name: str
   );
 }
 
-function LeaderboardWidget({ performance }: { performance: { id: string; name: string; email: string; confirmed: number; total: number; conversionRate: string; overdue: number }[] }) {
+function LeaderboardWidget() {
+  const [preset, setPreset] = useState<MonitoringPreset>('today');
+  const [customRange, setCustomRange] = useState(rangeForDays(7));
+  const range = monitoringRange(preset, customRange);
+  const { data } = useEmployeePerformance(range);
+  const performance = data?.data ?? [];
   const sorted = [...performance].sort((a, b) => b.confirmed - a.confirmed || parseFloat(b.conversionRate) - parseFloat(a.conversionRate));
   const medals = ['🥇', '🥈', '🥉'];
 
   return (
     <div className="card overflow-hidden">
-      <div className="px-5 py-4 border-b border-slate-200 flex items-center gap-2">
-        <Trophy className="w-4 h-4 text-yellow-500" />
-        <h3 className="text-sm font-semibold text-slate-700">Employee Leaderboard</h3>
+      <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between gap-2 flex-wrap">
+        <div className="flex items-center gap-2">
+          <Trophy className="w-4 h-4 text-yellow-500" />
+          <h3 className="text-sm font-semibold text-slate-700">Employee Leaderboard</h3>
+        </div>
+        <DateRangeFilter
+          preset={preset}
+          onPresetChange={setPreset}
+          customRange={customRange}
+          onCustomRangeChange={setCustomRange}
+          presets={MONITORING_PRESETS}
+          label=""
+        />
       </div>
       {sorted.length === 0 ? (
-        <div className="py-8 text-center text-slate-400 text-sm">No data yet</div>
+        <div className="py-8 text-center text-slate-400 text-sm">No leads in this period</div>
       ) : (
         <div className="divide-y divide-slate-100">
           {sorted.map((emp, idx) => {
@@ -415,13 +432,11 @@ export default function AdminDashboard() {
   const navigate = useNavigate();
   const { data: statsData, isLoading: statsLoading } = useLeadStats();
   const { data: campaignStatsData, isLoading: campLoading } = useCampaignStats();
-  const { data: perfData, isLoading: perfLoading } = useEmployeePerformance();
   const { data: activityData } = useRecentActivity();
   const { data: dashData, isLoading: dashLoading } = useDashboardStats();
 
   const stats = statsData?.data;
   const campaignStats = campaignStatsData?.data ?? [];
-  const performance = perfData?.data ?? [];
   const activity = activityData?.data ?? [];
   const dash = dashData?.data;
 
@@ -702,7 +717,7 @@ export default function AdminDashboard() {
       {dash && (
         <div className="grid grid-cols-1 xl:grid-cols-5 gap-4">
           <div className="xl:col-span-3">
-            <LeaderboardWidget performance={performance} />
+            <LeaderboardWidget />
           </div>
           <div className="xl:col-span-2">
             <WorkloadWidget workload={dash.workload} />

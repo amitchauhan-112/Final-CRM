@@ -5,6 +5,8 @@ import { useEmployeePerformance } from '../../hooks/useUsers';
 import { Skeleton } from '../../components/ui/Skeleton';
 import Avatar from '../../components/ui/Avatar';
 import { cn } from '../../utils/helpers';
+import DateRangeFilter from '../../components/ui/DateRangeFilter';
+import { MONITORING_PRESETS, MonitoringPreset, monitoringRange, rangeForDays } from '../../utils/dateRange';
 
 type SortKey = 'total' | 'fresh' | 'notContacted' | 'contacted' | 'interested' | 'followUpScheduled' | 'confirmed' | 'lost' | 'overdue' | 'conversionRate';
 
@@ -27,7 +29,11 @@ const COLUMNS: { key: SortKey; label: string; status?: string }[] = [
 
 export default function EmployeeMonitoringPage() {
   const navigate = useNavigate();
-  const { data, isLoading } = useEmployeePerformance();
+  const [preset, setPreset] = useState<MonitoringPreset>('today');
+  const [customRange, setCustomRange] = useState(rangeForDays(7));
+  const range = monitoringRange(preset, customRange);
+
+  const { data, isLoading } = useEmployeePerformance(range);
   const [search, setSearch] = useState('');
   const [sortKey, setSortKey] = useState<SortKey>('total');
 
@@ -59,8 +65,18 @@ export default function EmployeeMonitoringPage() {
           Employee Monitoring
         </h1>
         <p className="text-sm text-slate-500 mt-0.5">
-          Every active employee's lead pipeline, broken down by status — spot who's overloaded, who has stale leads, and who's converting. Click any number to see those leads.
+          Each active employee's pipeline for leads received in the selected period, broken down by status — spot who's overloaded, who has stale leads, and who's converting. Click any number to see those leads.
         </p>
+      </div>
+
+      <div className="card p-3">
+        <DateRangeFilter
+          preset={preset}
+          onPresetChange={setPreset}
+          customRange={customRange}
+          onCustomRangeChange={setCustomRange}
+          presets={MONITORING_PRESETS}
+        />
       </div>
 
       <div className="flex items-center gap-3">

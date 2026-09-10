@@ -27,11 +27,17 @@ export function useUsers(filters: UserFilters = {}) {
   });
 }
 
-export function useEmployeePerformance() {
+export function useEmployeePerformance(range?: { from?: string; to?: string }) {
+  const from = range?.from;
+  const to = range?.to;
   return useQuery<ApiResponse<EmployeePerformance[]>>({
-    queryKey: ['employee-performance'],
+    queryKey: ['employee-performance', from, to],
     queryFn: async () => {
-      const { data } = await api.get('/users/performance/employees');
+      const qs = new URLSearchParams();
+      if (from) qs.set('from', from);
+      if (to) qs.set('to', to);
+      const suffix = qs.toString() ? `?${qs.toString()}` : '';
+      const { data } = await api.get(`/users/performance/employees${suffix}`);
       return data;
     },
   });
