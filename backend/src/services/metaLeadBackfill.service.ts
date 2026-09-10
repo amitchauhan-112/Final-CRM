@@ -268,13 +268,13 @@ export async function enrichExistingMetaLeads(orgId: string): Promise<EnrichResu
 
     try {
       const { data } = await axios.get(`${META_BASE}/${lead.instagramLeadId}`, {
-        params: { fields: 'field_data,form_name', access_token: token },
+        params: { fields: 'field_data,campaign_name', access_token: token },
         timeout: 15000,
       });
       const fieldData: FieldDatum[] = data?.field_data || [];
       if (!fieldData.length) { result.skipped++; continue; }
 
-      const formName: string = data?.form_name || 'Meta Lead Ad';
+      const formName: string = data?.campaign_name || 'Meta Lead Ad';
       const destination = extractField(fieldData, ['destination', 'where_do_you', 'which_place', 'location']);
       const preferredDate = extractField(fieldData, ['date', 'when_are_you', 'travel_month', 'preferred_dates']);
       const groupSize = parseGroupSize(extractField(fieldData, ['travel', 'traveller', 'traveler', 'how_many', 'group', 'people']));
