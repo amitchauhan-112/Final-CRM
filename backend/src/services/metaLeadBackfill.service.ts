@@ -53,6 +53,39 @@ function extractField(fieldData: FieldDatum[], patterns: string[]): string | und
   return undefined;
 }
 
+// Meta field names come in like "who's_travelling_?" / "choose_your_preferred_dates"
+// and values like "2–4_travellers" / "join_a_group_trip". Tidy both for display.
+function tidy(s: string): string {
+  return s.replace(/[_?]+/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+const NAME_PHONE_EMAIL = ['full_name', 'name', 'phone', 'whatsapp', 'mobile', 'contact_number', 'email'];
+
+// Everything the customer answered on the Instant Form, minus name/phone/email,
+// turned into a readable block the sales team sees as the lead's message.
+function buildFormResponsesBlock(fieldData: FieldDatum[], formName: string): string {
+  const lines = fieldData
+    .filter((f) => f.name && !NAME_PHONE_EMAIL.some((k) => f.name!.toLowerCase().includes(k)))
+    .map((f) => {
+      const answer = (f.values || []).map(tidy).join(', ');
+      return answer ? `• ${tidy(f.name!)}: ${answer}` : '';
+    })
+    .filter(Boolean);
+
+  const headerLine = `Meta Lead Ad — form "${formName}"`;
+  return lines.length ? `${headerLine}\n\n${lines.join('\n')}` : headerLine;
+}
+
+// "just_me" → 1; "5–8_travellers" → 8; "2-4 travellers" → 4. Best-effort
+// planning number, undefined if nothing numeric.
+function parseGroupSize(raw?: string): number | undefined {
+  if (!raw) return undefined;
+  const low = raw.toLowerCase();
+  if (low.includes('just_me') || low.includes('only_me') || low.includes('solo')) return 1;
+  const nums = (raw.match(/\d+/g) || []).map(Number).filter((n) => n > 0 && n < 1000);
+  return nums.length ? Math.max(...nums) : undefined;
+}
+
 export interface BackfillResult {
   formsScanned: number;
   leadsFound: number;
@@ -121,6 +154,13 @@ export async function backfillLeadsForOrg(orgId: string, since?: Date): Promise<
         const phone = extractField(fieldData, ['phone', 'whatsapp', 'mobile', 'contact_number']);
         const email = extractField(fieldData, ['email']);
 
+        // Pull the rest of the form answers into structured fields + a
+        // readable block, so sales isn't stuck with just name/phone/email.
+        const destination = extractField(fieldData, ['destination', 'where_do_you', 'which_place', 'location']);
+        const preferredDate = extractField(fieldData, ['date', 'when_are_you', 'travel_month', 'preferred_dates']);
+        const groupSize = parseGroupSize(extractField(fieldData, ['travel', 'traveller', 'traveler', 'how_many', 'group', 'people']));
+        const formResponses = buildFormResponsesBlock(fieldData, form.name);
+
         if (!phone) {
           result.errors.push(`Form "${form.name}" lead ${ml.id}: no phone field in submission — skipped`);
           continue;
@@ -138,8 +178,11 @@ export async function backfillLeadsForOrg(orgId: string, since?: Date): Promise<
           name,
           phone,
           email,
+          destination: destination ? tidy(destination) : undefined,
+          preferredDate: preferredDate ? tidy(preferredDate) : undefined,
+          groupSize,
           source: 'META_ADS',
-          message: `Historical Meta Lead Ad submission — form "${form.name}"`,
+          message: formResponses,
           instagramLeadId: ml.id,
           adId: ml.ad_id,
           adName: ml.ad_name,
@@ -187,6 +230,76 @@ export async function backfillLeadsForOrg(orgId: string, since?: Date): Promise<
 // of relying on someone remembering to trigger the one-off backfill above.
 // Once HTTPS is in place, this can be replaced by (or kept alongside, as a
 // safety net for) a real webhook subscription.
+// ── One-time: enrich EXISTING Meta leads with their Instant Form answers ──────
+// Older leads only kept name/phone/email — this re-fetches each one's
+// field_data from Meta and fills in the "Customer Message" block plus
+// Destination / Preferred Date / Group Size. Idempotent: skips leads whose
+// message already has the new form-responses block, so it's safe to re-run.
+export interface EnrichResult {
+  scanned: number;
+  enriched: number;
+  skipped: number;
+  errors: string[];
+}
+
+export async function enrichExistingMetaLeads(orgId: string): Promise<EnrichResult> {
+  const result: EnrichResult = { scanned: 0, enriched: 0, skipped: 0, errors: [] };
+
+  const conn = await (prisma as any).metaConnection.findUnique({ where: { organizationId: orgId } });
+  if (!conn) throw new Error('No Meta connection configured for this organization');
+  if (!conn.pageId) throw new Error('No Facebook Page ID on this connection');
+
+  const systemUserToken = decrypt(conn.systemUserToken);
+  const pageTokenRes = await axios.get(`${META_BASE}/${conn.pageId}`, {
+    params: { fields: 'access_token', access_token: systemUserToken },
+    timeout: 15000,
+  });
+  const token = pageTokenRes.data?.access_token;
+  if (!token) throw new Error('Could not obtain a Page Access Token');
+
+  const leads = await prisma.lead.findMany({
+    where: { organizationId: orgId, source: 'META_ADS', instagramLeadId: { not: null }, deletedAt: null },
+    select: { id: true, instagramLeadId: true, message: true, destination: true, preferredDate: true, groupSize: true },
+  });
+
+  for (const lead of leads) {
+    result.scanned++;
+    if (lead.message?.startsWith('Meta Lead Ad — form "')) { result.skipped++; continue; }
+
+    try {
+      const { data } = await axios.get(`${META_BASE}/${lead.instagramLeadId}`, {
+        params: { fields: 'field_data,form_name', access_token: token },
+        timeout: 15000,
+      });
+      const fieldData: FieldDatum[] = data?.field_data || [];
+      if (!fieldData.length) { result.skipped++; continue; }
+
+      const formName: string = data?.form_name || 'Meta Lead Ad';
+      const destination = extractField(fieldData, ['destination', 'where_do_you', 'which_place', 'location']);
+      const preferredDate = extractField(fieldData, ['date', 'when_are_you', 'travel_month', 'preferred_dates']);
+      const groupSize = parseGroupSize(extractField(fieldData, ['travel', 'traveller', 'traveler', 'how_many', 'group', 'people']));
+
+      await prisma.lead.update({
+        where: { id: lead.id },
+        data: {
+          message: buildFormResponsesBlock(fieldData, formName),
+          // Only fill blanks — never overwrite something sales already set.
+          destination: lead.destination || (destination ? tidy(destination) : undefined),
+          preferredDate: lead.preferredDate || (preferredDate ? tidy(preferredDate) : undefined),
+          groupSize: lead.groupSize ?? groupSize,
+        },
+      });
+      result.enriched++;
+    } catch (err: any) {
+      const msg = err?.response?.data?.error?.message || err.message || 'Unknown error';
+      result.errors.push(`Lead ${lead.id} (${lead.instagramLeadId}): ${msg}`);
+    }
+  }
+
+  logger.info(`[metaLeadBackfill] enrich existing: scanned ${result.scanned}, enriched ${result.enriched}, skipped ${result.skipped}, errors ${result.errors.length}`);
+  return result;
+}
+
 export async function runScheduledLeadBackfill(): Promise<void> {
   const connections = await (prisma as any).metaConnection.findMany({ where: { isActive: true } });
   if (connections.length === 0) return;

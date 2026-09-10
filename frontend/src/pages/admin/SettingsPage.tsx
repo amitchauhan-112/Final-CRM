@@ -15,6 +15,7 @@ import { useTags, useCreateTag, useUpdateTag, useDeleteTag } from '../../hooks/u
 import {
   useMetaConnection, useSaveMetaConnection, useDeleteMetaConnection, useTriggerMetaSync,
   useTriggerLeadBackfill,
+  useEnrichExistingLeads,
   MetaConnectionInput,
 } from '../../hooks/useMetaConnection';
 import {
@@ -515,6 +516,7 @@ function MetaIntegrationsSection() {
   const deleteConnection = useDeleteMetaConnection();
   const triggerSync = useTriggerMetaSync();
   const triggerBackfill = useTriggerLeadBackfill();
+  const enrichLeads = useEnrichExistingLeads();
   const [showToken, setShowToken] = useState(false);
   const [confirmDisconnect, setConfirmDisconnect] = useState(false);
 
@@ -555,6 +557,15 @@ function MetaIntegrationsSection() {
       toast.success('Historical lead import started — this can take a few minutes for large accounts. Check back below for results.');
     } catch (err: any) {
       toast.error(err?.response?.data?.error || 'Backfill failed to start');
+    }
+  };
+
+  const onEnrich = async () => {
+    try {
+      const res = await enrichLeads.mutateAsync();
+      toast.success(res?.message || 'Existing leads enriched');
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error || 'Enrichment failed');
     }
   };
 
@@ -640,6 +651,15 @@ function MetaIntegrationsSection() {
             >
               <RefreshCw className={cn('w-4 h-4', triggerBackfill.isPending && 'animate-spin')} />
               {triggerBackfill.isPending ? 'Starting...' : 'Import Historical Leads'}
+            </button>
+            <button
+              onClick={onEnrich}
+              disabled={enrichLeads.isPending}
+              className="btn-secondary flex items-center gap-2 text-sm py-2"
+              title="Re-fetch the Instant Form answers (travellers, destination, dates, etc.) for existing Meta leads that only have name/phone/email"
+            >
+              <RefreshCw className={cn('w-4 h-4', enrichLeads.isPending && 'animate-spin')} />
+              {enrichLeads.isPending ? 'Enriching…' : 'Enrich Existing Leads'}
             </button>
             <button
               onClick={() => setConfirmDisconnect(true)}

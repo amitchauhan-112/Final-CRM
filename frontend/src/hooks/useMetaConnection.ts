@@ -92,6 +92,16 @@ export function useTriggerLeadBackfill() {
   });
 }
 
+// One-time — re-fetches Instant Form answers for existing Meta leads.
+// Runs synchronously and returns the result summary directly.
+export function useEnrichExistingLeads() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.post('/settings/meta-connection/enrich-leads').then((r) => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['leads'] }),
+  });
+}
+
 export function useArchivedCampaigns() {
   return useQuery<ArchivedCampaign[]>({
     queryKey: ['campaigns', 'archived'],

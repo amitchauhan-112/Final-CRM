@@ -5,7 +5,7 @@ import prisma from '../lib/prisma.js';
 import { AuthenticatedRequest } from '../types/index.js';
 import { encrypt, decrypt } from '../utils/encryption.js';
 import { runMetaSync } from '../services/metaSync.service.js';
-import { backfillLeadsForOrg } from '../services/metaLeadBackfill.service.js';
+import { backfillLeadsForOrg, enrichExistingMetaLeads } from '../services/metaLeadBackfill.service.js';
 import logger from '../utils/logger.js';
 
 const s3 = new S3Client({ region: process.env.AWS_REGION || 'ap-south-1' });
@@ -153,6 +153,25 @@ export const backfillLeads = async (req: AuthenticatedRequest, res: Response): P
     });
   } catch {
     res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+};
+
+// ── One-time: re-fetch Instant Form answers for existing Meta leads ──────────
+
+export const enrichExistingLeads = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const orgId = req.user?.organizationId;
+    if (!orgId) { res.status(400).json({ success: false, error: 'No organization attached to user' }); return; }
+
+    const result = await enrichExistingMetaLeads(orgId);
+    res.json({
+      success: true,
+      message: `Scanned ${result.scanned} Meta lead(s) — enriched ${result.enriched}, ${result.skipped} already had form data or none available${result.errors.length ? `, ${result.errors.length} error(s)` : ''}`,
+      data: result,
+    });
+  } catch (e: any) {
+    logger.error('[metaLeadBackfill] enrichExistingLeads error', e?.response?.data || e?.message);
+    res.status(500).json({ success: false, error: e?.response?.data?.error?.message || e?.message || 'Internal server error' });
   }
 };
 

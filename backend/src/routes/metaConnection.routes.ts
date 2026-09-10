@@ -5,6 +5,7 @@ import {
   deleteMetaConnection,
   triggerSync,
   backfillLeads,
+  enrichExistingLeads,
   getArchiveDownload,
 } from '../controllers/metaConnection.controller.js';
 import { authenticate, requireAdmin } from '../middleware/auth.js';
@@ -19,6 +20,7 @@ router.post('/',      saveMetaConnection);
 router.delete('/',    deleteMetaConnection);
 router.post('/sync',  triggerSync);
 router.post('/backfill-leads', backfillLeads);
+router.post('/enrich-leads', enrichExistingLeads);
 
 // Archive download is on campaigns router but wired here via controller
 // Campaign route: GET /api/campaigns/:id/archive-download → imported directly
