@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Search, RotateCcw, Archive } from 'lucide-react';
+import { ArrowLeft, Search, RotateCcw, Archive, Download } from 'lucide-react';
+import toast from 'react-hot-toast';
 import { useDeletedLeads, useRestoreLead } from '../../hooks/useLeads';
+import { exportDeletedLeadsToExcel } from '../../utils/export';
 import Table, { Column } from '../../components/ui/Table';
 import Pagination from '../../components/ui/Pagination';
 import Avatar from '../../components/ui/Avatar';
@@ -15,8 +17,21 @@ export default function DeletedLeadsPage() {
   const [search, setSearch] = useState('');
   const [restoreLeadId, setRestoreLeadId] = useState<string | null>(null);
 
+  const [exporting, setExporting] = useState(false);
+
   const { data, isLoading } = useDeletedLeads({ page, limit: 20, search: search || undefined });
   const restoreLead = useRestoreLead();
+
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      await exportDeletedLeadsToExcel();
+    } catch {
+      toast.error('Export failed');
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const leads = data?.data ?? [];
   const meta = data?.meta;
@@ -94,6 +109,15 @@ export default function DeletedLeadsPage() {
             <p className="page-subtitle">{meta?.total ?? 0} deleted lead{meta?.total === 1 ? '' : 's'} — Admin only</p>
           </div>
         </div>
+        <button
+          onClick={handleExport}
+          disabled={exporting || (meta?.total ?? 0) === 0}
+          className="btn-secondary gap-2 disabled:opacity-50"
+          title="Download all deleted leads (with reason, who deleted, when)"
+        >
+          <Download className="w-4 h-4" />
+          {exporting ? 'Exporting…' : 'Export'}
+        </button>
       </div>
 
       <div className="card p-4">

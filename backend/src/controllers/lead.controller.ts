@@ -561,6 +561,45 @@ export const getDeletedLeads = async (req: AuthenticatedRequest, res: Response):
   }
 };
 
+// Full spreadsheet of every soft-deleted lead — the permanent paper trail
+// (reason, who deleted it, when) for anything removed from the pipeline.
+export const exportDeletedLeads = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const leads = await prisma.lead.findMany({
+      where: { ...orgFilter(req), deletedAt: { not: null } },
+      include: {
+        campaign: { select: { name: true } },
+        assignedTo: { select: { name: true } },
+        deletedByUser: { select: { name: true } },
+      },
+      orderBy: { deletedAt: 'desc' },
+      take: 20000,
+    });
+
+    const rows = leads.map((l) => ({
+      Name: l.name,
+      Phone: l.phone,
+      Email: l.email ?? '',
+      'Status When Deleted': l.status,
+      Source: l.source,
+      Destination: l.destination ?? '',
+      Campaign: l.campaign?.name ?? '',
+      'Was Assigned To': l.assignedTo?.name ?? '',
+      Budget: l.budget ?? '',
+      Notes: l.notes ?? '',
+      'Delete Reason': l.deletedReason ?? '',
+      'Deleted By': l.deletedByUser?.name ?? '',
+      'Deleted At': l.deletedAt ? l.deletedAt.toISOString().slice(0, 16).replace('T', ' ') : '',
+      'Created At': l.createdAt.toISOString().slice(0, 10),
+    }));
+
+    res.json({ success: true, data: rows });
+  } catch (e) {
+    console.error('[leads] exportDeletedLeads error:', e);
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+};
+
 export const restoreLead = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;

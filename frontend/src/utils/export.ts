@@ -8,3 +8,6 @@ export const exportUsersToExcel = () =>
 
 export const exportCampaignsToExcel = () =>
   downloadSheetFromEndpoint('/campaigns/export', `campaigns_${todayStamp()}.xlsx`);
+
+export const exportDeletedLeadsToExcel = () =>
+  downloadSheetFromEndpoint('/leads/deleted/export', `deleted_leads_${todayStamp()}.xlsx`);
