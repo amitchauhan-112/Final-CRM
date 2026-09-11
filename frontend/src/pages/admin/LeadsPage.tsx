@@ -45,7 +45,7 @@ export default function AdminLeadsPage() {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState(searchParams.get('status') || '');
-  const [source, setSource] = useState('');
+  const [source, setSource] = useState(searchParams.get('source') || '');
   const [priority, setPriority] = useState('');
   const [tagId, setTagId] = useState('');
   const [preferredDate, setPreferredDate] = useState('');
@@ -56,14 +56,21 @@ export default function AdminLeadsPage() {
     setStatus(s);
     setPage(1);
   }, [searchParams]);
-  const [campaignId, setCampaignId] = useState('');
+  const [campaignId, setCampaignId] = useState(searchParams.get('campaignId') || '');
   const [assignedToId, setAssignedToId] = useState(searchParams.get('assignedToId') || '');
+  const [dateFrom, setDateFrom] = useState(searchParams.get('dateFrom') || '');
+  const [dateTo, setDateTo] = useState(searchParams.get('dateTo') || '');
 
-  // Deep-linked from Employee Monitoring — e.g. clicking a lead-count cell
-  // for a specific employee/status combination.
+  // Deep-linked from Employee Monitoring, Reports, or the Dashboard — e.g.
+  // clicking a lead-count cell for a specific employee/source/campaign/
+  // status/date-range combination, so what opens here is exactly the same
+  // set that number counted.
   useEffect(() => {
-    const a = searchParams.get('assignedToId') || '';
-    setAssignedToId(a);
+    setAssignedToId(searchParams.get('assignedToId') || '');
+    setSource(searchParams.get('source') || '');
+    setCampaignId(searchParams.get('campaignId') || '');
+    setDateFrom(searchParams.get('dateFrom') || '');
+    setDateTo(searchParams.get('dateTo') || '');
     setPage(1);
   }, [searchParams]);
   const [createOpen, setCreateOpen] = useState(false);
@@ -80,8 +87,8 @@ export default function AdminLeadsPage() {
   const [bulkSelected, setBulkSelected] = useState<string[]>([]);
   const [bulkStatus, setBulkStatus] = useState<LeadStatus>('CONTACTED');
 
-  const filters = { page, limit: 20, search: search || undefined, status: status || undefined, source: source || undefined, campaignId: campaignId || undefined, assignedToId: assignedToId || undefined, priority: priority || undefined, tagId: tagId || undefined, preferredDate: preferredDate || undefined };
-  const kanbanFilters = { page: 1, limit: 300, search: search || undefined, source: source || undefined, campaignId: campaignId || undefined, assignedToId: assignedToId || undefined, priority: priority || undefined, tagId: tagId || undefined, preferredDate: preferredDate || undefined };
+  const filters = { page, limit: 20, search: search || undefined, status: status || undefined, source: source || undefined, campaignId: campaignId || undefined, assignedToId: assignedToId || undefined, priority: priority || undefined, tagId: tagId || undefined, preferredDate: preferredDate || undefined, dateFrom: dateFrom || undefined, dateTo: dateTo || undefined };
+  const kanbanFilters = { page: 1, limit: 300, search: search || undefined, source: source || undefined, campaignId: campaignId || undefined, assignedToId: assignedToId || undefined, priority: priority || undefined, tagId: tagId || undefined, preferredDate: preferredDate || undefined, dateFrom: dateFrom || undefined, dateTo: dateTo || undefined };
 
   const { data, isLoading, refetch } = useLeads(viewMode === 'list' ? filters : kanbanFilters);
   const { data: campaignsData } = useCampaigns({ limit: 100 });
@@ -275,6 +282,9 @@ export default function AdminLeadsPage() {
     },
   ];
 
+  const deepLinkedEmployee = assignedToId ? employees.find((e) => e.id === assignedToId) : undefined;
+  const deepLinkedCampaign = campaignId ? campaigns.find((c) => c.id === campaignId) : undefined;
+
   return (
     <div className="space-y-4">
       {/* Header */}
@@ -314,6 +324,29 @@ export default function AdminLeadsPage() {
           </button>
         </div>
       </div>
+
+      {/* Deep-linked from Employee Monitoring, Reports, or the Dashboard —
+          makes it obvious why the list is scoped down, and gives an easy
+          way back to everything. */}
+      {(dateFrom || deepLinkedEmployee || source || deepLinkedCampaign) && (
+        <div className="flex items-center justify-between gap-3 px-4 py-2.5 bg-primary-50 border border-primary-200 rounded-xl">
+          <p className="text-sm text-primary-700">
+            Showing {deepLinkedEmployee ? <strong>{deepLinkedEmployee.name}</strong> : 'all employees'}
+            {source && <> · <strong>{source.charAt(0) + source.slice(1).toLowerCase()}</strong></>}
+            {deepLinkedCampaign && <> · <strong>{deepLinkedCampaign.name}</strong></>}
+            {dateFrom && (
+              <> · {dateFrom === dateTo ? formatDate(dateFrom) : `${formatDate(dateFrom)} – ${formatDate(dateTo)}`}</>
+            )}
+            {status && <> · <strong>{status.replace(/_/g, ' ')}</strong></>}
+          </p>
+          <button
+            onClick={() => navigate('/admin/leads')}
+            className="text-xs font-medium text-primary-700 hover:text-primary-900 underline flex-shrink-0"
+          >
+            Clear filter
+          </button>
+        </div>
+      )}
 
       {/* Upcoming interest — surfaces date clusters (e.g. "15 people want Sept 3")
           so a targeted offer can be sent to just that batch instead of everyone. */}

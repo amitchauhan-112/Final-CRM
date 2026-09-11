@@ -52,7 +52,7 @@ export default function EmployeeMonitoringPage() {
   }, {} as Record<string, number>), [employees]);
 
   const goToLeads = (employeeId: string, status?: string) => {
-    const params = new URLSearchParams({ assignedToId: employeeId });
+    const params = new URLSearchParams({ assignedToId: employeeId, dateFrom: range.from, dateTo: range.to });
     if (status) params.set('status', status);
     navigate(`/admin/leads?${params.toString()}`);
   };

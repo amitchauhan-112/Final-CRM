@@ -241,6 +241,7 @@ function RecentConfirmedWidget({ bookings }: { bookings: { id: string; name: str
 }
 
 function LeaderboardWidget() {
+  const navigate = useNavigate();
   const [preset, setPreset] = useState<MonitoringPreset>('today');
   const [customRange, setCustomRange] = useState(rangeForDays(7));
   const range = monitoringRange(preset, customRange);
@@ -273,7 +274,11 @@ function LeaderboardWidget() {
             const rate = parseFloat(emp.conversionRate);
             const rateColor = rate >= 50 ? 'text-green-600' : rate >= 25 ? 'text-yellow-600' : 'text-red-600';
             return (
-              <div key={emp.id} className={cn('flex items-center gap-3 px-5 py-3', idx === 0 && 'bg-yellow-50/50')}>
+              <div
+                key={emp.id}
+                onClick={() => navigate(`/admin/leads?assignedToId=${emp.id}&dateFrom=${range.from}&dateTo=${range.to}`)}
+                className={cn('flex items-center gap-3 px-5 py-3 cursor-pointer hover:bg-slate-50 transition-colors', idx === 0 && 'bg-yellow-50/50')}
+              >
                 <span className="text-lg w-6 text-center flex-shrink-0">{medals[idx] ?? `#${idx + 1}`}</span>
                 <Avatar name={emp.name} size="sm" className="flex-shrink-0" />
                 <div className="flex-1 min-w-0">

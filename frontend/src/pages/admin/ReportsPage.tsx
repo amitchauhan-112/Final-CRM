@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   BarChart2, Download, FileDown, FileText, TrendingUp, Users, CheckCircle,
   XCircle, Loader2, Megaphone, AlertTriangle,
@@ -60,6 +61,7 @@ function StatCard({ label, value, icon: Icon, color }: { label: string; value: s
 }
 
 export default function ReportsPage() {
+  const navigate = useNavigate();
   const [period, setPeriod] = useState<Period>('30d');
   const [customStart, setCustomStart] = useState('');
   const [customEnd, setCustomEnd] = useState('');
@@ -94,6 +96,16 @@ export default function ReportsPage() {
   const lostTotal = lostData?.data?.total ?? 0;
   const campaigns = campaignData?.data?.campaigns ?? [];
   const trend = trendData?.data?.trend ?? [];
+
+  // Same "click a number, see exactly those leads" pattern used on Employee
+  // Monitoring — carries this report's own date range through.
+  const goToLeads = (filter: { assignedToId?: string; source?: string; campaignId?: string }) => {
+    const params = new URLSearchParams({ dateFrom: startDate, dateTo: endDate });
+    if (filter.assignedToId) params.set('assignedToId', filter.assignedToId);
+    if (filter.source) params.set('source', filter.source);
+    if (filter.campaignId) params.set('campaignId', filter.campaignId);
+    navigate(`/admin/leads?${params.toString()}`);
+  };
 
   const getExportRows = () => {
     const date = `${startDate}-to-${endDate}`;
@@ -303,7 +315,11 @@ export default function ReportsPage() {
                     </thead>
                     <tbody>
                       {sourceStats.map((s: any, idx: number) => (
-                        <tr key={s.name} className="border-b border-slate-50 hover:bg-slate-50 transition-colors">
+                        <tr
+                          key={s.name}
+                          onClick={() => goToLeads({ source: s.name })}
+                          className="border-b border-slate-50 hover:bg-slate-50 transition-colors cursor-pointer"
+                        >
                           <td className="px-5 py-3.5">
                             <div className="flex items-center gap-3">
                               <span className="text-xs text-slate-400 w-4 text-center font-medium">{idx + 1}</span>
@@ -364,7 +380,11 @@ export default function ReportsPage() {
                     </thead>
                     <tbody>
                       {employees.map((emp: any, idx: number) => (
-                        <tr key={emp.id} className="border-b border-slate-50 hover:bg-slate-50 transition-colors">
+                        <tr
+                          key={emp.id}
+                          onClick={() => goToLeads({ assignedToId: emp.id })}
+                          className="border-b border-slate-50 hover:bg-slate-50 transition-colors cursor-pointer"
+                        >
                           <td className="px-5 py-3.5">
                             <div className="flex items-center gap-3">
                               <span className="text-xs text-slate-400 w-4 text-center font-medium">{idx + 1}</span>
@@ -401,7 +421,11 @@ export default function ReportsPage() {
                 <h3 className="font-semibold text-slate-800 mb-4 text-sm">Top Campaigns (by lead count)</h3>
                 <div className="space-y-2">
                   {topCampaigns.map((c: any, idx: number) => (
-                    <div key={c.id} className="flex items-center gap-3">
+                    <div
+                      key={c.id}
+                      onClick={() => goToLeads({ campaignId: c.id })}
+                      className="flex items-center gap-3 cursor-pointer hover:bg-slate-50 rounded-lg -mx-2 px-2 py-1 transition-colors"
+                    >
                       <span className="text-xs text-slate-400 w-4 font-medium">{idx + 1}</span>
                       <div className="flex-1">
                         <div className="flex items-center justify-between mb-1">
@@ -453,7 +477,11 @@ export default function ReportsPage() {
                   </thead>
                   <tbody>
                     {campaigns.map((c: any, idx: number) => (
-                      <tr key={c.id} className="border-b border-slate-50 hover:bg-slate-50 transition-colors">
+                      <tr
+                        key={c.id}
+                        onClick={() => goToLeads({ campaignId: c.id })}
+                        className="border-b border-slate-50 hover:bg-slate-50 transition-colors cursor-pointer"
+                      >
                         <td className="px-5 py-3.5 text-xs text-slate-400">{idx + 1}</td>
                         <td className="px-4 py-3.5">
                           <p className="text-sm font-medium text-slate-800">{c.name}</p>
