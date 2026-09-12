@@ -376,7 +376,7 @@ export default function EmployeeDashboard() {
           onClick={() => navigate(`/employee/leads?status=NEW&${dateQuery}`)}
         />
         <StatsCard
-          label="Not Contactable"
+          label="Not Contacted"
           value={cardStats.notContactable.length}
           icon={PhoneOff}
           iconBg="bg-slate-100"
