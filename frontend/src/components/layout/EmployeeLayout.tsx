@@ -5,7 +5,7 @@ import {
   LogOut, ChevronDown, Menu, X, Settings, UserCircle,
   Package, UserCheck, CheckSquare, Target, MessageCircle, BookOpen,
 } from 'lucide-react';
-import BookingLookup from './BookingLookup';
+import LeadLookup from './LeadLookup';
 import { useAuthStore } from '../../store/authStore';
 import { useNotifications, useMarkAllAsRead, useMarkAsRead } from '../../hooks/useNotifications';
 import FollowUpPopup from './FollowUpPopup';
@@ -135,7 +135,7 @@ export default function EmployeeLayout() {
           </div>
 
           <div className="flex items-center gap-2">
-            <BookingLookup />
+            <LeadLookup />
             <div ref={notifRef} className="relative">
               <button
                 onClick={() => setNotifOpen(!notifOpen)}

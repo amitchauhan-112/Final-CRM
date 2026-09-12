@@ -159,7 +159,7 @@ Desktop\master crm\
         │                        #   Reports, Payroll
         └── components/
             ├── layout/           # AdminLayout, EmployeeLayout (Operations/Finance settings reuse
-            │                     #   EmployeeSettingsPage), GlobalSearch, BookingLookup, FollowUpPopup
+            │                     #   EmployeeSettingsPage), GlobalSearch, LeadLookup, FollowUpPopup
             ├── dashboard/        # AdminDashboard, EmployeeDashboard
             ├── leads/            # LeadForm, LeadDetail, StatusBar, KanbanBoard, BookingConfirmModal,
             │                     #   FollowUpModal, FollowUpOutcomeModal, LostReasonModal,

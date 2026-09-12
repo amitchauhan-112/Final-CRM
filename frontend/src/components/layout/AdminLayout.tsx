@@ -15,7 +15,7 @@ import FeedbackButton from '../feedback/FeedbackButton';
 import { formatRelativeTime, cn } from '../../utils/helpers';
 import { SEVERITY_DOT, CATEGORIES } from '../../utils/notificationMeta';
 import GlobalSearch from './GlobalSearch';
-import BookingLookup from './BookingLookup';
+import LeadLookup from './LeadLookup';
 
 // ─── Nav Configuration ────────────────────────────────────────────────────────
 
@@ -346,7 +346,7 @@ export default function AdminLayout() {
           </div>
 
           <div className="flex items-center gap-1.5">
-            <BookingLookup />
+            <LeadLookup />
             <GlobalSearch />
 
             {/* Notifications */}

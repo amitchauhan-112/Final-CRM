@@ -7,10 +7,13 @@ const orgFilter = (req: AuthenticatedRequest) => (orgId(req) ? { organizationId:
 
 const LIMIT = 5;
 
-// ─── GET /erp/booking-lookup?q= ──────────────────────────────────────────────
-// Search bookings by booking number OR registered mobile number.
+// ─── GET /erp/lead-lookup?q= ─────────────────────────────────────────────────
+// Search leads by name, phone, email, or their booking number (if they've
+// gone on to become a booking). Was booking-only before — a lead not yet
+// confirmed returned nothing, which read as "search is broken" since most
+// searches here are for a person, not specifically a completed booking.
 // Accessible to all authenticated roles (Admin, Employee, Finance, Operations).
-export const bookingLookup = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+export const leadLookup = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const q = String(req.query.q ?? '').trim();
     if (q.length < 3) { res.json({ success: true, data: [] }); return; }
@@ -18,44 +21,46 @@ export const bookingLookup = async (req: AuthenticatedRequest, res: Response): P
     const oid = orgId(req);
     const contains = { contains: q, mode: 'insensitive' as const };
 
-    const bookings = await prisma.booking.findMany({
+    const leads = await prisma.lead.findMany({
       where: {
         ...(oid ? { organizationId: oid } : {}),
+        deletedAt: null,
         OR: [
-          { bookingNumber: contains },
-          { lead: { phone: contains } },
-          { travelerName: contains },
+          { name: contains },
+          { phone: contains },
+          { email: contains },
+          { booking: { bookingNumber: contains } },
         ],
       },
       include: {
-        lead: {
-          select: {
-            id: true, name: true, phone: true, email: true, destination: true,
-            assignedTo: { select: { id: true, name: true } },
+        assignedTo: { select: { id: true, name: true } },
+        campaign: { select: { id: true, name: true } },
+        booking: {
+          include: {
+            package: { select: { id: true, name: true, code: true } },
+            departure: { select: { id: true, departureDate: true, destination: true, status: true } },
+            payments: {
+              select: { id: true, amount: true, method: true, status: true, reference: true, receiptNo: true, createdAt: true },
+              orderBy: { createdAt: 'desc' },
+            },
+            travelers: {
+              select: { id: true, name: true, age: true, gender: true, mobile: true },
+              orderBy: { createdAt: 'asc' },
+            },
+            paymentSchedule: {
+              select: { id: true, dueDate: true, amount: true, label: true, paidAmount: true, status: true },
+              orderBy: { dueDate: 'asc' },
+            },
           },
-        },
-        package: { select: { id: true, name: true, code: true } },
-        departure: { select: { id: true, departureDate: true, destination: true, status: true } },
-        payments: {
-          select: { id: true, amount: true, method: true, status: true, reference: true, receiptNo: true, createdAt: true },
-          orderBy: { createdAt: 'desc' },
-        },
-        travelers: {
-          select: { id: true, name: true, age: true, gender: true, mobile: true },
-          orderBy: { createdAt: 'asc' },
-        },
-        paymentSchedule: {
-          select: { id: true, dueDate: true, amount: true, label: true, paidAmount: true, status: true },
-          orderBy: { dueDate: 'asc' },
         },
       },
       take: 10,
       orderBy: { createdAt: 'desc' },
     });
 
-    res.json({ success: true, data: bookings });
+    res.json({ success: true, data: leads });
   } catch (e) {
-    console.error('[search] bookingLookup error:', e);
+    console.error('[search] leadLookup error:', e);
     res.status(500).json({ success: false, error: 'Internal server error' });
   }
 };

@@ -4,7 +4,7 @@ import {
   Mountain, LayoutDashboard, CalendarRange, Truck, Bell,
   LogOut, ChevronDown, Menu, X, Settings, UserCircle, Map, BedDouble,
 } from 'lucide-react';
-import BookingLookup from './BookingLookup';
+import LeadLookup from './LeadLookup';
 import { useAuthStore } from '../../store/authStore';
 import { useNotifications, useMarkAllAsRead, useMarkAsRead } from '../../hooks/useNotifications';
 import Avatar from '../ui/Avatar';
@@ -130,7 +130,7 @@ export default function OperationsLayout() {
           </div>
 
           <div className="flex items-center gap-2">
-            <BookingLookup />
+            <LeadLookup />
             <div ref={notifRef} className="relative">
               <button
                 onClick={() => setNotifOpen(!notifOpen)}
