@@ -12,8 +12,9 @@ type SortKey = 'total' | 'fresh' | 'notContacted' | 'contacted' | 'interested' |
 
 // Maps each column to the Lead status its cell should filter the Leads page
 // by when clicked — undefined means "no status filter" (just this employee).
-// Overdue has no dedicated status of its own; it reuses FOLLOW_UP_SCHEDULED,
-// the same convention the Dashboard's "Overdue Follow-ups" card already uses.
+// Overdue has no dedicated status of its own — its cell is wired separately
+// below to the `overdue=true` deep-link param instead (FOLLOW_UP_SCHEDULED
+// whose date has already passed), not a plain status filter.
 const COLUMNS: { key: SortKey; label: string; status?: string }[] = [
   { key: 'total', label: 'Assigned' },
   { key: 'fresh', label: 'Fresh', status: 'NEW' },
@@ -23,7 +24,7 @@ const COLUMNS: { key: SortKey; label: string; status?: string }[] = [
   { key: 'followUpScheduled', label: 'Follow-up', status: 'FOLLOW_UP_SCHEDULED' },
   { key: 'confirmed', label: 'Confirmed', status: 'CONFIRMED' },
   { key: 'lost', label: 'Lost', status: 'LOST' },
-  { key: 'overdue', label: 'Overdue', status: 'FOLLOW_UP_SCHEDULED' },
+  { key: 'overdue', label: 'Overdue' },
   { key: 'conversionRate', label: 'Conv. %' },
 ];
 
@@ -51,9 +52,10 @@ export default function EmployeeMonitoringPage() {
     return acc;
   }, {} as Record<string, number>), [employees]);
 
-  const goToLeads = (employeeId: string, status?: string) => {
+  const goToLeads = (employeeId: string, status?: string, overdue?: boolean) => {
     const params = new URLSearchParams({ assignedToId: employeeId, dateFrom: range.from, dateTo: range.to });
     if (status) params.set('status', status);
+    if (overdue) params.set('overdue', 'true');
     navigate(`/admin/leads?${params.toString()}`);
   };
 
@@ -158,8 +160,8 @@ export default function EmployeeMonitoringPage() {
                       <Cell value={emp.lost} status="LOST" className="text-red-500" />
                       <td className="px-4 py-3.5 text-right">
                         <button
-                          onClick={() => goToLeads(emp.id, 'FOLLOW_UP_SCHEDULED')}
-                          title={`View ${emp.name}'s follow-up leads`}
+                          onClick={() => goToLeads(emp.id, undefined, true)}
+                          title={`View ${emp.name}'s overdue follow-up leads`}
                         >
                           {emp.overdue > 0 ? (
                             <span className="badge badge-danger text-xs hover:opacity-80 transition-opacity">{emp.overdue}</span>

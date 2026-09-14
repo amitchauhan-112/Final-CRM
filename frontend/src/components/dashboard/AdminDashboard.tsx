@@ -521,7 +521,7 @@ export default function AdminDashboard() {
           icon={AlertCircle}
           iconBg="bg-red-100"
           iconColor="text-red-600"
-          onClick={() => navigate('/admin/leads?status=FOLLOW_UP_SCHEDULED')}
+          onClick={() => navigate('/admin/leads?overdue=true')}
         />
       </div>
 

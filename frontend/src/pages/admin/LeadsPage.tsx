@@ -60,6 +60,7 @@ export default function AdminLeadsPage() {
   const [assignedToId, setAssignedToId] = useState(searchParams.get('assignedToId') || '');
   const [dateFrom, setDateFrom] = useState(searchParams.get('dateFrom') || '');
   const [dateTo, setDateTo] = useState(searchParams.get('dateTo') || '');
+  const [overdue, setOverdue] = useState(searchParams.get('overdue') === 'true');
 
   // Deep-linked from Employee Monitoring, Reports, or the Dashboard — e.g.
   // clicking a lead-count cell for a specific employee/source/campaign/
@@ -71,6 +72,7 @@ export default function AdminLeadsPage() {
     setCampaignId(searchParams.get('campaignId') || '');
     setDateFrom(searchParams.get('dateFrom') || '');
     setDateTo(searchParams.get('dateTo') || '');
+    setOverdue(searchParams.get('overdue') === 'true');
     setPage(1);
   }, [searchParams]);
   const [createOpen, setCreateOpen] = useState(false);
@@ -87,8 +89,8 @@ export default function AdminLeadsPage() {
   const [bulkSelected, setBulkSelected] = useState<string[]>([]);
   const [bulkStatus, setBulkStatus] = useState<LeadStatus>('CONTACTED');
 
-  const filters = { page, limit: 20, search: search || undefined, status: status || undefined, source: source || undefined, campaignId: campaignId || undefined, assignedToId: assignedToId || undefined, priority: priority || undefined, tagId: tagId || undefined, preferredDate: preferredDate || undefined, dateFrom: dateFrom || undefined, dateTo: dateTo || undefined };
-  const kanbanFilters = { page: 1, limit: 300, search: search || undefined, source: source || undefined, campaignId: campaignId || undefined, assignedToId: assignedToId || undefined, priority: priority || undefined, tagId: tagId || undefined, preferredDate: preferredDate || undefined, dateFrom: dateFrom || undefined, dateTo: dateTo || undefined };
+  const filters = { page, limit: 20, search: search || undefined, status: status || undefined, source: source || undefined, campaignId: campaignId || undefined, assignedToId: assignedToId || undefined, priority: priority || undefined, tagId: tagId || undefined, preferredDate: preferredDate || undefined, dateFrom: dateFrom || undefined, dateTo: dateTo || undefined, overdue: overdue || undefined };
+  const kanbanFilters = { page: 1, limit: 300, search: search || undefined, source: source || undefined, campaignId: campaignId || undefined, assignedToId: assignedToId || undefined, priority: priority || undefined, tagId: tagId || undefined, preferredDate: preferredDate || undefined, dateFrom: dateFrom || undefined, dateTo: dateTo || undefined, overdue: overdue || undefined };
 
   const { data, isLoading, refetch } = useLeads(viewMode === 'list' ? filters : kanbanFilters);
   const { data: campaignsData } = useCampaigns({ limit: 100 });
@@ -328,7 +330,7 @@ export default function AdminLeadsPage() {
       {/* Deep-linked from Employee Monitoring, Reports, or the Dashboard —
           makes it obvious why the list is scoped down, and gives an easy
           way back to everything. */}
-      {(dateFrom || deepLinkedEmployee || source || deepLinkedCampaign) && (
+      {(dateFrom || deepLinkedEmployee || source || deepLinkedCampaign || overdue) && (
         <div className="flex items-center justify-between gap-3 px-4 py-2.5 bg-primary-50 border border-primary-200 rounded-xl">
           <p className="text-sm text-primary-700">
             Showing {deepLinkedEmployee ? <strong>{deepLinkedEmployee.name}</strong> : 'all employees'}
@@ -337,7 +339,7 @@ export default function AdminLeadsPage() {
             {dateFrom && (
               <> · {dateFrom === dateTo ? formatDate(dateFrom) : `${formatDate(dateFrom)} – ${formatDate(dateTo)}`}</>
             )}
-            {status && <> · <strong>{status.replace(/_/g, ' ')}</strong></>}
+            {overdue ? <> · <strong>Overdue Follow-ups</strong></> : status && <> · <strong>{status.replace(/_/g, ' ')}</strong></>}
           </p>
           <button
             onClick={() => navigate('/admin/leads')}

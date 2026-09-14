@@ -30,7 +30,7 @@ export const getLeads = async (req: AuthenticatedRequest, res: Response): Promis
       // filters), the same way the Bookings list already does, instead of
       // staying wherever its original createdAt placed it.
       sortBy = 'updatedAt', sortOrder = 'desc',
-      dateFrom, dateTo, preferredDate,
+      dateFrom, dateTo, preferredDate, overdue,
     } = req.query;
 
     const skip = (Number(page) - 1) * Number(limit);
@@ -47,6 +47,15 @@ export const getLeads = async (req: AuthenticatedRequest, res: Response): Promis
     if (priority) where.priority = priority;
     if (tagId) where.tags = { some: { tagId } };
     if (assignedToId && req.user?.role === 'ADMIN') where.assignedToId = assignedToId;
+    // "Overdue" isn't its own status — it's FOLLOW_UP_SCHEDULED whose date has
+    // already passed (same definition as getOverdueFollowUps). Deliberately
+    // overrides any `status` filter above, so a deep-link only needs to pass
+    // this one flag instead of also knowing to pass status=FOLLOW_UP_SCHEDULED.
+    if (overdue === 'true' || overdue === '1') {
+      where.status = 'FOLLOW_UP_SCHEDULED';
+      where.followUpDone = false;
+      where.followUpDate = { lt: new Date() };
+    }
     // Exact match — preferredDate is already stored as a plain YYYY-MM-DD
     // string (same shape the `<input type="date">` in LeadForm submits).
     if (preferredDate) where.preferredDate = preferredDate;

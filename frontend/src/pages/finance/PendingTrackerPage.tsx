@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { usePendingTracker } from '../../hooks/useFinance';
 import { useUsers } from '../../hooks/useUsers';
 import Table, { Column } from '../../components/ui/Table';
@@ -13,11 +14,20 @@ const INDICATOR_STYLE: Record<string, string> = {
 };
 
 export default function PendingTrackerPage() {
+  const [searchParams] = useSearchParams();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [destination, setDestination] = useState('');
   const [salesEmployeeId, setSalesEmployeeId] = useState('');
-  const [status, setStatus] = useState('');
+  const [status, setStatus] = useState(searchParams.get('status') || '');
+
+  // Deep-linked from the Finance Dashboard's Overdue/Upcoming Due cards —
+  // pre-select the matching status instead of dropping the user on the
+  // full unfiltered list (same fix as the Leads "Overdue" cards).
+  useEffect(() => {
+    setStatus(searchParams.get('status') || '');
+    setPage(1);
+  }, [searchParams]);
 
   const handle = (setter: (v: string) => void) => (v: string) => { setter(v); setPage(1); };
 

@@ -21,6 +21,7 @@ export interface LeadFilters {
   dateFrom?: string;
   dateTo?: string;
   preferredDate?: string;
+  overdue?: boolean;
 }
 
 export interface PreferredDateSummaryEntry {

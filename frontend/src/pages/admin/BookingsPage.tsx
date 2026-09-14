@@ -3,11 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import {
   BookOpen, Search, IndianRupee, Users, TrendingUp, AlertCircle,
   ChevronLeft, ChevronRight, ExternalLink, Calendar, MapPin,
-  CheckCircle, Clock, XCircle,
+  CheckCircle, Clock, XCircle, Trash2,
 } from 'lucide-react';
 import { useAllBookings } from '../../hooks/useErp';
+import { useDeleteBooking } from '../../hooks/useBookings';
 import { BookingWithLead } from '../../types/index';
 import { Skeleton } from '../../components/ui/Skeleton';
+import DeleteBookingReasonModal from '../../components/leads/DeleteBookingReasonModal';
 import { formatCurrency, formatDate, cn } from '../../utils/helpers';
 
 // ─── Payment status badge ─────────────────────────────────────────────────────
@@ -39,9 +41,17 @@ export default function BookingsPage() {
   const [page, setPage] = useState(1);
 
   const { data, isLoading } = useAllBookings({ search, status, from, to, page, limit: 20 });
+  const deleteBooking = useDeleteBooking();
+  const [deleteBookingId, setDeleteBookingId] = useState<string | null>(null);
 
   const bookings = data?.data ?? [];
   const meta = data?.meta;
+  const bookingToDelete = bookings.find((b) => b.id === deleteBookingId) ?? null;
+
+  const handleDeleteConfirm = (reason: string) => {
+    if (!deleteBookingId) return;
+    deleteBooking.mutate({ id: deleteBookingId, reason }, { onSuccess: () => setDeleteBookingId(null) });
+  };
 
   // Quick stats from current page (full totals would need a separate endpoint — shown from what's loaded)
   const totals = bookings.reduce(
@@ -193,13 +203,22 @@ export default function BookingsPage() {
                       <PaymentBadge booking={b} />
                     </td>
                     <td className="px-4 py-3 align-top text-right">
-                      <button
-                        onClick={() => navigate(`/admin/leads?id=${b.leadId}`)}
-                        className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-primary-600 transition-colors"
-                        title="View lead"
-                      >
-                        <ExternalLink className="w-3.5 h-3.5" />
-                      </button>
+                      <div className="flex items-center justify-end gap-0.5">
+                        <button
+                          onClick={() => navigate(`/admin/leads?id=${b.leadId}`)}
+                          className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-primary-600 transition-colors"
+                          title="View lead"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => setDeleteBookingId(b.id)}
+                          className="p-1.5 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-600 transition-colors"
+                          title="Delete booking"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -233,6 +252,16 @@ export default function BookingsPage() {
           )}
         </>
       )}
+
+      {/* Delete confirm — mandatory reason, Admin-only (route already guards this whole page).
+          Hard delete, no trash folder — for cleaning up a wrong/duplicate/test booking. */}
+      <DeleteBookingReasonModal
+        open={!!deleteBookingId}
+        bookingLabel={bookingToDelete?.bookingNumber ?? bookingToDelete?.travelerName}
+        onCancel={() => setDeleteBookingId(null)}
+        onConfirm={handleDeleteConfirm}
+        isLoading={deleteBooking.isPending}
+      />
     </div>
   );
 }

@@ -88,6 +88,28 @@ export function useUpdateBooking() {
   });
 }
 
+// Hard delete — Admin only, mandatory reason. Unlike a lead delete, there's
+// no "trash folder" to restore from here; this is for cleaning up a wrongly
+// created or duplicate/test booking, not a normal cancellation (a real
+// cancellation belongs on the booking's own status, not a delete).
+export function useDeleteBooking() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, reason }: { id: string; reason: string }) => {
+      const { data } = await api.delete(`/bookings/${id}`, { data: { reason } });
+      return data;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['erp-bookings'] });
+      qc.invalidateQueries({ queryKey: ['finance-summary'] });
+      qc.invalidateQueries({ queryKey: ['operations-trips'] });
+      qc.invalidateQueries({ queryKey: ['customers'] });
+      toast.success('Booking deleted');
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.error || 'Failed to delete booking'),
+  });
+}
+
 export function useMarkReviewCollected(leadId: string | null) {
   const qc = useQueryClient();
   return useMutation({
