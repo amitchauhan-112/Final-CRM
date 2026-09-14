@@ -870,7 +870,7 @@ export default function LeadDetail({ leadId, open, onClose, isStarred, onToggleS
   const [followUpModalOpen, setFollowUpModalOpen] = useState(false);
   const [outcomeModalOpen, setOutcomeModalOpen] = useState(false);
 
-  const { data, isLoading } = useLead(leadId);
+  const { data, isLoading, isError } = useLead(leadId);
   const updateLead = useUpdateLead();
   const transferLead = useTransferLead();
   const { data: usersData } = useUsers({ limit: 100 });
@@ -1009,8 +1009,22 @@ export default function LeadDetail({ leadId, open, onClose, isStarred, onToggleS
   return (
     <>
       <Modal open={open} onClose={handleCloseAttempt} size="3xl" noPadding>
-        {isLoading || !lead ? (
+        {isLoading ? (
           <WorkspaceSkeleton />
+        ) : isError || !lead ? (
+          // Settled but no lead — e.g. deep-linked to one that's since been
+          // deleted, or belongs to another org. Previously this fell through
+          // to the loading skeleton forever with no way out but the browser
+          // back button, since the check above only looked at "no data yet",
+          // not "finished loading and still nothing."
+          <div className="flex flex-col items-center justify-center gap-3 py-20 px-6 text-center">
+            <AlertTriangle className="w-10 h-10 text-slate-300" />
+            <p className="font-semibold text-slate-600">Lead not found</p>
+            <p className="text-sm text-slate-400 max-w-xs">
+              It may have been deleted, or you may not have access to it.
+            </p>
+            <button onClick={onClose} className="btn-secondary mt-2">Close</button>
+          </div>
         ) : (
           <>
             {/* ── Sticky Header ─────────────────────────────────────────── */}
