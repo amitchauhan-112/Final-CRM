@@ -525,6 +525,16 @@ export const deleteLead = async (req: AuthenticatedRequest, res: Response): Prom
     const existing = await prisma.lead.findFirst({ where: { id, deletedAt: null, ...orgFilter(req) } });
     if (!existing) { res.status(404).json({ success: false, error: 'Lead not found' }); return; }
 
+    // A lead that has already become a booking must never be silently
+    // orphaned — deleting it while leaving the booking active would still
+    // count toward Finance/Operations totals with no lead to trace it back
+    // to. The booking has to be handled (cancelled/removed) explicitly first.
+    const hasBooking = await prisma.booking.findUnique({ where: { leadId: id }, select: { id: true } });
+    if (hasBooking) {
+      res.status(400).json({ success: false, error: 'This lead has a booking — cancel or remove the booking before deleting this lead' });
+      return;
+    }
+
     await prisma.lead.update({
       where: { id },
       data: { deletedAt: new Date(), deletedReason: resolvedReason, deletedById: req.user!.id },

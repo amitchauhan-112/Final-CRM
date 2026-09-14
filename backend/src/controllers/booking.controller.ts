@@ -444,6 +444,48 @@ export const updateBooking = async (req: AuthenticatedRequest, res: Response): P
   }
 };
 
+// ─── Delete (hard) — ADMIN only, mandatory reason ────────────────────────────
+// A booking has no soft-delete of its own — a real cancellation belongs on
+// Booking.status = CANCELLED, not here. This is purely for removing a
+// wrongly-created or duplicate/test booking so it stops counting toward
+// Finance/Operations totals. Cascades to its payments, tasks, travelers,
+// refunds, payment schedule and finance documents via the schema's
+// onDelete: Cascade relations.
+export const deleteBooking = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const resolvedReason = (req.body.reason || '').trim();
+    if (!resolvedReason) {
+      res.status(400).json({ success: false, error: 'A reason is required to delete a booking' });
+      return;
+    }
+
+    const existing = await prisma.booking.findFirst({
+      where: { id, ...(orgId(req) ? { organizationId: orgId(req) } : {}) },
+      select: { id: true, bookingNumber: true, travelerName: true, leadId: true },
+    });
+    if (!existing) { res.status(404).json({ success: false, error: 'Booking not found' }); return; }
+
+    await prisma.booking.delete({ where: { id } });
+
+    await prisma.activityLog.create({
+      data: {
+        action: 'Booking Deleted',
+        details: `Deleted booking ${existing.bookingNumber ?? existing.id.slice(0, 8)} (${existing.travelerName}) by ${req.user?.name} — ${resolvedReason}`,
+        entityType: 'BOOKING',
+        entityId: existing.id,
+        userId: req.user!.id,
+        leadId: existing.leadId,
+      },
+    });
+
+    res.json({ success: true, message: 'Booking deleted' });
+  } catch (e) {
+    console.error('[bookings] deleteBooking error:', e);
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+};
+
 // ─── Journey Tracker terminal stages ─────────────────────────────────────────
 // Review/referral collection has no dedicated workflow in this app yet — these
 // are simple one-click "mark as done" actions so the journey tracker can
