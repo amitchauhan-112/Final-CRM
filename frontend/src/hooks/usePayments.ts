@@ -21,8 +21,8 @@ export function usePaymentsSummary() {
       const { data } = await api.get('/payments/summary');
       return data;
     },
-    // Replaces the old 'finance_updated' Socket.IO event.
-    refetchInterval: 20000,
+    // Replaces the old 'finance_updated' Socket.IO event. Tightened from 20s.
+    refetchInterval: 7000,
   });
 }
 

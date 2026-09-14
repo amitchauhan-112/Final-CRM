@@ -49,8 +49,9 @@ export function useLeads(filters: LeadFilters = {}) {
       return data;
     },
     // Replaces the old 'lead_updated' Socket.IO event — only polls while this
-    // list is actually on screen.
-    refetchInterval: 20000,
+    // list is actually on screen. Tightened from 20s so a change made by
+    // another employee/admin shows up closer to real-time.
+    refetchInterval: 7000,
   });
 }
 
@@ -83,7 +84,7 @@ export function useLeadStats() {
       const { data } = await api.get('/leads/stats');
       return data;
     },
-    refetchInterval: 20000,
+    refetchInterval: 7000,
   });
 }
 
@@ -94,7 +95,7 @@ export function useOverdueFollowUps() {
       const { data } = await api.get('/leads/overdue');
       return data;
     },
-    refetchInterval: 20000,
+    refetchInterval: 7000,
   });
 }
 

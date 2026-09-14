@@ -14,8 +14,10 @@ export function useOpsDashboard() {
     queryKey: ['operations', 'dashboard'],
     queryFn: async () => (await api.get('/operations/dashboard')).data,
     staleTime: 60 * 1000,
-    // Replaces the old 'operations_updated' Socket.IO event.
-    refetchInterval: 20000,
+    // Replaces the old 'operations_updated' Socket.IO event. Tightened
+    // from 20s so a Sales confirmation or Finance payment shows up here
+    // closer to real-time, without a full WebSocket layer.
+    refetchInterval: 7000,
   });
 }
 
@@ -68,8 +70,8 @@ export function useDepartures(filters: DepartureFilters = {}) {
       const { data } = await api.get(`/operations/departures?${params.toString()}`);
       return data;
     },
-    // Replaces the old 'operations_updated' Socket.IO event.
-    refetchInterval: 20000,
+    // Replaces the old 'operations_updated' Socket.IO event. Tightened from 20s.
+    refetchInterval: 7000,
   });
 }
 

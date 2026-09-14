@@ -12,8 +12,11 @@ export function useBookingByLead(leadId: string | null) {
     },
     enabled: !!leadId,
     retry: false,
-    // Replaces the old 'finance_updated' Socket.IO event.
-    refetchInterval: 20000,
+    // Replaces the old 'finance_updated' Socket.IO event. Tightened from
+    // 20s so a booking edit made in one panel (e.g. Finance recording a
+    // payment) shows up in another (e.g. Sales viewing the same lead)
+    // closer to real-time, without a full WebSocket layer.
+    refetchInterval: 7000,
   });
 }
 

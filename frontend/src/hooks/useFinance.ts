@@ -13,8 +13,10 @@ export function useFinanceDashboard() {
     queryKey: ['finance', 'dashboard'],
     queryFn: async () => (await api.get('/finance/dashboard')).data,
     staleTime: 60 * 1000,
-    // Replaces the old 'finance_updated' Socket.IO event.
-    refetchInterval: 20000,
+    // Replaces the old 'finance_updated' Socket.IO event. Tightened from
+    // 20s so a booking/payment made in Sales or Operations shows up here
+    // closer to real-time, without a full WebSocket layer.
+    refetchInterval: 7000,
   });
 }
 
@@ -38,8 +40,8 @@ export function usePaymentsForVerification(filters: PaymentVerificationFilters =
       const { data } = await api.get(`/finance/payments?${params.toString()}`);
       return data;
     },
-    // Replaces the old 'finance_updated' Socket.IO event.
-    refetchInterval: 20000,
+    // Replaces the old 'finance_updated' Socket.IO event. Tightened from 20s.
+    refetchInterval: 7000,
   });
 }
 
