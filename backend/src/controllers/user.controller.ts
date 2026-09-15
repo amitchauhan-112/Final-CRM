@@ -133,6 +133,24 @@ export const updateUser = async (req: AuthenticatedRequest, res: Response): Prom
       return;
     }
 
+    // Deactivating here bypassed the same active-work check the dedicated
+    // "Deactivate Employee" flow enforces — closing that gap so a quick
+    // toggle can't silently strand someone's leads/tasks on a now-invisible employee.
+    if (isActive === false) {
+      const target = await prisma.user.findUnique({ where: { id }, select: { isActive: true } });
+      if (target?.isActive) {
+        const activeWork = await getActiveWorkSummary(id);
+        if (activeWork.total > 0) {
+          res.status(409).json({
+            success: false,
+            error: 'This employee still has active work assigned to them — use "Deactivate Employee" instead, which lets you reassign it first.',
+            activeWork,
+          });
+          return;
+        }
+      }
+    }
+
     const updateData: any = {};
     if (name !== undefined) updateData.name = name;
     if (email !== undefined) updateData.email = email.trim().toLowerCase();
@@ -252,45 +270,51 @@ export const deleteUser = async (req: AuthenticatedRequest, res: Response): Prom
         res.status(400).json({ success: false, error: 'Cannot reassign to a deactivated employee' }); return;
       }
 
-      await prisma.$transaction(async (tx) => {
-        await tx.lead.updateMany({
-          where: { assignedToId: id, deletedAt: null },
-          data: { assignedToId: reassignToId },
-        });
-
-        // CampaignEmployee has a @@unique([campaignId, userId]) — a plain
-        // updateMany would violate it for any campaign the target is
-        // already on, so each row is resolved individually: drop the
-        // departing employee's row if the target's already a member,
-        // otherwise hand it over.
-        const memberships = await tx.campaignEmployee.findMany({ where: { userId: id } });
-        for (const m of memberships) {
-          const alreadyMember = await tx.campaignEmployee.findUnique({
-            where: { campaignId_userId: { campaignId: m.campaignId, userId: reassignToId } },
-          });
-          if (alreadyMember) await tx.campaignEmployee.delete({ where: { id: m.id } });
-          else await tx.campaignEmployee.update({ where: { id: m.id }, data: { userId: reassignToId } });
-        }
-
-        await tx.bookingTask.updateMany({
-          where: { assigneeId: id, status: { notIn: NOT_DONE_TASK_STATUSES } },
-          data: { assigneeId: reassignToId },
-        });
-
-        await tx.department.updateMany({ where: { headId: id }, data: { headId: reassignToId } });
-
-        await tx.activityLog.create({
-          data: {
-            action: 'Employee Removed — Work Reassigned',
-            details: `${activeWork.leads} lead(s), ${activeWork.campaigns} campaign membership(s), ${activeWork.tasks} task(s) and ${activeWork.departments} department headship(s) moved from ${target.name} to ${reassignTarget.name}.`,
-            entityType: 'USER',
-            entityId: id,
-            userId: req.user!.id,
-          },
-        });
-
-        await tx.user.update({ where: { id }, data: { isActive: false } });
+      // Deliberately not wrapped in prisma.$transaction() — an interactive
+      // transaction here reliably 500s as "Transaction not found" (P2028)
+      // against Supabase's pooled connection (pgbouncer transaction-mode
+      // pooling doesn't hold interactive transactions open reliably across
+      // the conditional per-row loop below). Run sequentially instead: this
+      // is reassignment bookkeeping, not financial data, so a rare partial
+      // failure is recoverable by re-running the same request rather than
+      // leaving the whole flow permanently broken.
+      await prisma.lead.updateMany({
+        where: { assignedToId: id, deletedAt: null },
+        data: { assignedToId: reassignToId },
       });
+
+      // CampaignEmployee has a @@unique([campaignId, userId]) — a plain
+      // updateMany would violate it for any campaign the target is
+      // already on, so each row is resolved individually: drop the
+      // departing employee's row if the target's already a member,
+      // otherwise hand it over.
+      const memberships = await prisma.campaignEmployee.findMany({ where: { userId: id } });
+      for (const m of memberships) {
+        const alreadyMember = await prisma.campaignEmployee.findUnique({
+          where: { campaignId_userId: { campaignId: m.campaignId, userId: reassignToId } },
+        });
+        if (alreadyMember) await prisma.campaignEmployee.delete({ where: { id: m.id } });
+        else await prisma.campaignEmployee.update({ where: { id: m.id }, data: { userId: reassignToId } });
+      }
+
+      await prisma.bookingTask.updateMany({
+        where: { assigneeId: id, status: { notIn: NOT_DONE_TASK_STATUSES } },
+        data: { assigneeId: reassignToId },
+      });
+
+      await prisma.department.updateMany({ where: { headId: id }, data: { headId: reassignToId } });
+
+      await prisma.activityLog.create({
+        data: {
+          action: 'Employee Removed — Work Reassigned',
+          details: `${activeWork.leads} lead(s), ${activeWork.campaigns} campaign membership(s), ${activeWork.tasks} task(s) and ${activeWork.departments} department headship(s) moved from ${target.name} to ${reassignTarget.name}.`,
+          entityType: 'USER',
+          entityId: id,
+          userId: req.user!.id,
+        },
+      });
+
+      await prisma.user.update({ where: { id }, data: { isActive: false } });
 
       res.json({ success: true, message: 'Work reassigned and employee deactivated successfully' });
       return;
@@ -300,6 +324,62 @@ export const deleteUser = async (req: AuthenticatedRequest, res: Response): Prom
     res.json({ success: true, message: 'User deactivated successfully' });
   } catch (e) {
     console.error('[users] deleteUser error:', e);
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+};
+
+// ─── Permanent delete — ADMIN only, deactivated employees only ────────────────
+// Separate from the above on purpose (see the comment above
+// getActiveWorkSummary): most User-referencing tables are audit trails that
+// should keep pointing at whoever actually did the work, even after they
+// leave — so this only ever succeeds for an account with no real history
+// (e.g. an unused seed/test account). Anyone who's actually worked in the
+// CRM will hit the foreign-key check below and stay deactivated instead,
+// which is the correct outcome, not a bug to work around.
+export const hardDeleteUser = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+
+    if (id === req.user!.id) {
+      res.status(400).json({ success: false, error: 'Cannot delete your own account' });
+      return;
+    }
+
+    const target = await prisma.user.findUnique({ where: { id } });
+    if (!target || target.organizationId !== req.user?.organizationId) {
+      res.status(404).json({ success: false, error: 'User not found' });
+      return;
+    }
+    if (target.isActive) {
+      res.status(400).json({ success: false, error: 'Deactivate this employee first before permanently deleting them' });
+      return;
+    }
+
+    // Delete first — only log the permanent deletion if it actually
+    // succeeded, so a blocked (foreign-key) attempt never leaves a false
+    // "permanently deleted" entry in the audit trail.
+    await prisma.user.delete({ where: { id } });
+
+    await prisma.activityLog.create({
+      data: {
+        action: 'Employee Permanently Deleted',
+        details: `${target.name} (${target.email}) permanently deleted by ${req.user?.name}.`,
+        entityType: 'USER',
+        entityId: id,
+        userId: req.user!.id,
+      },
+    });
+
+    res.json({ success: true, message: 'Employee permanently deleted' });
+  } catch (e: any) {
+    if (e?.code === 'P2003') {
+      res.status(409).json({
+        success: false,
+        error: 'This employee has historical records tied to their account (payments, activity, leads they once worked, etc.) and can\'t be permanently deleted — they\'ll stay deactivated instead.',
+      });
+      return;
+    }
+    console.error('[users] hardDeleteUser error:', e);
     res.status(500).json({ success: false, error: 'Internal server error' });
   }
 };

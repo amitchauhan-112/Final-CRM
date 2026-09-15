@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import {
-  getUsers, createUser, updateUser, deleteUser,
+  getUsers, createUser, updateUser, deleteUser, hardDeleteUser,
   getEmployeePerformance, resetUserPassword, exportUsers,
   updateAvailability, getEmployeeProfile,
 } from '../controllers/user.controller.js';
@@ -18,5 +18,6 @@ router.put('/:id', requireAdmin, updateUser);
 router.put('/:id/availability', updateAvailability);
 router.put('/:id/reset-password', requireAdmin, resetUserPassword);
 router.delete('/:id', requireAdmin, deleteUser);
+router.delete('/:id/permanent', requireAdmin, hardDeleteUser);
 
 export default router;

@@ -451,7 +451,7 @@ function WebhookSimulator() {
       toast.success(`${data.source === 'WHATSAPP' ? 'WhatsApp' : 'Instagram'} webhook simulated! Check Leads.`);
       reset({ source: data.source });
     } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Webhook simulation failed');
+      toast.error(err?.response?.data?.error || 'Webhook simulation failed');
     }
   };
 

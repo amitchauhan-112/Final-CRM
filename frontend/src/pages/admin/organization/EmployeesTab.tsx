@@ -4,7 +4,7 @@ import {
   Mail, Phone, ToggleLeft, ToggleRight, Users, Filter,
 } from 'lucide-react';
 import {
-  useUsers, useCreateUser, useUpdateUser, useDeleteUser,
+  useUsers, useCreateUser, useUpdateUser, useDeleteUser, useHardDeleteUser,
   useEmployeePerformance, useResetEmployeePassword,
 } from '../../../hooks/useUsers';
 import { useDepartments } from '../../../hooks/useDepartments';
@@ -327,7 +327,14 @@ function EmployeeCard({
           {perf && <button onClick={onPerf} className="btn-ghost p-1.5" title="Performance"><TrendingUp className="w-3.5 h-3.5" /></button>}
           <button onClick={onResetPass} className="btn-ghost p-1.5" title="Reset password"><KeyRound className="w-3.5 h-3.5" /></button>
           <button onClick={onEdit} className="btn-ghost p-1.5" title="Edit"><Edit className="w-3.5 h-3.5" /></button>
-          <button onClick={onDelete} className="btn-ghost p-1.5 hover:text-red-600" title="Delete"><Trash2 className="w-3.5 h-3.5" /></button>
+          <button
+            onClick={onDelete}
+            disabled={user.isActive}
+            className="btn-ghost p-1.5 hover:text-red-600 disabled:opacity-30 disabled:hover:text-current disabled:cursor-not-allowed"
+            title={user.isActive ? 'Deactivate this employee first to permanently delete them' : 'Permanently delete'}
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
         </div>
       </div>
 
@@ -395,6 +402,7 @@ export default function EmployeesTab() {
   const [deleteUserId, setDeleteUserId] = useState<string | null>(null);
   const [activeWork, setActiveWork] = useState<ActiveWorkSummary | null>(null);
   const [reassignToId, setReassignToId] = useState('');
+  const [hardDeleteUserId, setHardDeleteUserId] = useState<string | null>(null);
   const [perfEmployee, setPerfEmployee] = useState<EmployeePerformance | null>(null);
   const [createdCreds, setCreatedCreds] = useState<{ email: string; password: string } | null>(null);
   const [resetPassUser, setResetPassUser] = useState<User | null>(null);
@@ -413,6 +421,7 @@ export default function EmployeesTab() {
   const createUser = useCreateUser();
   const updateUser = useUpdateUser();
   const deleteUser = useDeleteUser();
+  const hardDeleteUser = useHardDeleteUser();
 
   const users = data?.data ?? [];
   const performance = perfData?.data ?? [];
@@ -462,6 +471,27 @@ export default function EmployeesTab() {
 
   const deletingUser = users.find((u) => u.id === deleteUserId) ?? null;
   const reassignCandidates = users.filter((u) => u.id !== deleteUserId && u.isActive);
+
+  // Reactivating is always safe (direct toggle). Deactivating needs the same
+  // active-work check as "Deactivate Employee" below, so it routes through
+  // that modal instead of firing a plain update that the backend would just
+  // reject anyway.
+  const handleToggleActive = (u: User) => {
+    if (u.isActive) setDeleteUserId(u.id);
+    else updateUser.mutate({ id: u.id, isActive: true });
+  };
+
+  const handleHardDelete = () => {
+    if (!hardDeleteUserId) return;
+    hardDeleteUser.mutate(hardDeleteUserId, {
+      onSuccess: () => setHardDeleteUserId(null),
+      onError: (err: any) => {
+        toast.error(err?.response?.data?.error || 'Failed to permanently delete employee');
+      },
+    });
+  };
+
+  const hardDeletingUser = users.find((u) => u.id === hardDeleteUserId) ?? null;
 
   return (
     <div className="space-y-4">
@@ -556,9 +586,9 @@ export default function EmployeesTab() {
               onProfile={() => setProfileUserId(u.id)}
               onPerf={() => { const p = getPerf(u.id); if (p) setPerfEmployee(p); }}
               onEdit={() => setEditUser(u)}
-              onDelete={() => setDeleteUserId(u.id)}
+              onDelete={() => setHardDeleteUserId(u.id)}
               onResetPass={() => setResetPassUser(u)}
-              onToggleActive={() => updateUser.mutate({ id: u.id, isActive: !u.isActive })}
+              onToggleActive={() => handleToggleActive(u)}
             />
           ))}
         </div>
@@ -572,7 +602,7 @@ export default function EmployeesTab() {
           onSubmit={handleEdit} isLoading={updateUser.isPending} isEdit />
       )}
 
-      <Modal open={!!deleteUserId} onClose={closeDeleteModal} title="Remove Employee" size="sm"
+      <Modal open={!!deleteUserId} onClose={closeDeleteModal} title="Deactivate Employee" size="sm"
         footer={<>
           <button onClick={closeDeleteModal} className="btn-secondary">Cancel</button>
           <button
@@ -580,12 +610,15 @@ export default function EmployeesTab() {
             disabled={deleteUser.isPending || (!!activeWork && !reassignToId)}
             className="btn-danger"
           >
-            {deleteUser.isPending ? (activeWork ? 'Reassigning…' : 'Removing…') : activeWork ? 'Reassign & Remove' : 'Remove'}
+            {deleteUser.isPending ? (activeWork ? 'Reassigning…' : 'Deactivating…') : activeWork ? 'Reassign & Deactivate' : 'Deactivate'}
           </button>
         </>}
       >
         {!activeWork ? (
-          <p className="text-sm text-slate-600">Are you sure you want to remove {deletingUser?.name ?? 'this employee'}? This action cannot be undone.</p>
+          <p className="text-sm text-slate-600">
+            {deletingUser?.name ?? 'This employee'} will be moved to Inactive and hidden from assignment pickers.
+            Their history stays intact, and they can be reactivated anytime from the Inactive filter.
+          </p>
         ) : (
           <div className="space-y-3">
             <p className="text-sm text-slate-600">
@@ -604,9 +637,29 @@ export default function EmployeesTab() {
                 {reassignCandidates.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
               </select>
             </div>
-            <p className="text-xs text-slate-400">Only then can {deletingUser?.name} be removed.</p>
+            <p className="text-xs text-slate-400">Only then can {deletingUser?.name} be deactivated.</p>
           </div>
         )}
+      </Modal>
+
+      {/* Permanent delete — Admin only, deactivated employees only. Unlike
+          the modal above, this really can't be undone, and only ever
+          succeeds for an account with no real history (see the backend
+          comment on hardDeleteUser) — a real, worked-in account will come
+          back with a 409 explaining it has to stay deactivated instead. */}
+      <Modal open={!!hardDeleteUserId} onClose={() => setHardDeleteUserId(null)} title="Permanently Delete Employee" size="sm"
+        footer={<>
+          <button onClick={() => setHardDeleteUserId(null)} className="btn-secondary">Cancel</button>
+          <button onClick={handleHardDelete} disabled={hardDeleteUser.isPending} className="btn-danger">
+            {hardDeleteUser.isPending ? 'Deleting…' : 'Permanently Delete'}
+          </button>
+        </>}
+      >
+        <p className="text-sm text-slate-600">
+          <strong>{hardDeletingUser?.name ?? 'This employee'}</strong> and their account will be permanently deleted —
+          this cannot be undone. Only possible if they have no leads, payments, or other history on record; if they
+          do, this will fail and they'll simply stay deactivated instead.
+        </p>
       </Modal>
 
       <PerformanceModal open={!!perfEmployee} onClose={() => setPerfEmployee(null)} employee={perfEmployee} />

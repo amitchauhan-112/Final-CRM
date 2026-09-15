@@ -63,7 +63,7 @@ export function useCreateCampaign() {
       toast.success('Campaign created successfully');
     },
     onError: (err: any) => {
-      toast.error(err?.response?.data?.message || 'Failed to create campaign');
+      toast.error(err?.response?.data?.error || 'Failed to create campaign');
     },
   });
 }
@@ -85,7 +85,7 @@ export function useUpdateCampaign() {
       toast.success('Campaign updated successfully');
     },
     onError: (err: any) => {
-      toast.error(err?.response?.data?.message || 'Failed to update campaign');
+      toast.error(err?.response?.data?.error || 'Failed to update campaign');
     },
   });
 }
@@ -103,7 +103,7 @@ export function useDeleteCampaign() {
       toast.success('Campaign deleted successfully');
     },
     onError: (err: any) => {
-      toast.error(err?.response?.data?.message || 'Failed to delete campaign');
+      toast.error(err?.response?.data?.error || 'Failed to delete campaign');
     },
   });
 }

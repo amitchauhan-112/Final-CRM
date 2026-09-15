@@ -62,7 +62,7 @@ export function useCreateUser() {
       toast.success('User created successfully');
     },
     onError: (err: any) => {
-      toast.error(err?.response?.data?.message || 'Failed to create user');
+      toast.error(err?.response?.data?.error || 'Failed to create user');
     },
   });
 }
@@ -80,7 +80,7 @@ export function useUpdateUser() {
       toast.success('User updated successfully');
     },
     onError: (err: any) => {
-      toast.error(err?.response?.data?.message || 'Failed to update user');
+      toast.error(err?.response?.data?.error || 'Failed to update user');
     },
   });
 }
@@ -96,10 +96,33 @@ export function useDeleteUser() {
       const { data } = await api.delete(`/users/${id}`, { data: reassignToId ? { reassignToId } : undefined });
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: ['users'] });
       qc.invalidateQueries({ queryKey: ['employee-performance'] });
-      toast.success('Employee removed successfully');
+      // Uses the backend's own message instead of a fixed string — it
+      // already says accurately whether this was a plain deactivation or a
+      // "work reassigned, then deactivated" one.
+      toast.success(data?.message || 'Employee deactivated');
+    },
+  });
+}
+
+// Permanent, unrecoverable — only ever succeeds for an employee with no
+// real history (see hardDeleteUser's comment on the backend). Left without
+// a blanket onError toast for the same reason as useDeleteUser: a 400
+// ("deactivate first") or 409 (has historical records) both need their
+// specific message shown, which the caller reads off the thrown error.
+export function useHardDeleteUser() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { data } = await api.delete(`/users/${id}/permanent`);
+      return data;
+    },
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: ['users'] });
+      qc.invalidateQueries({ queryKey: ['employee-performance'] });
+      toast.success(data?.message || 'Employee permanently deleted');
     },
   });
 }
