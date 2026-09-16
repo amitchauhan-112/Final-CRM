@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Plus, Edit, Trash2, TrendingUp, Search, Copy, Check, KeyRound,
   Mail, Phone, ToggleLeft, ToggleRight, Users, Filter, Eye,
@@ -49,7 +49,7 @@ function EmployeeFormModal({
   const { data: deptData } = useDepartments({ status: 'ACTIVE' });
   const departments = deptData?.data ?? [];
 
-  const { register, handleSubmit, control, setValue, formState: { errors } } = useForm<UserForm>({
+  const { register, handleSubmit, control, setValue, reset, formState: { errors } } = useForm<UserForm>({
     defaultValues: {
       name: defaultValues?.name ?? '',
       email: defaultValues?.email ?? '',
@@ -59,6 +59,24 @@ function EmployeeFormModal({
       designationId: defaultValues?.designationId ?? '',
     },
   });
+
+  // Modal stays mounted (just hidden) between opens, so react-hook-form's
+  // state otherwise keeps whatever was last typed — reset it fresh every
+  // time this actually opens, whether that's a blank Add form or an Edit
+  // form pre-filled with that employee's own values.
+  useEffect(() => {
+    if (open) {
+      reset({
+        name: defaultValues?.name ?? '',
+        email: defaultValues?.email ?? '',
+        phone: defaultValues?.phone ?? '',
+        role: defaultValues?.role ?? 'EMPLOYEE',
+        departmentId: defaultValues?.departmentId ?? '',
+        designationId: defaultValues?.designationId ?? '',
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   const selectedDeptId = useWatch({ control, name: 'departmentId' });
   const { data: desigData } = useDesignations({ departmentId: selectedDeptId || undefined, status: 'ACTIVE' });
