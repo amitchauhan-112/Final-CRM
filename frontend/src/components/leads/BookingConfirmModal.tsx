@@ -150,10 +150,12 @@ export default function BookingConfirmModal({ open, onClose, lead, existingBooki
   const updateBooking = useUpdateBooking();
   const updatePendingPayment = useUpdatePendingPayment();
   const { user } = useAuthStore();
-  const { data: usersData } = useUsers({ limit: 100 });
   // Any active employee can hold cash, not just Sales — a real dropdown,
   // never free text (see createBooking in booking.controller.ts, which
-  // rejects anything that isn't an active user's id).
+  // rejects anything that isn't an active user's id). allRoles: true so a
+  // non-admin sees the whole org here (Finance, Operations, Trip Captain,
+  // Admin too), not just fellow Sales employees.
+  const { data: usersData } = useUsers({ limit: 100, allRoles: true });
   const activeEmployees = (usersData?.data ?? []).filter((u) => u.isActive);
   const isEdit = !!existingBooking;
 

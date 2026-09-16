@@ -11,6 +11,10 @@ export interface UserFilters {
   isActive?: boolean;
   departmentId?: string;
   designationId?: string;
+  // Non-admins normally only see fellow Sales employees (lead-transfer picker's
+  // scope). Pass true for pickers where cash/anything could genuinely go to
+  // anyone in the org — Finance, Operations, Trip Captain, Admin — not just Sales.
+  allRoles?: boolean;
 }
 
 export function useUsers(filters: UserFilters = {}) {

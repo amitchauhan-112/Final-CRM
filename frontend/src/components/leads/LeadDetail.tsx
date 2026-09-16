@@ -546,7 +546,11 @@ function TaskRow({ task, onStatusChange }: { task: BookingTask; onStatusChange: 
 function PaymentsTab({ booking }: { booking: Booking }) {
   const { user } = useAuthStore();
   const { data, isLoading } = useBookingPayments(booking.id);
-  const { data: usersData } = useUsers({ limit: 100 });
+  // allRoles: true — cash can genuinely be handed to anyone in the org
+  // (Finance, Operations, Trip Captain, Admin), not just fellow Sales
+  // employees, so this picker shouldn't be narrowed the way the lead-transfer
+  // picker elsewhere on this page deliberately is.
+  const { data: usersData } = useUsers({ limit: 100, allRoles: true });
   const recordPayment = useRecordPayment();
   const deletePayment = useDeletePayment();
   const [showForm, setShowForm] = useState(false);

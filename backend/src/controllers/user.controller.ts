@@ -28,8 +28,15 @@ export const getUsers = async (req: AuthenticatedRequest, res: Response): Promis
       // except Operations looking up active Trip Captains specifically (for
       // departure assignment) — still scoped to isActive:true either way,
       // never the full unrestricted user list.
-      where.role = req.user?.role === 'OPERATIONS' && role === 'TRIP_CAPTAIN' ? 'TRIP_CAPTAIN' : 'EMPLOYEE';
+      //
+      // allRoles opts out of the role narrowing entirely — for pickers where
+      // the person genuinely could be anyone in the org (e.g. "who was cash
+      // physically handed to?" — could be Finance, Operations, a Trip
+      // Captain, or Admin, not just a fellow Sales employee).
       where.isActive = true;
+      if (req.query.allRoles !== 'true') {
+        where.role = req.user?.role === 'OPERATIONS' && role === 'TRIP_CAPTAIN' ? 'TRIP_CAPTAIN' : 'EMPLOYEE';
+      }
     }
 
     // Support dept/desig filters (admin only)
