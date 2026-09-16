@@ -356,6 +356,68 @@ export const resubmitPayment = async (req: AuthenticatedRequest, res: Response):
   }
 };
 
+// ─── Edit a still-pending payment ────────────────────────────────────────────
+// Separate from resubmitPayment above (that's specifically for a
+// REJECTED/CORRECTION_REQUESTED payment being fixed and re-sent). This is
+// for correcting a plain mistake — wrong amount, wrong mode, wrong person
+// entered — before Finance has even looked at it. Once VERIFIED (or
+// REJECTED/CORRECTION_REQUESTED, which has its own flow), this refuses:
+// changing the numbers after money has actually been confirmed/counted
+// would silently disagree with whatever Finance already approved.
+export const updatePendingPayment = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const payment = await prisma.payment.findUnique({ where: { id }, include: { booking: true } });
+    if (!payment) { res.status(404).json({ success: false, error: 'Payment not found' }); return; }
+    if (orgId(req) && payment.booking.organizationId !== orgId(req)) { res.status(404).json({ success: false, error: 'Payment not found' }); return; }
+    if (payment.status !== 'PENDING') {
+      res.status(400).json({ success: false, error: 'Only a payment still awaiting Finance verification can be edited' });
+      return;
+    }
+    if (payment.recordedById !== req.user?.id && req.user?.role !== 'ADMIN') {
+      res.status(403).json({ success: false, error: 'Only the original recorder or an admin can edit this payment' });
+      return;
+    }
+
+    const { amount, method, reference, notes, handoverToId } = req.body;
+
+    if (amount !== undefined) {
+      if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) {
+        res.status(400).json({ success: false, error: 'Valid amount is required' }); return;
+      }
+      if (!isWholeAmount(amount)) { res.status(400).json({ success: false, error: WHOLE_AMOUNT_ERROR }); return; }
+    }
+
+    const resolvedMethod = method ?? payment.method;
+    if (resolvedMethod === 'CASH') {
+      if (!handoverToId) {
+        res.status(400).json({ success: false, error: 'Handover To is required for cash payments' }); return;
+      }
+      const handoverTarget = await prisma.user.findUnique({ where: { id: handoverToId } });
+      if (!handoverTarget || handoverTarget.organizationId !== orgId(req) || !handoverTarget.isActive) {
+        res.status(400).json({ success: false, error: 'Handover To must be an active employee' }); return;
+      }
+    }
+
+    const updated = await prisma.payment.update({
+      where: { id },
+      data: {
+        amount: amount !== undefined ? Number(amount) : payment.amount,
+        method: resolvedMethod,
+        reference: reference !== undefined ? reference?.trim() || null : payment.reference,
+        notes: notes !== undefined ? notes?.trim() || null : payment.notes,
+        handoverToId: resolvedMethod === 'CASH' ? handoverToId : null,
+      },
+      include: { handoverTo: { select: { id: true, name: true } } },
+    });
+
+    res.json({ success: true, data: updated });
+  } catch (e) {
+    console.error('[payment] updatePendingPayment error:', e);
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+};
+
 // ─── Payment verification queue (Finance Panel) ──────────────────────────────
 
 export const listPaymentsForVerification = async (req: AuthenticatedRequest, res: Response): Promise<void> => {

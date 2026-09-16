@@ -59,6 +59,25 @@ export function useRecordPayment() {
   });
 }
 
+// Only ever succeeds while the payment is still PENDING — the backend
+// refuses once Finance has verified it (or it's mid-correction via the
+// separate resubmit flow). Used by the "Edit Booking Details" form to let
+// the original advance payment be corrected before anyone's approved it.
+export function useUpdatePendingPayment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, bookingId, ...payload }: { id: string; bookingId: string; amount?: number; method?: string; handoverToId?: string; reference?: string; notes?: string }) => {
+      const { data } = await api.put(`/payments/${id}`, payload);
+      return data;
+    },
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ['payments', vars.bookingId] });
+      qc.invalidateQueries({ queryKey: ['booking'] });
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.error || 'Failed to update payment'),
+  });
+}
+
 export function useDeletePayment() {
   const qc = useQueryClient();
   return useMutation({

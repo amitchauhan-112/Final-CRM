@@ -8,6 +8,7 @@ import {
   deletePayment,
   getPaymentsSummary,
   resubmitPayment,
+  updatePendingPayment,
 } from '../controllers/payment.controller.js';
 
 const router = Router({ mergeParams: true }); // mergeParams to get :bookingId
@@ -17,6 +18,7 @@ router.use(authenticate);
 router.get('/summary', getPaymentsSummary);
 router.get('/', getBookingPayments);
 router.post('/', upload.single('proof'), recordPayment);
+router.put('/:id', updatePendingPayment);
 router.put('/:id/resubmit', upload.single('proof'), resubmitPayment);
 router.delete('/:id', deletePayment);
 

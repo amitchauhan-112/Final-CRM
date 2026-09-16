@@ -9,6 +9,7 @@ import { Lead, Booking, FoodPreference, RoomSharing, TourType } from '../../type
 import { useCreateBooking, useUpdateBooking } from '../../hooks/useBookings';
 import { usePackages, usePackage, useCreatePackage } from '../../hooks/usePackages';
 import { useUsers } from '../../hooks/useUsers';
+import { useBookingPayments, useUpdatePendingPayment } from '../../hooks/usePayments';
 import { useAuthStore } from '../../store/authStore';
 import { formatCurrency, cn, blockDecimalKey, wholeNumberRule } from '../../utils/helpers';
 import toast from 'react-hot-toast';
@@ -147,6 +148,7 @@ function PkgItineraryTable({ rows, nights, onUpdateRow }: {
 export default function BookingConfirmModal({ open, onClose, lead, existingBooking }: Props) {
   const createBooking = useCreateBooking();
   const updateBooking = useUpdateBooking();
+  const updatePendingPayment = useUpdatePendingPayment();
   const { user } = useAuthStore();
   const { data: usersData } = useUsers({ limit: 100 });
   // Any active employee can hold cash, not just Sales — a real dropdown,
@@ -154,6 +156,17 @@ export default function BookingConfirmModal({ open, onClose, lead, existingBooki
   // rejects anything that isn't an active user's id).
   const activeEmployees = (usersData?.data ?? []).filter((u) => u.isActive);
   const isEdit = !!existingBooking;
+
+  // The original advance payment recorded at confirmation time — editable
+  // here only while Finance hasn't verified it yet (see updatePendingPayment
+  // on the backend). Once VERIFIED, this form shows it read-only instead;
+  // any further payments/corrections go through the normal Record Payment /
+  // verification flow, not this form.
+  const { data: paymentsData } = useBookingPayments(isEdit ? existingBooking!.id : null);
+  const confirmationPayment = isEdit
+    ? [...(paymentsData?.data ?? [])].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())[0] ?? null
+    : null;
+  const paymentIsEditable = !isEdit || confirmationPayment?.status === 'PENDING';
   const todayDate = new Date().toISOString().split('T')[0];
 
   // Split room types — only offered when creating a booking (not editing one
@@ -263,6 +276,24 @@ export default function BookingConfirmModal({ open, onClose, lead, existingBooki
     setShowCreatePackage(false);
   }, [watchedTourType]);
 
+  // Payments load separately (their own query) from the rest of the booking,
+  // so this can't just be folded into the reset effect below — it needs to
+  // react once confirmationPayment actually arrives, which is usually a
+  // render or two after the modal opens. When it's still PENDING, the
+  // amount/mode/handover fields edit *that payment*, not the booking's own
+  // amountPaid (which stays 0 until Finance verifies it) — same as how a
+  // brand-new booking's amountPaid means "what's about to be recorded,"
+  // not "what's already credited."
+  useEffect(() => {
+    if (!open || !isEdit || !confirmationPayment) return;
+    setValue('amountPaid', confirmationPayment.amount);
+    setValue('paymentMode', confirmationPayment.method === 'CASH' ? 'CASH' : 'ONLINE');
+    setValue('paymentMethod', confirmationPayment.method === 'BANK_TRANSFER' ? 'BANK_TRANSFER' : 'UPI');
+    setValue('paymentReference', confirmationPayment.reference ?? '');
+    setValue('handoverToId', confirmationPayment.handoverTo?.id ?? user?.id ?? '');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, isEdit, confirmationPayment?.id, confirmationPayment?.status]);
+
   useEffect(() => {
     if (open) {
       setValue('travelerName', existingBooking?.travelerName ?? lead.name);
@@ -335,7 +366,26 @@ export default function BookingConfirmModal({ open, onClose, lead, existingBooki
     };
 
     if (isEdit && existingBooking) {
-      updateBooking.mutate({ ...payload, id: existingBooking.id }, { onSuccess: onClose });
+      // If the confirmation payment is still editable, save it first — if
+      // it fails (e.g. someone verified it moments ago), the booking-detail
+      // fields below are left untouched rather than partially applying half
+      // of what was on screen.
+      const saveBooking = () => updateBooking.mutate({ ...payload, id: existingBooking.id }, { onSuccess: onClose });
+      if (paymentIsEditable && confirmationPayment) {
+        updatePendingPayment.mutate(
+          {
+            id: confirmationPayment.id,
+            bookingId: existingBooking.id,
+            amount: Number(data.amountPaid),
+            method: data.paymentMode === 'CASH' ? 'CASH' : data.paymentMethod,
+            reference: data.paymentReference || undefined,
+            handoverToId: data.paymentMode === 'CASH' ? data.handoverToId || undefined : undefined,
+          },
+          { onSuccess: saveBooking }
+        );
+      } else {
+        saveBooking();
+      }
     } else {
       createBooking.mutate(payload, { onSuccess: onClose });
     }
@@ -374,7 +424,7 @@ export default function BookingConfirmModal({ open, onClose, lead, existingBooki
     }
   };
 
-  const isPending = createBooking.isPending || updateBooking.isPending;
+  const isPending = createBooking.isPending || updateBooking.isPending || updatePendingPayment.isPending;
 
   // Itinerary preview items (TRIP_DAY type only, sorted by dayOffset)
   const itineraryPreview = (selectedPkg?.itineraryItems ?? [])
@@ -782,6 +832,7 @@ export default function BookingConfirmModal({ open, onClose, lead, existingBooki
               <label className="label">Amount Paid (₹){!isEdit && <span className="text-red-500"> *</span>}</label>
               <input
                 type="number" min={isEdit ? 0 : 1} step="1" onKeyDown={blockDecimalKey}
+                disabled={isEdit && !paymentIsEditable}
                 {...register('amountPaid', {
                   valueAsNumber: true,
                   required: isEdit ? false : 'An advance payment is required to confirm a booking',
@@ -792,11 +843,14 @@ export default function BookingConfirmModal({ open, onClose, lead, existingBooki
                     return true;
                   },
                 })}
-                className="input"
+                className={cn('input', isEdit && !paymentIsEditable && 'bg-slate-50 text-slate-500 cursor-not-allowed')}
               />
               {errors.amountPaid && <p className="text-red-500 text-xs mt-1">{errors.amountPaid.message}</p>}
               {!isEdit && !errors.amountPaid && (
                 <p className="text-[10px] text-slate-400 mt-0.5">An advance must be recorded to confirm this booking.</p>
+              )}
+              {isEdit && confirmationPayment && !paymentIsEditable && (
+                <p className="text-[10px] text-slate-400 mt-0.5">Verified by Finance — locked, can't be changed here.</p>
               )}
             </div>
           </div>
@@ -820,8 +874,11 @@ export default function BookingConfirmModal({ open, onClose, lead, existingBooki
             </div>
           </div>
 
-          {/* Payment mode — only for new bookings when advance is entered */}
-          {!isEdit && Number(amountPaid) > 0 && (
+          {/* Payment mode — for a new booking's advance, or an existing
+              booking's confirmation payment while it's still PENDING.
+              Once Finance verifies it, this whole section is replaced by a
+              locked read-only summary below instead. */}
+          {paymentIsEditable && Number(amountPaid) > 0 && (
             <div className="mt-3 p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
               <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">How was the payment received?</p>
 
@@ -883,6 +940,20 @@ export default function BookingConfirmModal({ open, onClose, lead, existingBooki
                   {errors.handoverToId && <p className="text-red-500 text-xs mt-1">{errors.handoverToId.message}</p>}
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Locked summary — Finance has already verified this payment, so
+              it's shown for reference only. Any correction from here on
+              goes through a refund/adjustment, not an edit of history. */}
+          {isEdit && confirmationPayment && !paymentIsEditable && (
+            <div className="mt-3 p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 space-y-1.5">
+              <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wider">Payment Received — Verified</p>
+              <p className="text-sm text-slate-700">
+                {formatCurrency(confirmationPayment.amount)} via {confirmationPayment.method === 'CASH' ? 'Cash' : confirmationPayment.method === 'BANK_TRANSFER' ? 'Bank Transfer' : confirmationPayment.method}
+                {confirmationPayment.method === 'CASH' && confirmationPayment.handoverTo && <> — handed to {confirmationPayment.handoverTo.name}</>}
+                {confirmationPayment.reference && <> · {confirmationPayment.reference}</>}
+              </p>
             </div>
           )}
 

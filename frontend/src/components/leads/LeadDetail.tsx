@@ -1134,13 +1134,20 @@ export default function LeadDetail({ leadId, open, onClose, isStarred, onToggleS
                       >
                         <ArrowRightLeft className="w-4 h-4" />
                       </button>
-                      <button
-                        onClick={() => setEditOpen(true)}
-                        className="btn-ghost p-2"
-                        title="Edit lead"
-                      >
-                        <Edit className="w-4 h-4" />
-                      </button>
+                      {/* Once confirmed, editing happens through "Edit Booking
+                          Details" (the BookingSummary "Edit" link below, and
+                          My Bookings' Edit button) instead — that form has
+                          the traveler/room/tour-type/payment fields this one
+                          doesn't, so keeping both around was confusing. */}
+                      {lead.status !== 'CONFIRMED' && (
+                        <button
+                          onClick={() => setEditOpen(true)}
+                          className="btn-ghost p-2"
+                          title="Edit lead"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </button>
+                      )}
                     </>
                   )}
                   <button
