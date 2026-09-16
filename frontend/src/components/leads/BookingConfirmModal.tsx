@@ -67,14 +67,18 @@ interface PkgItineraryRow {
   dayIndex: number;
   activityType: PkgActivityType;
   activityDetails: string;
+  // City/place for this night — distinct from activityDetails. Only
+  // meaningful for STAY rows; drives Operations' Hotel Required day-wise
+  // breakdown on the Departure Detail page.
+  location: string;
 }
 
 function buildPkgItineraryRows(nights: number): PkgItineraryRow[] {
   const rows: PkgItineraryRow[] = [];
   for (let i = 0; i <= nights + 1; i++) {
     const isEdge = i === 0 || i === nights + 1;
-    rows.push({ key: `day-${i}`, label: `Day ${i}`, rowType: 'day', dayIndex: i, activityType: isEdge ? 'JOURNEY' : 'SIGHTSEEING', activityDetails: '' });
-    rows.push({ key: `night-${i}`, label: `Night ${i}`, rowType: 'night', dayIndex: i, activityType: isEdge ? 'JOURNEY' : 'STAY', activityDetails: '' });
+    rows.push({ key: `day-${i}`, label: `Day ${i}`, rowType: 'day', dayIndex: i, activityType: isEdge ? 'JOURNEY' : 'SIGHTSEEING', activityDetails: '', location: '' });
+    rows.push({ key: `night-${i}`, label: `Night ${i}`, rowType: 'night', dayIndex: i, activityType: isEdge ? 'JOURNEY' : 'STAY', activityDetails: '', location: '' });
   }
   return rows;
 }
@@ -88,20 +92,22 @@ const PKG_ACTIVITY_OPTIONS: { value: PkgActivityType; label: string }[] = [
 function PkgItineraryTable({ rows, nights, onUpdateRow }: {
   rows: PkgItineraryRow[];
   nights: number;
-  onUpdateRow: (key: string, field: 'activityType' | 'activityDetails', value: string) => void;
+  onUpdateRow: (key: string, field: 'activityType' | 'activityDetails' | 'location', value: string) => void;
 }) {
   return (
     <div>
-      <div className="hidden sm:grid sm:grid-cols-[8rem_7rem_1fr] gap-x-2 mb-1.5 px-1">
+      <div className="hidden sm:grid sm:grid-cols-[8rem_7rem_1fr_8rem] gap-x-2 mb-1.5 px-1">
         <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Day / Night</p>
         <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Activity Type</p>
         <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Activity Details</p>
+        <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">City / Location</p>
       </div>
       <div className="space-y-1.5 max-h-64 overflow-y-auto pr-1">
         {rows.map((row) => {
           const isDep = row.dayIndex === 0;
           const isRet = row.dayIndex === nights + 1;
           const isJourney = row.activityType === 'JOURNEY';
+          const isStay = row.activityType === 'STAY';
           const badgeColor = isDep
             ? 'bg-amber-100 text-amber-700'
             : isRet
@@ -109,7 +115,7 @@ function PkgItineraryTable({ rows, nights, onUpdateRow }: {
             : row.rowType === 'day' ? 'bg-sky-100 text-sky-700' : 'bg-blue-100 text-blue-700';
           const badgeText = row.rowType === 'day' ? `D${row.dayIndex}` : `N${row.dayIndex}`;
           return (
-            <div key={row.key} className="grid grid-cols-1 sm:grid-cols-[8rem_7rem_1fr] gap-2 sm:gap-x-2 sm:items-center">
+            <div key={row.key} className="grid grid-cols-1 sm:grid-cols-[8rem_7rem_1fr_8rem] gap-2 sm:gap-x-2 sm:items-center">
               <div className="flex items-center gap-2">
                 <span className={cn('text-[10px] font-bold px-1.5 py-0.5 rounded-full tabular-nums flex-shrink-0', badgeColor)}>
                   {badgeText}
@@ -136,6 +142,15 @@ function PkgItineraryTable({ rows, nights, onUpdateRow }: {
                   : 'Place or activity name…'
                 }
                 className={cn('input text-sm py-1.5', isJourney && 'bg-slate-50 text-slate-300 cursor-not-allowed')}
+              />
+              <input
+                type="text"
+                value={row.location}
+                onChange={(e) => onUpdateRow(row.key, 'location', e.target.value)}
+                disabled={!isStay}
+                placeholder={isStay ? 'City (e.g. Manali)' : '—'}
+                title="Drives Operations' day-wise Hotel Required view"
+                className={cn('input text-sm py-1.5', !isStay && 'bg-slate-50 text-slate-300 cursor-not-allowed')}
               />
             </div>
           );
@@ -196,15 +211,16 @@ export default function BookingConfirmModal({ open, onClose, lead, existingBooki
       const next = buildPkgItineraryRows(n);
       return next.map((row) => {
         const existing = prev.find((r) => r.key === row.key);
-        return existing ? { ...row, activityType: existing.activityType, activityDetails: existing.activityDetails } : row;
+        return existing ? { ...row, activityType: existing.activityType, activityDetails: existing.activityDetails, location: existing.location } : row;
       });
     });
   };
 
-  const updateNewPkgRow = (key: string, field: 'activityType' | 'activityDetails', value: string) => {
+  const updateNewPkgRow = (key: string, field: 'activityType' | 'activityDetails' | 'location', value: string) => {
     setNewPkgRows((prev) => prev.map((r) => {
       if (r.key !== key) return r;
       const updated = { ...r, [field]: value as PkgActivityType };
+      if (field === 'activityType' && value !== 'STAY') updated.location = '';
       if (field === 'activityType' && value === 'JOURNEY') updated.activityDetails = '';
       return updated;
     }));
@@ -414,6 +430,7 @@ export default function BookingConfirmModal({ open, onClose, lead, existingBooki
           title: r.label,
           activityType: r.activityType,
           activityDetails: r.activityDetails,
+          location: r.location,
         })),
       } as any);
       const created = result?.data;
