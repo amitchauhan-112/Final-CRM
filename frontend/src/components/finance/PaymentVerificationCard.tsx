@@ -50,6 +50,12 @@ export default function PaymentVerificationCard({ payment }: { payment: Payment 
           <p className="text-slate-400">Payment Mode</p>
           <p className="font-medium text-slate-700">{METHOD_LABEL[payment.method] ?? payment.method}</p>
         </div>
+        {payment.method === 'CASH' && payment.handoverTo && (
+          <div>
+            <p className="text-slate-400">Handed To</p>
+            <p className="font-medium text-slate-700 flex items-center gap-1"><User className="w-3 h-3" />{payment.handoverTo.name}</p>
+          </div>
+        )}
         {payment.reference && (
           <div>
             <p className="text-slate-400">Transaction / UTR ID</p>

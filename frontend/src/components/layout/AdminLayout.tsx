@@ -80,6 +80,7 @@ const SUB_LABELS: Record<string, string> = {
   'finance/vendor-payments': 'Vendor Payments',
   'finance/vendor-ledger': 'Vendor Ledger',
   'finance/expenses': 'Expenses',
+  'finance/employee-cash': 'Employee Cash',
   'finance/reports': 'Reports',
   'operations/dashboard': 'Dashboard',
   'operations/departures': 'Departures',

@@ -3,7 +3,7 @@ import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
   Mountain, LayoutDashboard, Users, Calendar, Bell,
   LogOut, ChevronDown, Menu, X, Settings, UserCircle,
-  Package, UserCheck, CheckSquare, Target, MessageCircle, BookOpen,
+  Package, UserCheck, CheckSquare, Target, MessageCircle, BookOpen, Wallet,
 } from 'lucide-react';
 import LeadLookup from './LeadLookup';
 import { useAuthStore } from '../../store/authStore';
@@ -22,6 +22,7 @@ const navLinks = [
   { to: '/employee/packages',   label: 'Packages',     icon: Package },
   { to: '/employee/customers',  label: 'My Customers', icon: UserCheck },
   { to: '/employee/bookings',   label: 'My Bookings',  icon: BookOpen },
+  { to: '/employee/cash',       label: 'My Cash',      icon: Wallet },
   { to: '/employee/targets',    label: 'My Targets',   icon: Target },
   { to: '/employee/settings',   label: 'Settings',     icon: Settings },
 ];

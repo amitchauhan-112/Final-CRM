@@ -36,6 +36,7 @@ interface RecordPaymentPayload {
   receiptNo?: string;
   scheduleItemId?: string;
   proof?: File;
+  handoverToId?: string;
 }
 
 export function useRecordPayment() {

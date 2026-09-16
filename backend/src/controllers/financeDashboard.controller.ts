@@ -54,6 +54,15 @@ export const getDashboardStats = async (req: AuthenticatedRequest, res: Response
       prisma.paymentScheduleItem.aggregate({ where: { booking: bookingOrgFilter }, _sum: { amount: true, paidAmount: true } }),
     ]);
 
+    // Cash currently with employees vs. already collected by the company —
+    // same two aggregates the Employee Cash page computes, surfaced here too.
+    const [cashHandedOver, cashCollected] = await Promise.all([
+      prisma.employeeCashLedger.aggregate({ where: { type: 'HANDOVER', ...orgFilter(req) }, _sum: { amount: true } }),
+      prisma.employeeCashLedger.aggregate({ where: { type: 'COLLECTION', ...orgFilter(req) }, _sum: { amount: true } }),
+    ]);
+    const cashCollectedByCompany = cashCollected._sum.amount ?? 0;
+    const cashWithEmployees = (cashHandedOver._sum.amount ?? 0) - cashCollectedByCompany;
+
     const totalRevenue = activeBookings.reduce((s, b) => s + b.finalPrice, 0);
     const collectionByMethod: Record<string, number> = { CASH: 0, ONLINE: 0, UPI: 0, BANK_TRANSFER: 0, CHEQUE: 0 };
     for (const row of monthlyByMethod) collectionByMethod[row.method] = row._sum.amount ?? 0;
@@ -137,6 +146,8 @@ export const getDashboardStats = async (req: AuthenticatedRequest, res: Response
         profitThisMonth,
         topRevenuePackage,
         paymentCompletionPct,
+        cashWithEmployees,
+        cashCollectedByCompany,
         cashCollection: collectionByMethod.CASH,
         onlineCollection: collectionByMethod.ONLINE,
         upiCollection: collectionByMethod.UPI,

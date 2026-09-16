@@ -37,6 +37,7 @@ model Organization {
   expenses      Expense[]
   financeDocuments FinanceDocument[]
   metaAdMaps    MetaAdMap[]
+  employeeCashLedgers EmployeeCashLedger[]
 
   @@map("organizations")
 }
@@ -58,6 +59,16 @@ model User {
   availability String   @default("AVAILABLE")  // AVAILABLE | BUSY | OFFLINE
   lastLogin    DateTime?
 
+  // Soft delete — moves the employee to Deleted Employees, hidden from every
+  // normal list/picker, but the row (and name) stays intact so past activity
+  // logs, payments, comments, etc. keep reading correctly. Reversible.
+  // Distinct from isActive: deactivated just means "not currently working";
+  // deleted means "removed from the roster."
+  deletedAt     DateTime?
+  deletedReason String?
+  deletedById   String?
+  deletedByUser User?     @relation("UserDeletedBy", fields: [deletedById], references: [id], onDelete: SetNull)
+
   employeeId    String?      @unique
   departmentId  String?
   department    Department?  @relation("UserDepartment", fields: [departmentId], references: [id])
@@ -69,6 +80,7 @@ model User {
 
   assignedLeads       Lead[]             @relation("AssignedTo")
   deletedLeads        Lead[]             @relation("LeadDeletedBy")
+  deletedUsers        User[]             @relation("UserDeletedBy")
   tripCaptainDepartures Departure[]      @relation("TripCaptainDepartures")
   campaignAssignments CampaignEmployee[]
   notifications       Notification[]
@@ -87,6 +99,9 @@ model User {
   opsNotes            OperationsNote[]   @relation("OpsNoteAuthor")
   updatedDepartureTasks DepartureTask[]  @relation("DepartureTaskUpdater")
   verifiedPayments     Payment[]        @relation("PaymentVerifier")
+  handedOverPayments   Payment[]        @relation("PaymentHandover")
+  cashLedgerEntries    EmployeeCashLedger[] @relation("CashLedgerEmployee")
+  collectedCashEntries EmployeeCashLedger[] @relation("CashLedgerCollector")
   requestedRefunds     Refund[]         @relation("RefundRequester")
   approvedRefunds      Refund[]         @relation("RefundApprover")
   createdVendorPayments VendorPayment[] @relation("VendorPaymentCreator")
@@ -118,6 +133,7 @@ model User {
   @@index([organizationId])
   @@index([departmentId])
   @@index([designationId])
+  @@index([deletedAt])
   @@map("users")
 }
 
@@ -473,7 +489,7 @@ model ActivityLog {
   id         String  @id @default(uuid())
   action     String
   details    String?
-  entityType String? // LEAD | CAMPAIGN | USER | LEAVE | DEPARTURE | HOTEL | VEHICLE | VENDOR | TRAVELER | PAYMENT | REFUND | VENDOR_PAYMENT | TRAVELER_PORTAL | VENDOR_DOCUMENT | EXPENSE
+  entityType String? // LEAD | CAMPAIGN | USER | LEAVE | DEPARTURE | HOTEL | VEHICLE | VENDOR | TRAVELER | PAYMENT | REFUND | VENDOR_PAYMENT | TRAVELER_PORTAL | VENDOR_DOCUMENT | EXPENSE | EMPLOYEE_CASH
   entityId   String?
 
   // Before/after snapshot for a real audit diff — only populated at the
@@ -1019,6 +1035,12 @@ model Payment {
   recordedById String
   recordedBy   User   @relation("PaymentRecorder", fields: [recordedById], references: [id])
 
+  // Set only when method = CASH — who physically holds the cash after this
+  // payment is verified. Drives an EmployeeCashLedger HANDOVER credit at
+  // verification time (see approvePayment).
+  handoverToId String?
+  handoverTo   User?   @relation("PaymentHandover", fields: [handoverToId], references: [id])
+
   // Optional tag for which installment this payment is meant to settle — purely
   // informational at recording time; the actual allocation (see approvePayment
   // in payment.controller.ts) always applies in schedule sequence order so a
@@ -1027,6 +1049,7 @@ model Payment {
   scheduleItem   PaymentScheduleItem? @relation(fields: [scheduleItemId], references: [id], onDelete: SetNull)
 
   financeDocuments FinanceDocument[]
+  cashLedgerEntries EmployeeCashLedger[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now()) @updatedAt
@@ -1035,6 +1058,44 @@ model Payment {
   @@index([createdAt])
   @@index([status])
   @@map("payments")
+}
+
+// ─── Employee Cash Ledger ───────────────────────────────────────────────────
+// Tracks physical cash custody — who currently holds how much, separate from
+// revenue recognition (a payment is already counted as collected the moment
+// it's VERIFIED, regardless of who's physically holding it). An employee's
+// current holding is always computed live as SUM(HANDOVER) - SUM(COLLECTION)
+// for that employee, never stored as a running total.
+model EmployeeCashLedger {
+  id             String        @id @default(uuid())
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+
+  employeeId String
+  employee   User   @relation("CashLedgerEmployee", fields: [employeeId], references: [id])
+
+  type   String // HANDOVER | COLLECTION
+  amount Float
+
+  // Set for HANDOVER entries — the verified cash payment that generated this
+  // credit. Null for COLLECTION entries.
+  paymentId String?
+  payment   Payment? @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+
+  // Set for COLLECTION entries — the Finance/Admin user who collected it.
+  // Null for HANDOVER entries.
+  collectedById String?
+  collectedBy   User?   @relation("CashLedgerCollector", fields: [collectedById], references: [id])
+
+  notes String?
+
+  createdAt DateTime @default(now())
+
+  @@index([employeeId])
+  @@index([organizationId])
+  @@index([paymentId])
+  @@index([type])
+  @@map("employee_cash_ledger")
 }
 
 // ─── Payment Schedule (installment plan) ─────────────────────────────────────

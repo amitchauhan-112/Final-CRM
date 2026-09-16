@@ -4,7 +4,7 @@ import {
   Mail, Phone, ToggleLeft, ToggleRight, Users, Filter, Eye,
 } from 'lucide-react';
 import {
-  useUsers, useCreateUser, useUpdateUser, useDeleteUser, useHardDeleteUser,
+  useUsers, useCreateUser, useUpdateUser, useDeleteUser, useSoftDeleteUser,
   useEmployeePerformance, useResetEmployeePassword,
 } from '../../../hooks/useUsers';
 import { useDepartments } from '../../../hooks/useDepartments';
@@ -15,6 +15,7 @@ import Modal from '../../../components/ui/Modal';
 import Avatar from '../../../components/ui/Avatar';
 import AvailabilityBadge from '../../../components/ui/AvailabilityBadge';
 import EmployeeProfileModal from '../../../components/employees/EmployeeProfileModal';
+import DeleteEmployeeReasonModal from '../../../components/employees/DeleteEmployeeReasonModal';
 import { Skeleton } from '../../../components/ui/Skeleton';
 import { formatDate, cn } from '../../../utils/helpers';
 import toast from 'react-hot-toast';
@@ -332,7 +333,7 @@ function EmployeeCard({
             onClick={onDelete}
             disabled={user.isActive}
             className="btn-ghost p-1.5 hover:text-red-600 disabled:opacity-30 disabled:hover:text-current disabled:cursor-not-allowed"
-            title={user.isActive ? 'Deactivate this employee first to permanently delete them' : 'Permanently delete'}
+            title={user.isActive ? 'Deactivate this employee first to delete them' : 'Delete'}
           >
             <Trash2 className="w-3.5 h-3.5" />
           </button>
@@ -403,7 +404,7 @@ export default function EmployeesTab() {
   const [deleteUserId, setDeleteUserId] = useState<string | null>(null);
   const [activeWork, setActiveWork] = useState<ActiveWorkSummary | null>(null);
   const [reassignToId, setReassignToId] = useState('');
-  const [hardDeleteUserId, setHardDeleteUserId] = useState<string | null>(null);
+  const [softDeleteUserId, setSoftDeleteUserId] = useState<string | null>(null);
   const [perfEmployee, setPerfEmployee] = useState<EmployeePerformance | null>(null);
   const [createdCreds, setCreatedCreds] = useState<{ email: string; password: string } | null>(null);
   const [resetPassUser, setResetPassUser] = useState<User | null>(null);
@@ -422,7 +423,7 @@ export default function EmployeesTab() {
   const createUser = useCreateUser();
   const updateUser = useUpdateUser();
   const deleteUser = useDeleteUser();
-  const hardDeleteUser = useHardDeleteUser();
+  const softDeleteUser = useSoftDeleteUser();
 
   const users = data?.data ?? [];
   const performance = perfData?.data ?? [];
@@ -482,17 +483,18 @@ export default function EmployeesTab() {
     else updateUser.mutate({ id: u.id, isActive: true });
   };
 
-  const handleHardDelete = () => {
-    if (!hardDeleteUserId) return;
-    hardDeleteUser.mutate(hardDeleteUserId, {
-      onSuccess: () => setHardDeleteUserId(null),
-      onError: (err: any) => {
-        toast.error(err?.response?.data?.error || 'Failed to permanently delete employee');
-      },
-    });
+  const handleSoftDelete = (reason: string) => {
+    if (!softDeleteUserId) return;
+    softDeleteUser.mutate(
+      { id: softDeleteUserId, reason },
+      {
+        onSuccess: () => setSoftDeleteUserId(null),
+        onError: (err: any) => toast.error(err?.response?.data?.error || 'Failed to delete employee'),
+      }
+    );
   };
 
-  const hardDeletingUser = users.find((u) => u.id === hardDeleteUserId) ?? null;
+  const softDeletingUser = users.find((u) => u.id === softDeleteUserId) ?? null;
 
   return (
     <div className="space-y-4">
@@ -587,7 +589,7 @@ export default function EmployeesTab() {
               onProfile={() => setProfileUserId(u.id)}
               onPerf={() => { const p = getPerf(u.id); if (p) setPerfEmployee(p); }}
               onEdit={() => setEditUser(u)}
-              onDelete={() => setHardDeleteUserId(u.id)}
+              onDelete={() => setSoftDeleteUserId(u.id)}
               onResetPass={() => setResetPassUser(u)}
               onToggleActive={() => handleToggleActive(u)}
             />
@@ -643,25 +645,17 @@ export default function EmployeesTab() {
         )}
       </Modal>
 
-      {/* Permanent delete — Admin only, deactivated employees only. Unlike
-          the modal above, this really can't be undone, and only ever
-          succeeds for an account with no real history (see the backend
-          comment on hardDeleteUser) — a real, worked-in account will come
-          back with a 409 explaining it has to stay deactivated instead. */}
-      <Modal open={!!hardDeleteUserId} onClose={() => setHardDeleteUserId(null)} title="Permanently Delete Employee" size="sm"
-        footer={<>
-          <button onClick={() => setHardDeleteUserId(null)} className="btn-secondary">Cancel</button>
-          <button onClick={handleHardDelete} disabled={hardDeleteUser.isPending} className="btn-danger">
-            {hardDeleteUser.isPending ? 'Deleting…' : 'Permanently Delete'}
-          </button>
-        </>}
-      >
-        <p className="text-sm text-slate-600">
-          <strong>{hardDeletingUser?.name ?? 'This employee'}</strong> and their account will be permanently deleted —
-          this cannot be undone. Only possible if they have no leads, payments, or other history on record; if they
-          do, this will fail and they'll simply stay deactivated instead.
-        </p>
-      </Modal>
+      {/* Delete — Admin only, deactivated employees only. Reversible: moves
+          them to Deleted Employees (see that tab for Restore / Purge
+          Permanently) rather than erasing anything — their name stays
+          correct on every past activity log, payment, comment, etc. */}
+      <DeleteEmployeeReasonModal
+        open={!!softDeleteUserId}
+        employeeName={softDeletingUser?.name}
+        onCancel={() => setSoftDeleteUserId(null)}
+        onConfirm={handleSoftDelete}
+        isLoading={softDeleteUser.isPending}
+      />
 
       <PerformanceModal open={!!perfEmployee} onClose={() => setPerfEmployee(null)} employee={perfEmployee} />
       <CredentialsModal open={!!createdCreds} onClose={() => setCreatedCreds(null)} email={createdCreds?.email ?? ''} password={createdCreds?.password ?? ''} />

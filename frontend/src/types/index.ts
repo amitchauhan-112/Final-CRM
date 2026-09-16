@@ -50,6 +50,9 @@ export interface User {
   designationId?: string;
   designation?: { id: string; name: string };
   _count?: { assignedLeads: number };
+  deletedAt?: string;
+  deletedReason?: string;
+  deletedByUser?: Pick<User, 'id' | 'name'>;
 }
 
 export interface Tag {
@@ -455,6 +458,8 @@ export interface Payment {
   verifiedAt?: string;
   recordedById: string;
   recordedBy: Pick<User, 'id' | 'name'>;
+  handoverToId?: string;
+  handoverTo?: Pick<User, 'id' | 'name'>;
   createdAt: string;
   updatedAt: string;
   booking?: {
@@ -462,6 +467,29 @@ export interface Payment {
     lead: Pick<Lead, 'id' | 'name' | 'phone'> & { assignedTo?: Pick<User, 'id' | 'name'> };
     departure?: { destination: string; departureDate: string };
   };
+}
+
+// ─── Employee Cash Ledger ────────────────────────────────────────────────────
+
+export interface EmployeeCashRow {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  currentHolding: number;
+  totalHandedOver: number;
+  totalCollected: number;
+}
+
+export interface EmployeeCashLedgerEntry {
+  id: string;
+  employeeId: string;
+  type: 'HANDOVER' | 'COLLECTION';
+  amount: number;
+  notes?: string;
+  createdAt: string;
+  payment?: { id: string; booking?: { bookingNumber?: string; travelerName: string } };
+  collectedBy?: Pick<User, 'id' | 'name'>;
 }
 
 export interface BookingTask {
@@ -1273,6 +1301,8 @@ export interface FinanceDashboardStats {
   onlineCollection: number;
   upiCollection: number;
   bankTransferCollection: number;
+  cashWithEmployees: number;
+  cashCollectedByCompany: number;
   collectionTrend: Array<{ date: string; amount: number }>;
   revenueByDestination: Array<{ destination: string; revenue: number }>;
   revenueByDeparture: Array<{ id: string; label: string; revenue: number }>;

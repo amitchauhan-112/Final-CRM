@@ -11,6 +11,7 @@ export const getUsers = async (req: AuthenticatedRequest, res: Response): Promis
 
     const where: Record<string, unknown> = {
       organizationId: req.user?.organizationId ?? null,
+      deletedAt: null, // soft-deleted employees never appear in any normal list/picker
     };
 
     if (isAdmin) {
@@ -328,14 +329,128 @@ export const deleteUser = async (req: AuthenticatedRequest, res: Response): Prom
   }
 };
 
-// ─── Permanent delete — ADMIN only, deactivated employees only ────────────────
+// ─── Soft delete — ADMIN only, deactivated employees only ─────────────────────
+// This is what "Delete Employee" means day to day: the employee disappears
+// from every normal list/picker and moves to Deleted Employees, but their
+// row (and name) stays intact, so every past activity log, payment, comment,
+// etc. still reads correctly. Reversible via restoreUser. Requires already
+// being deactivated (isActive: false) so the active-work/reassignment check
+// in deleteUser has already run — soft-delete never has to re-derive that.
+export const softDeleteUser = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+    const resolvedReason = (reason || '').trim();
+    if (!resolvedReason) {
+      res.status(400).json({ success: false, error: 'A reason is required to delete an employee' });
+      return;
+    }
+
+    if (id === req.user!.id) {
+      res.status(400).json({ success: false, error: 'Cannot delete your own account' });
+      return;
+    }
+
+    const target = await prisma.user.findFirst({ where: { id, organizationId: req.user?.organizationId ?? null } });
+    if (!target) { res.status(404).json({ success: false, error: 'User not found' }); return; }
+    if (target.deletedAt) { res.status(400).json({ success: false, error: 'This employee is already deleted' }); return; }
+    if (target.isActive) {
+      res.status(400).json({ success: false, error: 'Deactivate this employee first before deleting them' });
+      return;
+    }
+
+    await prisma.user.update({
+      where: { id },
+      data: { deletedAt: new Date(), deletedReason: resolvedReason, deletedById: req.user!.id },
+    });
+
+    await prisma.activityLog.create({
+      data: {
+        action: 'Employee Deleted',
+        details: `${target.name} deleted by ${req.user?.name} — ${resolvedReason}`,
+        entityType: 'USER',
+        entityId: id,
+        userId: req.user!.id,
+      },
+    });
+
+    res.json({ success: true, message: 'Employee deleted' });
+  } catch (e) {
+    console.error('[users] softDeleteUser error:', e);
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+};
+
+// ─── Deleted Employees (Admin-only recovery view) ──────────────────────────────
+
+export const getDeletedUsers = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const { search, page = '1', limit = '20' } = req.query;
+    const skip = (Number(page) - 1) * Number(limit);
+
+    const where: Record<string, unknown> = { organizationId: req.user?.organizationId ?? null, deletedAt: { not: null } };
+    if (search) {
+      where.OR = [
+        { name: { contains: search as string, mode: 'insensitive' } },
+        { email: { contains: search as string, mode: 'insensitive' } },
+      ];
+    }
+
+    const [users, total] = await Promise.all([
+      prisma.user.findMany({
+        where,
+        select: {
+          id: true, name: true, email: true, role: true,
+          phone: true, isActive: true, availability: true, lastLogin: true, createdAt: true,
+          employeeId: true, deletedAt: true, deletedReason: true,
+          department: { select: { id: true, name: true } },
+          designation: { select: { id: true, name: true } },
+          deletedByUser: { select: { id: true, name: true } },
+        },
+        orderBy: { deletedAt: 'desc' },
+        skip, take: Number(limit),
+      }),
+      prisma.user.count({ where }),
+    ]);
+
+    res.json({ success: true, data: users, meta: { total, page: Number(page), limit: Number(limit), totalPages: Math.ceil(total / Number(limit)) } });
+  } catch (e) {
+    console.error('[users] getDeletedUsers error:', e);
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+};
+
+export const restoreUser = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const existing = await prisma.user.findFirst({ where: { id, deletedAt: { not: null }, organizationId: req.user?.organizationId ?? null } });
+    if (!existing) { res.status(404).json({ success: false, error: 'Deleted employee not found' }); return; }
+
+    await prisma.user.update({
+      where: { id },
+      data: { deletedAt: null, deletedReason: null, deletedById: null },
+    });
+
+    await prisma.activityLog.create({
+      data: { action: 'Employee Restored', details: `${existing.name} restored by ${req.user?.name}`, entityType: 'USER', entityId: id, userId: req.user!.id },
+    });
+
+    res.json({ success: true, message: 'Employee restored' });
+  } catch (e) {
+    console.error('[users] restoreUser error:', e);
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+};
+
+// ─── Permanent delete — ADMIN only, already-soft-deleted employees only ───────
 // Separate from the above on purpose (see the comment above
 // getActiveWorkSummary): most User-referencing tables are audit trails that
 // should keep pointing at whoever actually did the work, even after they
 // leave — so this only ever succeeds for an account with no real history
 // (e.g. an unused seed/test account). Anyone who's actually worked in the
-// CRM will hit the foreign-key check below and stay deactivated instead,
-// which is the correct outcome, not a bug to work around.
+// CRM will hit the foreign-key check below and stay in Deleted Employees
+// (soft-deleted) instead, which is the correct outcome, not a bug to work
+// around. Reached from the Deleted Employees page, one step past soft-delete.
 export const hardDeleteUser = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
@@ -350,8 +465,8 @@ export const hardDeleteUser = async (req: AuthenticatedRequest, res: Response): 
       res.status(404).json({ success: false, error: 'User not found' });
       return;
     }
-    if (target.isActive) {
-      res.status(400).json({ success: false, error: 'Deactivate this employee first before permanently deleting them' });
+    if (!target.deletedAt) {
+      res.status(400).json({ success: false, error: 'Delete this employee first before permanently purging them' });
       return;
     }
 
@@ -375,7 +490,7 @@ export const hardDeleteUser = async (req: AuthenticatedRequest, res: Response): 
     if (e?.code === 'P2003') {
       res.status(409).json({
         success: false,
-        error: 'This employee has historical records tied to their account (payments, activity, leads they once worked, etc.) and can\'t be permanently deleted — they\'ll stay deactivated instead.',
+        error: 'This employee has historical records tied to their account (payments, activity, leads they once worked, etc.) and can\'t be permanently deleted — they\'ll stay in Deleted Employees instead.',
       });
       return;
     }
@@ -387,7 +502,7 @@ export const hardDeleteUser = async (req: AuthenticatedRequest, res: Response): 
 export const exportUsers = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const users = await prisma.user.findMany({
-      where: { organizationId: req.user?.organizationId ?? null },
+      where: { organizationId: req.user?.organizationId ?? null, deletedAt: null },
       include: {
         _count: { select: { assignedLeads: { where: { deletedAt: null } } } },
         assignedLeads: {

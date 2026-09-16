@@ -546,11 +546,17 @@ function TaskRow({ task, onStatusChange }: { task: BookingTask; onStatusChange: 
 function PaymentsTab({ booking }: { booking: Booking }) {
   const { user } = useAuthStore();
   const { data, isLoading } = useBookingPayments(booking.id);
+  const { data: usersData } = useUsers({ limit: 100 });
   const recordPayment = useRecordPayment();
   const deletePayment = useDeletePayment();
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ amount: '', type: 'PARTIAL', method: 'CASH', reference: '', notes: '' });
+  const [form, setForm] = useState({ amount: '', type: 'PARTIAL', method: 'CASH', reference: '', notes: '', handoverToId: user?.id ?? '' });
   const [proofFile, setProofFile] = useState<File | null>(null);
+
+  // Any active employee can hold cash, not just Sales — a real dropdown,
+  // never free text (see recordPayment in payment.controller.ts, which
+  // rejects anything that isn't an active user's id).
+  const activeEmployees = (usersData?.data ?? []).filter((u) => u.isActive);
 
   const payments = data?.data ?? [];
 
@@ -574,6 +580,7 @@ function PaymentsTab({ booking }: { booking: Booking }) {
 
   const handleRecord = () => {
     if (!form.amount || isNaN(Number(form.amount)) || Number(form.amount) <= 0) return;
+    if (form.method === 'CASH' && !form.handoverToId) return;
     recordPayment.mutate({
       bookingId: booking.id,
       amount: Number(form.amount),
@@ -582,10 +589,11 @@ function PaymentsTab({ booking }: { booking: Booking }) {
       reference: form.reference || undefined,
       notes: form.notes || undefined,
       proof: proofFile ?? undefined,
+      handoverToId: form.method === 'CASH' ? form.handoverToId : undefined,
     }, {
       onSuccess: () => {
         setShowForm(false);
-        setForm({ amount: '', type: 'PARTIAL', method: 'CASH', reference: '', notes: '' });
+        setForm({ amount: '', type: 'PARTIAL', method: 'CASH', reference: '', notes: '', handoverToId: user?.id ?? '' });
         setProofFile(null);
       },
     });
@@ -654,6 +662,21 @@ function PaymentsTab({ booking }: { booking: Booking }) {
               <label className="label text-xs">Reference / UTR</label>
               <input value={form.reference} onChange={(e) => setForm((f) => ({ ...f, reference: e.target.value }))} className="input text-sm" placeholder="Optional" />
             </div>
+            {form.method === 'CASH' && (
+              <div>
+                <label className="label text-xs">Handover To *</label>
+                <select
+                  value={form.handoverToId}
+                  onChange={(e) => setForm((f) => ({ ...f, handoverToId: e.target.value }))}
+                  className="input text-sm"
+                >
+                  <option value="">Select employee…</option>
+                  {activeEmployees.map((emp) => (
+                    <option key={emp.id} value={emp.id}>{emp.name}{emp.id === user?.id ? ' (Me)' : ''}</option>
+                  ))}
+                </select>
+              </div>
+            )}
             <div className="sm:col-span-2">
               <label className="label text-xs">Payment Screenshot / Proof</label>
               <input type="file" onChange={(e) => setProofFile(e.target.files?.[0] ?? null)} className="input text-sm" accept="image/*,.pdf" />
@@ -662,7 +685,11 @@ function PaymentsTab({ booking }: { booking: Booking }) {
           <p className="text-xs text-slate-400">This payment will appear in the Finance Panel for verification before it's added to Collected.</p>
           <div className="flex items-center gap-2 justify-end">
             <button onClick={() => setShowForm(false)} className="btn-secondary text-xs">Cancel</button>
-            <button onClick={handleRecord} disabled={recordPayment.isPending || !form.amount} className="btn-primary text-xs">
+            <button
+              onClick={handleRecord}
+              disabled={recordPayment.isPending || !form.amount || (form.method === 'CASH' && !form.handoverToId)}
+              className="btn-primary text-xs"
+            >
               {recordPayment.isPending ? 'Submitting…' : 'Submit for Verification'}
             </button>
           </div>
@@ -696,6 +723,7 @@ function PaymentsTab({ booking }: { booking: Booking }) {
                 <div className="flex items-center gap-2 text-[10px] text-slate-400 mt-0.5">
                   <span>By {p.recordedBy?.name}</span>
                   <span>• {formatDateTime(p.createdAt)}</span>
+                  {p.method === 'CASH' && p.handoverTo && <span>• Handed to {p.handoverTo.name}</span>}
                   {p.notes && <span>• {p.notes}</span>}
                 </div>
                 {p.financeNote && (

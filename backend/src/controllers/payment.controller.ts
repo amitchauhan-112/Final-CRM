@@ -43,6 +43,7 @@ export const getBookingPayments = async (req: AuthenticatedRequest, res: Respons
       include: {
         recordedBy: { select: { id: true, name: true } },
         verifiedBy: { select: { id: true, name: true } },
+        handoverTo: { select: { id: true, name: true } },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -68,7 +69,7 @@ export const recordPayment = async (req: AuthenticatedRequest, res: Response): P
     });
     if (!booking) { res.status(404).json({ success: false, error: 'Booking not found' }); return; }
 
-    const { amount, type, method, reference, notes, receiptNo, scheduleItemId } = req.body;
+    const { amount, type, method, reference, notes, receiptNo, scheduleItemId, handoverToId } = req.body;
 
     if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) {
       res.status(400).json({ success: false, error: 'Valid amount is required' }); return;
@@ -82,6 +83,19 @@ export const recordPayment = async (req: AuthenticatedRequest, res: Response): P
       res.status(403).json({ success: false, error: 'Only an Admin can record a write-off' }); return;
     }
 
+    const paymentMethod = method || 'CASH';
+    // Cash needs a named, real employee to hold it — no free text, no
+    // anonymous cash. Every other method skips this entirely.
+    if (paymentMethod === 'CASH') {
+      if (!handoverToId) {
+        res.status(400).json({ success: false, error: 'Handover To is required for cash payments' }); return;
+      }
+      const handoverTarget = await prisma.user.findUnique({ where: { id: handoverToId } });
+      if (!handoverTarget || handoverTarget.organizationId !== orgId(req) || !handoverTarget.isActive) {
+        res.status(400).json({ success: false, error: 'Handover To must be an active employee' }); return;
+      }
+    }
+
     const paymentAmount = Number(amount);
     const proofUrl = req.file ? buildUploadUrl(req.file) : null;
 
@@ -90,7 +104,7 @@ export const recordPayment = async (req: AuthenticatedRequest, res: Response): P
         bookingId,
         amount: paymentAmount,
         type: type || 'ADVANCE',
-        method: method || 'CASH',
+        method: paymentMethod,
         reference: reference?.trim() || null,
         notes: notes?.trim() || null,
         receiptNo: receiptNo?.trim() || null,
@@ -98,8 +112,9 @@ export const recordPayment = async (req: AuthenticatedRequest, res: Response): P
         status: 'PENDING',
         recordedById: req.user!.id,
         scheduleItemId: scheduleItemId || null,
+        handoverToId: paymentMethod === 'CASH' ? handoverToId : null,
       },
-      include: { recordedBy: { select: { id: true, name: true } } },
+      include: { recordedBy: { select: { id: true, name: true } }, handoverTo: { select: { id: true, name: true } } },
     });
 
     await prisma.activityLog.create({
@@ -170,6 +185,11 @@ export const approvePayment = async (req: AuthenticatedRequest, res: Response): 
       : payment.booking.amountPaid + payment.amount;
     const newBalance = Math.max(0, payment.booking.finalPrice - newAmountPaid);
 
+    // Cash that's just been verified becomes the handover employee's
+    // holding as of now — credited here, not at recording time, since a
+    // PENDING payment isn't confirmed real money yet.
+    const creditsCashHolding = !isRefund && payment.method === 'CASH' && payment.handoverToId;
+
     const [updatedPayment] = await prisma.$transaction([
       prisma.payment.update({
         where: { id },
@@ -179,6 +199,17 @@ export const approvePayment = async (req: AuthenticatedRequest, res: Response): 
         where: { id: payment.bookingId },
         data: { amountPaid: newAmountPaid, balanceAmount: newBalance },
       }),
+      ...(creditsCashHolding ? [
+        prisma.employeeCashLedger.create({
+          data: {
+            organizationId: payment.booking.organizationId,
+            employeeId: payment.handoverToId!,
+            type: 'HANDOVER',
+            amount: payment.amount,
+            paymentId: payment.id,
+          },
+        }),
+      ] : []),
     ]);
 
     await prisma.activityLog.create({
@@ -358,6 +389,7 @@ export const listPaymentsForVerification = async (req: AuthenticatedRequest, res
           },
           recordedBy: { select: { id: true, name: true } },
           verifiedBy: { select: { id: true, name: true } },
+          handoverTo: { select: { id: true, name: true } },
         },
         orderBy: { createdAt: 'asc' },
         skip,

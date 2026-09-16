@@ -35,6 +35,7 @@ import EmployeeSettingsPage from './pages/employee/SettingsPage';
 import PackageCatalogPage from './pages/employee/PackageCatalogPage';
 import MyCustomersPage from './pages/employee/MyCustomersPage';
 import MyBookingsPage from './pages/employee/MyBookingsPage';
+import MyCashPage from './pages/employee/MyCashPage';
 import TasksPage from './pages/employee/TasksPage';
 import OperationsDashboardPage from './pages/operations/DashboardPage';
 import DeparturesPage from './pages/operations/DeparturesPage';
@@ -52,6 +53,7 @@ import VendorPaymentsPage from './pages/finance/VendorPaymentsPage';
 import VendorLedgerPage from './pages/finance/VendorLedgerPage';
 import ExpensesPage from './pages/finance/ExpensesPage';
 import FinanceReportsPage from './pages/finance/ReportsPage';
+import EmployeeCashPage from './pages/finance/EmployeeCashPage';
 import AdminPayrollPage from './pages/admin/PayrollPage';
 import FinancePayrollPage from './pages/finance/PayrollPage';
 import MyTargetsPage from './pages/employee/MyTargetsPage';
@@ -131,6 +133,7 @@ export default function App() {
         <Route path="finance/vendor-payments" element={<VendorPaymentsPage />} />
         <Route path="finance/vendor-ledger" element={<VendorLedgerPage />} />
         <Route path="finance/expenses" element={<ExpensesPage />} />
+        <Route path="finance/employee-cash" element={<EmployeeCashPage />} />
         <Route path="finance/reports" element={<FinanceReportsPage />} />
         <Route path="payroll" element={<AdminPayrollPage />} />
       </Route>
@@ -171,6 +174,7 @@ export default function App() {
         <Route path="vendor-payments" element={<VendorPaymentsPage />} />
         <Route path="vendor-ledger" element={<VendorLedgerPage />} />
         <Route path="expenses" element={<ExpensesPage />} />
+        <Route path="employee-cash" element={<EmployeeCashPage />} />
         <Route path="reports" element={<FinanceReportsPage />} />
         <Route path="payroll" element={<FinancePayrollPage />} />
         <Route path="settings" element={<EmployeeSettingsPage />} />
@@ -191,6 +195,7 @@ export default function App() {
         <Route path="packages" element={<PackageCatalogPage />} />
         <Route path="customers" element={<MyCustomersPage />} />
         <Route path="bookings" element={<MyBookingsPage />} />
+        <Route path="cash" element={<MyCashPage />} />
         <Route path="tasks" element={<TasksPage />} />
         <Route path="targets" element={<MyTargetsPage />} />
         <Route path="whatsapp" element={<EmployeeWhatsAppInboxPage />} />

@@ -1,16 +1,18 @@
 import { useSearchParams } from 'react-router-dom';
-import { Users, Building2, Award } from 'lucide-react';
+import { Users, Building2, Award, Archive } from 'lucide-react';
 import { cn } from '../../utils/helpers';
 import EmployeesTab from './organization/EmployeesTab';
 import DepartmentsTab from './organization/DepartmentsTab';
 import DesignationsTab from './organization/DesignationsTab';
+import DeletedEmployeesTab from './organization/DeletedEmployeesTab';
 
-type OrgTab = 'employees' | 'departments' | 'designations';
+type OrgTab = 'employees' | 'departments' | 'designations' | 'deleted-employees';
 
 const TABS: { key: OrgTab; label: string; icon: React.ElementType }[] = [
   { key: 'employees',    label: 'Employees',    icon: Users },
   { key: 'departments',  label: 'Departments',  icon: Building2 },
   { key: 'designations', label: 'Designations', icon: Award },
+  { key: 'deleted-employees', label: 'Deleted Employees', icon: Archive },
 ];
 
 export default function OrganizationPage() {
@@ -52,6 +54,7 @@ export default function OrganizationPage() {
       {activeTab === 'employees'    && <EmployeesTab />}
       {activeTab === 'departments'  && <DepartmentsTab />}
       {activeTab === 'designations' && <DesignationsTab />}
+      {activeTab === 'deleted-employees' && <DeletedEmployeesTab />}
     </div>
   );
 }

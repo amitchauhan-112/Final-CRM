@@ -50,6 +50,8 @@ export default function FinanceDashboardPage() {
         { label: 'Online Collection', value: formatCurrency(stats.onlineCollection), icon: CreditCard, iconBg: 'bg-slate-100', iconColor: 'text-slate-600', onClick: () => navigate(`${base}/reports`) },
         { label: 'UPI Collection', value: formatCurrency(stats.upiCollection), icon: Smartphone, iconBg: 'bg-slate-100', iconColor: 'text-slate-600', onClick: () => navigate(`${base}/reports`) },
         { label: 'Bank Transfer Collection', value: formatCurrency(stats.bankTransferCollection), icon: Landmark, iconBg: 'bg-slate-100', iconColor: 'text-slate-600', onClick: () => navigate(`${base}/reports`) },
+        { label: 'Cash With Employees', value: formatCurrency(stats.cashWithEmployees), icon: Wallet, iconBg: 'bg-amber-100', iconColor: 'text-amber-600', onClick: () => navigate(`${base}/employee-cash`) },
+        { label: 'Cash Collected (Company)', value: formatCurrency(stats.cashCollectedByCompany), icon: Landmark, iconBg: 'bg-emerald-100', iconColor: 'text-emerald-600', onClick: () => navigate(`${base}/employee-cash`) },
       ]
     : [];
 
@@ -146,6 +148,9 @@ export default function FinanceDashboardPage() {
               </button>
               <button onClick={() => navigate(`${base}/expenses`)} className="btn-secondary text-sm">
                 <Receipt className="w-4 h-4" />Expenses<ArrowRight className="w-3.5 h-3.5" />
+              </button>
+              <button onClick={() => navigate(`${base}/employee-cash`)} className="btn-secondary text-sm">
+                <Landmark className="w-4 h-4" />Employee Cash<ArrowRight className="w-3.5 h-3.5" />
               </button>
             </div>
           </div>

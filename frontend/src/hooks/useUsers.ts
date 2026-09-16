@@ -121,9 +121,69 @@ export function useHardDeleteUser() {
     },
     onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: ['users'] });
+      qc.invalidateQueries({ queryKey: ['deleted-users'] });
       qc.invalidateQueries({ queryKey: ['employee-performance'] });
       toast.success(data?.message || 'Employee permanently deleted');
     },
+  });
+}
+
+// ─── Soft delete / Deleted Employees (recovery view) ─────────────────────────
+// Mirrors the Lead soft-delete pattern exactly: the employee disappears from
+// every normal list/picker but the row stays intact, so past activity logs,
+// payments, comments, etc. keep reading their real name. Reversible via
+// useRestoreUser. Left without a blanket onError toast, same reason as
+// useDeleteUser above — a 400 ("deactivate first") needs its own message.
+export function useSoftDeleteUser() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, reason }: { id: string; reason: string }) => {
+      const { data } = await api.delete(`/users/${id}/soft`, { data: { reason } });
+      return data;
+    },
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: ['users'] });
+      qc.invalidateQueries({ queryKey: ['deleted-users'] });
+      qc.invalidateQueries({ queryKey: ['employee-performance'] });
+      toast.success(data?.message || 'Employee deleted');
+    },
+  });
+}
+
+export interface DeletedUserFilters {
+  search?: string;
+  page?: number;
+  limit?: number;
+}
+
+export function useDeletedUsers(filters: DeletedUserFilters = {}) {
+  return useQuery<PaginatedResponse<User>>({
+    queryKey: ['deleted-users', filters],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (filters.search) params.set('search', filters.search);
+      params.set('page', String(filters.page ?? 1));
+      params.set('limit', String(filters.limit ?? 20));
+      const { data } = await api.get(`/users/deleted?${params}`);
+      return data;
+    },
+  });
+}
+
+export function useRestoreUser() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { data } = await api.put(`/users/${id}/restore`);
+      return data;
+    },
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: ['users'] });
+      qc.invalidateQueries({ queryKey: ['deleted-users'] });
+      qc.invalidateQueries({ queryKey: ['employee-performance'] });
+      toast.success(data?.message || 'Employee restored');
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.error || 'Failed to restore employee'),
   });
 }
 
