@@ -1,10 +1,10 @@
 import { Router } from 'express';
-import { authenticate, requireOperationsOrAdmin } from '../middleware/auth.js';
+import { authenticate, requireOperationsOrAdmin, requireAdmin } from '../middleware/auth.js';
 import { createUpload } from '../middleware/upload.js';
 const uploadVendorDoc = createUpload('vendor-documents');
 const uploadOperationsDoc = createUpload('operations-documents');
 import {
-  getDashboardStats, getStayPlan, getRoomsRequired, listDepartures, getDepartureDetail, updateDeparture,
+  getDashboardStats, getStayPlan, getRoomsRequired, listDepartures, getDepartureDetail, updateDeparture, deleteDeparture,
   createTraveler, updateTraveler, deleteTraveler,
   approveTraveler, rejectTraveler, requestTravelerCorrection, regenerateTravelerPortalLink,
   updateChecklist, suggestRoomAllocation, getTravelCalendar, getDepartureActivity,
@@ -35,6 +35,7 @@ router.put('/departures/:id', updateDeparture);
 router.patch('/departures/:id/checklist', updateChecklist);
 router.get('/departures/:id/room-allocation-suggestion', suggestRoomAllocation);
 router.get('/departures/:id/activity', getDepartureActivity);
+router.delete('/departures/:id', requireAdmin, deleteDeparture);
 
 // Travelers (Passenger List)
 router.post('/bookings/:bookingId/travelers', createTraveler);

@@ -471,11 +471,22 @@ export const deleteBooking = async (req: AuthenticatedRequest, res: Response): P
 
     const existing = await prisma.booking.findFirst({
       where: { id, ...(orgId(req) ? { organizationId: orgId(req) } : {}) },
-      select: { id: true, bookingNumber: true, travelerName: true, leadId: true },
+      select: { id: true, bookingNumber: true, travelerName: true, leadId: true, departureId: true },
     });
     if (!existing) { res.status(404).json({ success: false, error: 'Booking not found' }); return; }
 
     await prisma.booking.delete({ where: { id } });
+
+    // Booking.departureId is onDelete: SetNull, so the Departure that this
+    // booking created (via linkBookingToDeparture) would otherwise survive as
+    // an empty orphan forever — clean it up the moment it has no bookings
+    // left, rather than leaving it to clutter Operations' Departures list.
+    if (existing.departureId) {
+      const remaining = await prisma.booking.count({ where: { departureId: existing.departureId } });
+      if (remaining === 0) {
+        await prisma.departure.delete({ where: { id: existing.departureId } }).catch(() => {});
+      }
+    }
 
     await prisma.activityLog.create({
       data: {

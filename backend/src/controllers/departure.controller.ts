@@ -138,6 +138,53 @@ export async function linkBookingToDeparture(
   return departure.id;
 }
 
+// ─── Delete (hard) — ADMIN only, mandatory reason ────────────────────────────
+// Only ever allowed on a departure with zero bookings left. A departure with
+// real bookings on it represents an actual trip — removing that is a data-loss
+// footgun this action deliberately refuses. Empty departures happen when the
+// booking(s) that created them (via linkBookingToDeparture) get hard-deleted
+// later (see deleteBooking) — Booking.departureId is onDelete: SetNull, so the
+// departure survives its last booking unless explicitly cleaned up, either
+// here or automatically from deleteBooking itself. Cascades to its hotels,
+// vehicles, tasks, documents and notes via the schema's onDelete: Cascade.
+export const deleteDeparture = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const resolvedReason = (req.body.reason || '').trim();
+    if (!resolvedReason) {
+      res.status(400).json({ success: false, error: 'A reason is required to delete a departure' });
+      return;
+    }
+
+    const existing = await prisma.departure.findFirst({
+      where: { id, ...orgFilter(req) },
+      include: { bookings: { select: { id: true } } },
+    });
+    if (!existing) { res.status(404).json({ success: false, error: 'Departure not found' }); return; }
+    if (existing.bookings.length > 0) {
+      res.status(400).json({ success: false, error: 'Cannot delete a departure that still has bookings on it' });
+      return;
+    }
+
+    await prisma.departure.delete({ where: { id } });
+
+    await prisma.activityLog.create({
+      data: {
+        action: 'Departure Deleted',
+        details: `Deleted empty departure ${existing.destination} (${existing.departureDate.toDateString()}) by ${req.user?.name} — ${resolvedReason}`,
+        entityType: 'DEPARTURE',
+        entityId: existing.id,
+        userId: req.user!.id,
+      },
+    });
+
+    res.json({ success: true, message: 'Departure deleted' });
+  } catch (e) {
+    console.error('[departures] deleteDeparture error:', e);
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+};
+
 // ─── Checklist Engine ─────────────────────────────────────────────────────────
 // Most items are computed live from existing fields — never stored — so they
 // can never drift out of sync. Only the handful with no natural backing field

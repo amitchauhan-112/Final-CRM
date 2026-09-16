@@ -98,6 +98,26 @@ export function useUpdateDeparture(id: string) {
   });
 }
 
+// Hard delete — Admin only, mandatory reason. Backend refuses unless the
+// departure has zero bookings left (an orphan left behind when the booking(s)
+// that created it were themselves deleted before the auto-cleanup in
+// deleteBooking existed, or from an org's earlier test data).
+export function useDeleteDeparture() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, reason }: { id: string; reason: string }) => {
+      const { data } = await api.delete(`/operations/departures/${id}`, { data: { reason } });
+      return data;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['operations', 'departures'] });
+      qc.invalidateQueries({ queryKey: ['operations', 'dashboard'] });
+      toast.success('Departure deleted');
+    },
+    onError: (err: any) => toast.error(err?.response?.data?.error || 'Failed to delete departure'),
+  });
+}
+
 export function useDepartureActivity(departureId: string | undefined) {
   return useQuery<ApiResponse<ActivityLog[]>>({
     queryKey: ['operations', 'departure', departureId, 'activity'],

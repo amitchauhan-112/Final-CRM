@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
-import { Map, Users, IndianRupee, AlertCircle, ChevronRight } from 'lucide-react';
-import { useDepartures } from '../../hooks/useOperations';
+import { Map, Users, IndianRupee, AlertCircle, ChevronRight, Trash2 } from 'lucide-react';
+import { useDepartures, useDeleteDeparture } from '../../hooks/useOperations';
 import Table, { Column } from '../../components/ui/Table';
 import Pagination from '../../components/ui/Pagination';
+import DeleteDepartureReasonModal from '../../components/operations/DeleteDepartureReasonModal';
 import { DepartureListItem } from '../../types/index';
 import { formatCurrency, cn } from '../../utils/helpers';
+import { useAuthStore } from '../../store/authStore';
 
 const STATUSES = [
   { value: '', label: 'All Statuses' },
@@ -35,6 +37,11 @@ export default function DeparturesPage() {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState(searchParams.get('status') || '');
+  const [deleteTarget, setDeleteTarget] = useState<DepartureListItem | null>(null);
+
+  const currentUser = useAuthStore((s) => s.user);
+  const isAdmin = currentUser?.role === 'ADMIN';
+  const deleteDeparture = useDeleteDeparture();
 
   const handleSearch = (v: string) => { setSearch(v); setPage(1); };
   const handleStatus = (v: string) => { setStatus(v); setPage(1); };
@@ -42,6 +49,11 @@ export default function DeparturesPage() {
   const { data, isLoading } = useDepartures({ search: search || undefined, status: status || undefined, page, limit: 20 });
   const departures = data?.data ?? [];
   const meta = data?.meta;
+
+  const handleDeleteConfirm = (reason: string) => {
+    if (!deleteTarget) return;
+    deleteDeparture.mutate({ id: deleteTarget.id, reason }, { onSuccess: () => setDeleteTarget(null) });
+  };
 
   const columns: Column<DepartureListItem>[] = [
     {
@@ -112,7 +124,21 @@ export default function DeparturesPage() {
     {
       key: 'action',
       header: '',
-      render: () => <ChevronRight className="w-4 h-4 text-slate-300" />,
+      render: (d) => (
+        <div className="flex items-center justify-end gap-2">
+          {isAdmin && d.bookingCount === 0 && (
+            <button
+              type="button"
+              title="Delete empty departure"
+              onClick={(e) => { e.stopPropagation(); setDeleteTarget(d); }}
+              className="p-1 text-slate-300 hover:text-red-500 transition-colors"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          )}
+          <ChevronRight className="w-4 h-4 text-slate-300" />
+        </div>
+      ),
       className: 'text-right',
     },
   ];
@@ -149,6 +175,14 @@ export default function DeparturesPage() {
       {meta && meta.totalPages > 1 && (
         <Pagination page={page} totalPages={meta.totalPages} onPageChange={setPage} />
       )}
+
+      <DeleteDepartureReasonModal
+        open={!!deleteTarget}
+        departureLabel={deleteTarget ? `${deleteTarget.destination} — ${formatDatePretty(deleteTarget.departureDate)}` : undefined}
+        onConfirm={handleDeleteConfirm}
+        onCancel={() => setDeleteTarget(null)}
+        isLoading={deleteDeparture.isPending}
+      />
     </div>
   );
 }
