@@ -53,15 +53,6 @@ export function VendorAllocationFields({ alloc }: { alloc: ReturnType<typeof use
             <label className="label">Rate (₹)</label>
             <input type="number" step="1" onKeyDown={blockDecimalKey} value={values.rate} onChange={(e) => updateField('rate', e.target.value)} className="input" />
           </div>
-          <div>
-            <label className="label">Advance Required (₹)</label>
-            <input
-              type="number" step="1" onKeyDown={blockDecimalKey}
-              value={values.advanceRequired} onChange={(e) => updateField('advanceRequired', e.target.value)}
-              className="input" placeholder="Optional"
-              title="Once Finance records this much paid to the vendor, this auto-confirms"
-            />
-          </div>
           {isNew && (
             <label className="flex items-center gap-2 text-xs text-slate-600 sm:col-span-2 pt-1">
               <input type="checkbox" checked={saveAsNewVendor} onChange={(e) => setSaveAsNewVendor(e.target.checked)} className="rounded" />
@@ -76,6 +67,19 @@ export function VendorAllocationFields({ alloc }: { alloc: ReturnType<typeof use
           )}
         </div>
       )}
+
+      {/* Deliberately outside the vendor-directory box above and never sent
+          to createVendor — this is specific to THIS hotel/vehicle booking,
+          not saved to the vendor's profile for future bookings. */}
+      <div className="pt-2 border-t border-slate-200">
+        <label className="label">Advance Required (₹) — for this booking</label>
+        <input
+          type="number" step="1" onKeyDown={blockDecimalKey}
+          value={values.advanceRequired} onChange={(e) => updateField('advanceRequired', e.target.value)}
+          className="input max-w-xs" placeholder="Optional"
+          title="Once Finance records this much paid for this booking, it auto-confirms — not saved to the vendor's profile"
+        />
+      </div>
     </div>
   );
 }
