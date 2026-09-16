@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import {
   Plus, Edit, Trash2, TrendingUp, Search, Copy, Check, KeyRound,
-  Mail, Phone, ToggleLeft, ToggleRight, Users, Filter,
+  Mail, Phone, ToggleLeft, ToggleRight, Users, Filter, Eye,
 } from 'lucide-react';
 import {
   useUsers, useCreateUser, useUpdateUser, useDeleteUser, useHardDeleteUser,
@@ -324,6 +324,7 @@ function EmployeeCard({
         </div>
         {/* Actions */}
         <div className="flex items-center gap-0.5 flex-shrink-0">
+          <button onClick={onProfile} className="btn-ghost p-1.5" title="View all details"><Eye className="w-3.5 h-3.5" /></button>
           {perf && <button onClick={onPerf} className="btn-ghost p-1.5" title="Performance"><TrendingUp className="w-3.5 h-3.5" /></button>}
           <button onClick={onResetPass} className="btn-ghost p-1.5" title="Reset password"><KeyRound className="w-3.5 h-3.5" /></button>
           <button onClick={onEdit} className="btn-ghost p-1.5" title="Edit"><Edit className="w-3.5 h-3.5" /></button>
