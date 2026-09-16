@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { Building2, Plus, Pencil, Trash2, MapPin, Phone, User, IndianRupee, FileCheck, Wand2, BedDouble, Info } from 'lucide-react';
+import { Building2, Plus, Pencil, Trash2, MapPin, Phone, User, IndianRupee, FileCheck, Wand2, BedDouble, Info, CalendarDays, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { useCreateHotel, useUpdateHotel, useDeleteHotel, useRoomAllocationSuggestion } from '../../hooks/useOperations';
 import { useVendorAllocation } from '../../hooks/useVendorAllocation';
 import { VendorAllocationFields, VendorDivergenceConfirm } from './VendorAllocationFields';
-import { Hotel } from '../../types/index';
+import { Hotel, HotelRequirementBlock } from '../../types/index';
 import Modal from '../ui/Modal';
 import { formatDate, cn } from '../../utils/helpers';
 
@@ -183,6 +183,63 @@ function RoomAllocationModal({ open, onClose, departureId, hotels }: {
   );
 }
 
+// ─── Hotel Required — day-wise, from the package itinerary ───────────────────
+
+function formatDateStr(dateStr: string) {
+  return new Date(`${dateStr}T00:00:00`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function HotelRequirementsByStay({ blocks, onFillDetails }: {
+  blocks: HotelRequirementBlock[];
+  onFillDetails: (block: HotelRequirementBlock) => void;
+}) {
+  if (blocks.length === 0) {
+    return (
+      <div className="flex items-start gap-3 px-4 py-3 bg-amber-50 border border-amber-100 rounded-xl text-sm text-amber-700">
+        <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+        <span>
+          This package's itinerary has no city info yet, so a day-wise breakdown can't be shown —
+          add a City for each STAY night under Packages → Day Plan, and it'll appear here
+          automatically. The room-count summary below still works from bookings as usual.
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Hotel Required — by stay</p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {blocks.map((b, i) => (
+          <div key={i} className={cn('card p-4 space-y-2 border', b.fulfilled ? 'border-emerald-200 bg-emerald-50/30' : 'border-amber-200 bg-amber-50/20')}>
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-1.5">
+                <MapPin className="w-3.5 h-3.5 text-primary-500" />
+                <span className="font-semibold text-slate-800 text-sm">{b.location}</span>
+              </div>
+              {b.fulfilled
+                ? <span className="badge bg-emerald-50 text-emerald-700 flex items-center gap-1"><CheckCircle2 className="w-3 h-3" />Booked</span>
+                : <span className="badge bg-amber-50 text-amber-700">Pending</span>}
+            </div>
+            <p className="text-xs text-slate-500 flex items-center gap-1.5">
+              <CalendarDays className="w-3.5 h-3.5" />
+              {formatDateStr(b.checkIn)} → {formatDateStr(b.checkOut)} · {b.nights} night{b.nights !== 1 ? 's' : ''}
+            </p>
+            <p className="text-xs text-slate-500 flex items-center gap-1.5">
+              <BedDouble className="w-3.5 h-3.5" />{b.roomsNeeded} room{b.roomsNeeded !== 1 ? 's' : ''} needed
+            </p>
+            {!b.fulfilled && (
+              <button onClick={() => onFillDetails(b)} className="text-xs font-medium text-primary-600 hover:text-primary-700 flex items-center gap-1 pt-1">
+                <Plus className="w-3 h-3" />Fill Details
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ─── Room requirements panel ──────────────────────────────────────────────────
 
 interface RoomReqProps {
@@ -231,10 +288,11 @@ function RoomRequirements({ roomsRequired, hotels }: RoomReqProps) {
   );
 }
 
-export default function HotelsTab({ departureId, hotels, roomsRequired = 0, defaultCheckIn, defaultCheckOut, defaultLocation, autoOpenAdd }: {
+export default function HotelsTab({ departureId, hotels, roomsRequired = 0, hotelRequirements = [], defaultCheckIn, defaultCheckOut, defaultLocation, autoOpenAdd }: {
   departureId: string;
   hotels: Hotel[];
   roomsRequired?: number;
+  hotelRequirements?: HotelRequirementBlock[];
   defaultCheckIn?: string;
   defaultCheckOut?: string;
   defaultLocation?: string;
@@ -244,6 +302,7 @@ export default function HotelsTab({ departureId, hotels, roomsRequired = 0, defa
   const [editHotel, setEditHotel] = useState<Hotel | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [allocationOpen, setAllocationOpen] = useState(false);
+  const [blockPrefill, setBlockPrefill] = useState<Partial<Hotel> | null>(null);
 
   const createHotel = useCreateHotel(departureId);
   const updateHotel = useUpdateHotel(departureId);
@@ -257,16 +316,22 @@ export default function HotelsTab({ departureId, hotels, roomsRequired = 0, defa
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoOpenAdd]);
 
-  const addDefaults: Partial<Hotel> | undefined = (defaultCheckIn || defaultLocation)
+  const handleFillDetails = (block: HotelRequirementBlock) => {
+    setBlockPrefill({ location: block.location, checkInDate: block.checkIn, checkOutDate: block.checkOut, numberOfRooms: block.roomsNeeded });
+    setAddOpen(true);
+  };
+
+  const addDefaults: Partial<Hotel> | undefined = blockPrefill ?? ((defaultCheckIn || defaultLocation)
     ? { location: defaultLocation, checkInDate: defaultCheckIn, checkOutDate: defaultCheckOut }
-    : undefined;
+    : undefined);
 
   return (
     <div className="space-y-4">
+      <HotelRequirementsByStay blocks={hotelRequirements} onFillDetails={handleFillDetails} />
       <RoomRequirements roomsRequired={roomsRequired} hotels={hotels} />
 
       <div className="flex items-center gap-2 flex-wrap">
-        <button onClick={() => setAddOpen(true)} className="btn-primary text-sm">
+        <button onClick={() => { setBlockPrefill(null); setAddOpen(true); }} className="btn-primary text-sm">
           <Plus className="w-4 h-4" />Add Hotel
         </button>
         <button onClick={() => setAllocationOpen(true)} className="btn-secondary text-sm">
@@ -313,9 +378,14 @@ export default function HotelsTab({ departureId, hotels, roomsRequired = 0, defa
       )}
 
       <HotelFormModal
-        open={addOpen} onClose={() => setAddOpen(false)} isLoading={createHotel.isPending}
+        // Keyed on the prefill so switching which stay block "Fill Details"
+        // was clicked for forces a fresh form instance — react-hook-form's
+        // defaultValues only ever apply once per mount otherwise, which
+        // would leave a previous block's dates/location stuck in the form.
+        key={blockPrefill ? `${blockPrefill.location}-${blockPrefill.checkInDate}` : 'default'}
+        open={addOpen} onClose={() => { setAddOpen(false); setBlockPrefill(null); }} isLoading={createHotel.isPending}
         defaultValues={addDefaults}
-        onSubmit={(data) => createHotel.mutate(data as any, { onSuccess: () => setAddOpen(false) })}
+        onSubmit={(data) => createHotel.mutate(data as any, { onSuccess: () => { setAddOpen(false); setBlockPrefill(null); } })}
       />
       <HotelFormModal
         open={!!editHotel} onClose={() => setEditHotel(null)} defaultValues={editHotel ?? undefined} isLoading={updateHotel.isPending}

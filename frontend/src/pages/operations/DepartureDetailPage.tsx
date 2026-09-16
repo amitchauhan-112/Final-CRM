@@ -1,24 +1,14 @@
-import { useState } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { useForm } from 'react-hook-form';
 import {
-  ArrowLeft, Map, Calendar, Users2, UserCog, Pencil, Phone,
+  ArrowLeft, Map, Calendar, Users2,
 } from 'lucide-react';
 import { useDeparture, useUpdateDeparture } from '../../hooks/useOperations';
-import { useUsers } from '../../hooks/useUsers';
 import { Skeleton } from '../../components/ui/Skeleton';
-import Modal from '../../components/ui/Modal';
 import Tabs, { useUrlTab } from '../../components/ui/Tabs';
-import TripOverviewTab from '../../components/operations/TripOverviewTab';
-import PassengerTable from '../../components/operations/PassengerTable';
-import GroupSummaryGrid from '../../components/operations/GroupSummaryGrid';
-import TripProfitabilityCard from '../../components/operations/TripProfitabilityCard';
 import HotelsTab from '../../components/operations/HotelsTab';
 import VehiclesTab from '../../components/operations/VehiclesTab';
-import TimelineTab from '../../components/operations/TimelineTab';
-import ChecklistTab from '../../components/operations/ChecklistTab';
-import DocumentsTab from '../../components/operations/DocumentsTab';
-import NotesTab from '../../components/operations/NotesTab';
+import TripCaptainTab from '../../components/operations/TripCaptainTab';
+import OthersTab from '../../components/operations/OthersTab';
 import { cn } from '../../utils/helpers';
 
 const STATUS_BADGE: Record<string, string> = {
@@ -28,87 +18,25 @@ const STATUS_BADGE: Record<string, string> = {
   CANCELLED: 'bg-red-50 text-red-600',
 };
 
-const CAPTAIN_STATUS_BADGE: Record<string, string> = {
-  UNASSIGNED: 'bg-red-50 text-red-600',
-  ASSIGNED: 'bg-amber-50 text-amber-700',
-  CONFIRMED: 'bg-emerald-50 text-emerald-700',
-};
-
+// Only these 4 tabs are rendered here — Overview/Passengers/Group Summary/
+// Timeline/Checklist/Documents/Notes were deliberately dropped from this page
+// per an explicit request to show only the operational requirements that need
+// action. Their components/routes/backend data are untouched — only unmounted
+// from here — so restoring any of them later is a small, low-risk change.
 const TABS = [
-  { key: 'overview', label: 'Overview' },
-  { key: 'passengers', label: 'Passengers' },
-  { key: 'summary', label: 'Group Summary' },
-  { key: 'hotels', label: 'Hotels' },
-  { key: 'vehicles', label: 'Vehicles' },
-  { key: 'timeline', label: 'Timeline' },
-  { key: 'checklist', label: 'Checklist' },
-  { key: 'documents', label: 'Documents' },
-  { key: 'notes', label: 'Notes' },
+  { key: 'captain', label: 'Trip Captain' },
+  { key: 'hotels', label: 'Hotel Required' },
+  { key: 'vehicles', label: 'Vehicle Required' },
+  { key: 'others', label: 'Others' },
 ] as const;
 type Tab = (typeof TABS)[number]['key'];
-
-interface CaptainForm { tripCaptainUserId?: string; tripCaptainStatus: string; }
-
-function TripCaptainModal({ open, onClose, departure }: { open: boolean; onClose: () => void; departure: NonNullable<ReturnType<typeof useDeparture>['data']>['data'] }) {
-  const update = useUpdateDeparture(departure.id);
-  // TRIP_CAPTAIN-role accounts only (created the same way Employees are, from
-  // Organization → Employees) — replaces the old free-text name/phone entry
-  // so a departure's captain is always a real, logged-in account.
-  const { data: captainsData } = useUsers({ role: 'TRIP_CAPTAIN', isActive: true, limit: 200 });
-  const captains = captainsData?.data ?? [];
-
-  const { register, handleSubmit } = useForm<CaptainForm>({
-    defaultValues: {
-      tripCaptainUserId: departure.tripCaptainUserId ?? '',
-      tripCaptainStatus: departure.tripCaptainStatus,
-    },
-  });
-
-  const onSubmit = (data: CaptainForm) => update.mutate(data as any, { onSuccess: onClose });
-
-  return (
-    <Modal
-      open={open} onClose={onClose} title="Assign Trip Captain" size="sm"
-      footer={<>
-        <button type="button" onClick={onClose} className="btn-secondary">Cancel</button>
-        <button form="captain-form" type="submit" disabled={update.isPending} className="btn-primary">{update.isPending ? 'Saving…' : 'Save'}</button>
-      </>}
-    >
-      <form id="captain-form" onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-        <div>
-          <label className="label">Trip Captain</label>
-          <select {...register('tripCaptainUserId')} className="input">
-            <option value="">Not assigned</option>
-            {captains.map((c) => (
-              <option key={c.id} value={c.id}>{c.name}{c.phone ? ` — ${c.phone}` : ''}</option>
-            ))}
-          </select>
-          {captains.length === 0 && (
-            <p className="text-xs text-slate-400 mt-1">
-              No Trip Captain accounts yet — create one from Organization → Employees (role: Trip Captain).
-            </p>
-          )}
-        </div>
-        <div>
-          <label className="label">Status</label>
-          <select {...register('tripCaptainStatus')} className="input">
-            <option value="UNASSIGNED">Unassigned</option>
-            <option value="ASSIGNED">Assigned</option>
-            <option value="CONFIRMED">Confirmed</option>
-          </select>
-        </div>
-      </form>
-    </Modal>
-  );
-}
 
 export default function DepartureDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
   const base = location.pathname.startsWith('/admin') ? '/admin/operations' : '/operations';
-  const [tab, setTab] = useUrlTab<Tab>(TABS, 'overview');
-  const [captainModalOpen, setCaptainModalOpen] = useState(false);
+  const [tab, setTab] = useUrlTab<Tab>(TABS, 'captain');
   const searchParams = new URLSearchParams(location.search);
   const prefillCheckIn = searchParams.get('checkIn') ?? undefined;
   const prefillCheckOut = searchParams.get('checkOut') ?? undefined;
@@ -169,38 +97,13 @@ export default function DepartureDetailPage() {
               </p>
             </div>
           </div>
-
-          <div className="text-right">
-            <button
-              onClick={() => setCaptainModalOpen(true)}
-              className="flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-200 hover:border-primary-300 transition-colors"
-            >
-              <UserCog className="w-4 h-4 text-slate-400" />
-              <div className="text-left">
-                <p className="text-xs text-slate-400">Trip Captain</p>
-                <p className="text-sm font-medium text-slate-700">
-                  {departure.tripCaptainName || 'Not assigned'}
-                  {departure.tripCaptainPhone && <span className="text-slate-400 font-normal"> · <Phone className="w-3 h-3 inline" /> {departure.tripCaptainPhone}</span>}
-                </p>
-              </div>
-              <span className={cn('badge', CAPTAIN_STATUS_BADGE[departure.tripCaptainStatus])}>{departure.tripCaptainStatus}</span>
-              <Pencil className="w-3.5 h-3.5 text-slate-400" />
-            </button>
-          </div>
         </div>
       </div>
 
       {/* Tabs */}
       <Tabs tabs={TABS} active={tab} onChange={setTab} />
 
-      {tab === 'overview' && <TripOverviewTab departure={departure} onChangeTab={(t) => setTab(t as Tab)} />}
-      {tab === 'passengers' && <PassengerTable departure={departure} />}
-      {tab === 'summary' && departure.groupSummary && (
-        <div className="space-y-4">
-          {departure.tripProfitability && <TripProfitabilityCard profitability={departure.tripProfitability} />}
-          <GroupSummaryGrid summary={departure.groupSummary} />
-        </div>
-      )}
+      {tab === 'captain' && <TripCaptainTab departure={departure} />}
       {tab === 'hotels' && <HotelsTab
         departureId={departure.id}
         hotels={departure.hotels}
@@ -208,18 +111,14 @@ export default function DepartureDetailPage() {
           const cap = ({ SINGLE: 1, DOUBLE: 2, TRIPLE: 3, QUAD: 4 } as Record<string, number>)[b.roomSharing] ?? 2;
           return sum + Math.ceil(b.numberOfTravelers / cap);
         }, 0)}
+        hotelRequirements={departure.hotelRequirements}
         defaultCheckIn={prefillCheckIn}
         defaultCheckOut={prefillCheckOut}
         defaultLocation={prefillLocation}
         autoOpenAdd={!!prefillCheckIn}
       />}
       {tab === 'vehicles' && <VehiclesTab departureId={departure.id} vehicles={departure.vehicles} totalTravelers={departure.groupSummary?.totalTravelers ?? 0} />}
-      {tab === 'timeline' && <TimelineTab departureId={departure.id} timeline={departure.timeline} departureDate={departure.departureDate} />}
-      {tab === 'checklist' && <ChecklistTab departureId={departure.id} checklist={departure.checklist} />}
-      {tab === 'documents' && <DocumentsTab departureId={departure.id} documents={departure.documents} />}
-      {tab === 'notes' && <NotesTab departureId={departure.id} notes={departure.notes} />}
-
-      <TripCaptainModal open={captainModalOpen} onClose={() => setCaptainModalOpen(false)} departure={departure} />
+      {tab === 'others' && <OthersTab departureId={departure.id} requirements={departure.requirements} />}
     </div>
   );
 }

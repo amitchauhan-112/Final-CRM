@@ -97,6 +97,7 @@ model User {
   assignedTasks       BookingTask[]      @relation("TaskAssignee")
   uploadedOpsDocuments OperationsDocument[] @relation("OpsDocumentUploader")
   opsNotes            OperationsNote[]   @relation("OpsNoteAuthor")
+  createdRequirements DepartureRequirement[] @relation("DepartureRequirementCreator")
   updatedDepartureTasks DepartureTask[]  @relation("DepartureTaskUpdater")
   verifiedPayments     Payment[]        @relation("PaymentVerifier")
   handedOverPayments   Payment[]        @relation("PaymentHandover")
@@ -1001,6 +1002,12 @@ model PackageItinerary {
   department  String  @default("SALES")   // SALES | OPERATIONS | CUSTOMER_CARE | ALL
   sortOrder   Int     @default(0)
 
+  // City/place for this day or night — distinct from the free-text description
+  // ("Activity Details" in the Day Plan UI). Nullable since older itinerary rows
+  // predate this field; Operations' Hotel Required view falls back to
+  // description, then the departure's overall destination, when this is empty.
+  location String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -1197,6 +1204,7 @@ model Departure {
   vehicles  Vehicle[]
   documents OperationsDocument[]
   notes     OperationsNote[]
+  requirements DepartureRequirement[]
   timeline  DepartureTask[]
   vendorPayments VendorPayment[]
   notifications  Notification[]
@@ -1373,6 +1381,28 @@ model OperationsNote {
 
   @@index([departureId])
   @@map("operations_notes")
+}
+
+// Freeform manual requirements that don't fit Trip Captain / Hotel / Vehicle —
+// backs the Departure Detail page's "Others" tab. A simple checklist, not a log
+// like OperationsNote: each row can be toggled PENDING <-> DONE.
+model DepartureRequirement {
+  id          String    @id @default(uuid())
+  departureId String
+  departure   Departure @relation(fields: [departureId], references: [id], onDelete: Cascade)
+
+  title  String
+  notes  String?
+  status String  @default("PENDING") // PENDING | DONE
+
+  createdById String
+  createdBy   User   @relation("DepartureRequirementCreator", fields: [createdById], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([departureId])
+  @@map("departure_requirements")
 }
 
 model DepartureTask {

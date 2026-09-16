@@ -7,6 +7,7 @@ import { generateOpsTasksFromItinerary, generateStandardOpsTasks } from './depar
 import { computeJourney } from './journey.controller.js';
 import { validateTravelerInput } from '../utils/travelerValidation.js';
 import { roomsForBookingList, computeFitGitRoomRequirement, emptyRoomCounts, addRoomCounts, ROOM_CAPACITY } from '../services/roomRequirement.service.js';
+import { deriveStayBlocks } from '../services/stayBlocks.service.js';
 
 const orgId = (req: AuthenticatedRequest) => req.user?.organizationId ?? null;
 const orgFilter = (req: AuthenticatedRequest) => (orgId(req) ? { organizationId: orgId(req) } : {});
@@ -484,7 +485,17 @@ export const getDepartureDetail = async (req: AuthenticatedRequest, res: Respons
     const departure = await prisma.departure.findFirst({
       where: { id, ...orgFilter(req) },
       include: {
-        package: { select: { id: true, name: true, code: true, nights: true, days: true } },
+        package: {
+          select: {
+            id: true, name: true, code: true, nights: true, days: true,
+            itineraryItems: {
+              where: { taskType: 'TRIP_DAY' },
+              select: { dayOffset: true, title: true, notes: true, description: true, location: true },
+              orderBy: { dayOffset: 'asc' },
+            },
+          },
+        },
+        requirements: { include: { createdBy: { select: { id: true, name: true } } }, orderBy: { createdAt: 'desc' } },
         bookings: {
           include: {
             lead: {
@@ -593,7 +604,30 @@ export const getDepartureDetail = async (req: AuthenticatedRequest, res: Respons
       return { bookingId: b.id, leadId: b.lead.id, leadName: b.lead.name, ...summary };
     });
 
-    res.json({ success: true, data: { ...departure, groupSummary, checklist, tripProfitability, journeySummaries } });
+    // Hotel Required — day-wise stay blocks derived from the package's
+    // itinerary (same algorithm as the cross-departure Stay Planning page,
+    // see stayBlocks.service.ts), scoped to this one departure. Empty when
+    // the package has no itinerary, or no STAY night has a location/
+    // description filled in yet — the frontend shows a fallback nudge in
+    // that case rather than an error.
+    const itineraryItems = departure.package?.itineraryItems ?? [];
+    const roomsNeeded = roomsForBookingList(departure.bookings).total;
+    const hotelRequirements = deriveStayBlocks(itineraryItems, departure.departureDate, departure.destination).map((block) => ({
+      ...block,
+      roomsNeeded,
+      // Fulfilled once a CONFIRMED hotel exists at this location whose stay
+      // covers the block — a simple overlap check, not an exact date match,
+      // so a slightly earlier check-in/later check-out still counts.
+      fulfilled: departure.hotels.some((h) =>
+        h.status === 'CONFIRMED' &&
+        (h.location ?? '').trim().toLowerCase() === block.location.trim().toLowerCase() &&
+        h.checkInDate && h.checkOutDate &&
+        h.checkInDate.toISOString().slice(0, 10) <= block.checkIn &&
+        h.checkOutDate.toISOString().slice(0, 10) >= block.checkOut
+      ),
+    }));
+
+    res.json({ success: true, data: { ...departure, groupSummary, checklist, tripProfitability, journeySummaries, hotelRequirements } });
   } catch (e) {
     console.error('[operations] getDepartureDetail error:', e);
     res.status(500).json({ success: false, error: 'Internal server error' });
@@ -1147,12 +1181,6 @@ type DestEntry = {
   fit: FitBookingEntry[];
 };
 
-function addDaysStr(dateStr: string, days: number): string {
-  const d = new Date(`${dateStr}T00:00:00.000Z`);
-  d.setUTCDate(d.getUTCDate() + days);
-  return d.toISOString().split('T')[0];
-}
-
 async function buildStayDateMap(req: AuthenticatedRequest) {
   const activeUpcomingFilter = { ...orgFilter(req), status: { in: ['UPCOMING', 'ACTIVE'] } };
   const departures = await prisma.departure.findMany({
@@ -1171,7 +1199,7 @@ async function buildStayDateMap(req: AuthenticatedRequest) {
           id: true, name: true, code: true, nights: true, packageType: true,
           itineraryItems: {
             where: { taskType: 'TRIP_DAY' },
-            select: { dayOffset: true, title: true, notes: true, description: true },
+            select: { dayOffset: true, title: true, notes: true, description: true, location: true },
             orderBy: { dayOffset: 'asc' },
           },
         },
@@ -1194,8 +1222,6 @@ async function buildStayDateMap(req: AuthenticatedRequest) {
   const dateMap: Record<string, Record<string, DestEntry>> = {};
 
   for (const dep of departures) {
-    const depDate = new Date(dep.departureDate);
-    depDate.setHours(0, 0, 0, 0);
     const items = dep.package?.itineraryItems ?? [];
     const totalGuests = dep.bookings.reduce((s, b) => s + b.numberOfTravelers, 0);
     if (totalGuests === 0) continue;
@@ -1222,40 +1248,14 @@ async function buildStayDateMap(req: AuthenticatedRequest) {
     })));
 
     // Turn each STAY night into its calendar date, then collapse consecutive
-    // nights at the SAME location into one stay block (checkIn → checkOut).
-    // This is what makes "Manali Night 1 + Night 2" show as one 2-night stay
-    // instead of two identical, independently-counted entries — and it's why
-    // vehicles/rooms below get computed once per block, not once per night.
-    // A package that returns to the same city later (Night 1 Manali, Night 2
-    // Kasol, Night 3 Manali) still gets two separate blocks, because the
-    // nights aren't consecutive.
-    const nights = items
-      .filter((item) => item.notes === 'STAY')
-      .map((item) => {
-        const dayIndex = Math.floor(item.dayOffset / 2);
-        const date = new Date(depDate);
-        date.setDate(date.getDate() + dayIndex);
-        return {
-          dateStr: date.toISOString().split('T')[0],
-          dest: (item.description || dep.destination || '').trim() || 'Unknown',
-        };
-      });
-
-    type StayBlock = { dest: string; checkIn: string; checkOut: string; nights: number };
-    const blocks: StayBlock[] = [];
-    for (const n of nights) {
-      const last = blocks[blocks.length - 1];
-      if (last && last.dest === n.dest && last.checkOut === n.dateStr) {
-        last.checkOut = addDaysStr(n.dateStr, 1);
-        last.nights += 1;
-      } else {
-        blocks.push({ dest: n.dest, checkIn: n.dateStr, checkOut: addDaysStr(n.dateStr, 1), nights: 1 });
-      }
-    }
+    // nights at the SAME location into one stay block (checkIn → checkOut) —
+    // shared with the per-departure Hotel Required view via
+    // stayBlocks.service.ts, so both stay in sync automatically.
+    const blocks = deriveStayBlocks(items, dep.departureDate, dep.destination);
 
     for (const block of blocks) {
       const dateStr = block.checkIn;
-      const dest = block.dest;
+      const dest = block.location;
 
       if (!dateMap[dateStr]) dateMap[dateStr] = {};
       if (!dateMap[dateStr][dest]) {

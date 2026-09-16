@@ -18,6 +18,7 @@ import {
 import { updateTaskStatus, createTask } from '../controllers/departureTask.controller.js';
 import { uploadDocument, deleteDocument } from '../controllers/opsDocument.controller.js';
 import { createNote, deleteNote } from '../controllers/opsNote.controller.js';
+import { createRequirement, toggleRequirementStatus, deleteRequirement } from '../controllers/departureRequirement.controller.js';
 
 const router = Router();
 router.use(authenticate, requireOperationsOrAdmin);
@@ -78,5 +79,10 @@ router.delete('/documents/:id', deleteDocument);
 // Internal notes
 router.post('/departures/:departureId/notes', createNote);
 router.delete('/notes/:id', deleteNote);
+
+// Others — manual requirements checklist
+router.post('/departures/:departureId/requirements', createRequirement);
+router.patch('/requirements/:id/toggle', toggleRequirementStatus);
+router.delete('/requirements/:id', deleteRequirement);
 
 export default router;

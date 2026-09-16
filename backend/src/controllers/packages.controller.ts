@@ -257,6 +257,7 @@ export const createPackage = async (req: AuthenticatedRequest, res: Response): P
         taskType: 'TRIP_DAY' as const,
         department: 'SALES' as const,
         sortOrder: Number(row.dayOffset),
+        location: row.location ? String(row.location).trim() : null,
       }));
     } else {
       itineraryData = [
@@ -383,6 +384,7 @@ export const updatePackage = async (req: AuthenticatedRequest, res: Response): P
           taskType: 'TRIP_DAY' as const,
           department: 'SALES' as const,
           sortOrder: Number(row.dayOffset),
+          location: row.location ? String(row.location).trim() : null,
         })),
       });
     } else if (nightsChanged) {

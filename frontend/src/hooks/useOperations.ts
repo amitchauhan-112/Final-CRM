@@ -474,3 +474,33 @@ export function useDeleteNote(departureId: string) {
     onError: (err: any) => toast.error(err?.response?.data?.error || 'Failed to remove note'),
   });
 }
+
+// ─── Others — manual requirements checklist ─────────────────────────────────
+
+export function useCreateRequirement(departureId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: { title: string; notes?: string }) =>
+      (await api.post(`/operations/departures/${departureId}/requirements`, payload)).data.data,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['operations', 'departure', departureId] }),
+    onError: (err: any) => toast.error(err?.response?.data?.error || 'Failed to add requirement'),
+  });
+}
+
+export function useToggleRequirement(departureId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => (await api.patch(`/operations/requirements/${id}/toggle`)).data.data,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['operations', 'departure', departureId] }),
+    onError: (err: any) => toast.error(err?.response?.data?.error || 'Failed to update requirement'),
+  });
+}
+
+export function useDeleteRequirement(departureId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => (await api.delete(`/operations/requirements/${id}`)).data,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['operations', 'departure', departureId] }),
+    onError: (err: any) => toast.error(err?.response?.data?.error || 'Failed to remove requirement'),
+  });
+}

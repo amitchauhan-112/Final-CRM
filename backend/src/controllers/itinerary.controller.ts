@@ -33,7 +33,7 @@ export const createItineraryItem = async (req: AuthenticatedRequest, res: Respon
     const pkg = await (prisma as any).package.findFirst({ where: { id: packageId, organizationId: orgId(req) } });
     if (!pkg) { res.status(404).json({ success: false, error: 'Package not found' }); return; }
 
-    const { dayOffset, title, description, notes, taskType, department, sortOrder } = req.body;
+    const { dayOffset, title, description, notes, taskType, department, sortOrder, location } = req.body;
 
     if (!title?.trim()) { res.status(400).json({ success: false, error: 'Title is required' }); return; }
     if (dayOffset === undefined || dayOffset === null || isNaN(Number(dayOffset))) {
@@ -50,6 +50,7 @@ export const createItineraryItem = async (req: AuthenticatedRequest, res: Respon
         taskType: taskType || 'GENERAL',
         department: department || 'SALES',
         sortOrder: sortOrder !== undefined ? Number(sortOrder) : 0,
+        location: location?.trim() || null,
       },
     });
 
@@ -73,7 +74,7 @@ export const updateItineraryItem = async (req: AuthenticatedRequest, res: Respon
       res.status(404).json({ success: false, error: 'Item not found' }); return;
     }
 
-    const { dayOffset, title, description, notes, taskType, department, sortOrder } = req.body;
+    const { dayOffset, title, description, notes, taskType, department, sortOrder, location } = req.body;
 
     const item = await (prisma as any).packageItinerary.update({
       where: { id },
@@ -85,6 +86,7 @@ export const updateItineraryItem = async (req: AuthenticatedRequest, res: Respon
         taskType: taskType ?? existing.taskType,
         department: department ?? existing.department,
         sortOrder: sortOrder !== undefined ? Number(sortOrder) : existing.sortOrder,
+        location: location !== undefined ? location?.trim() || null : existing.location,
       },
     });
 

@@ -104,14 +104,18 @@ interface ItineraryRow {
   dayIndex: number;
   activityType: ActivityType;
   activityDetails: string;
+  // City/place for this night — distinct from activityDetails. Only
+  // meaningful for STAY rows; drives Operations' Hotel Required day-wise
+  // breakdown on the Departure Detail page.
+  location: string;
 }
 
 function buildItineraryRows(nights: number): ItineraryRow[] {
   const rows: ItineraryRow[] = [];
   for (let i = 0; i <= nights + 1; i++) {
     const isEdge = i === 0 || i === nights + 1;
-    rows.push({ key: `day-${i}`, label: `Day ${i}`, rowType: 'day', dayIndex: i, activityType: isEdge ? 'JOURNEY' : 'SIGHTSEEING', activityDetails: '' });
-    rows.push({ key: `night-${i}`, label: `Night ${i}`, rowType: 'night', dayIndex: i, activityType: isEdge ? 'JOURNEY' : 'STAY', activityDetails: '' });
+    rows.push({ key: `day-${i}`, label: `Day ${i}`, rowType: 'day', dayIndex: i, activityType: isEdge ? 'JOURNEY' : 'SIGHTSEEING', activityDetails: '', location: '' });
+    rows.push({ key: `night-${i}`, label: `Night ${i}`, rowType: 'night', dayIndex: i, activityType: isEdge ? 'JOURNEY' : 'STAY', activityDetails: '', location: '' });
   }
   return rows;
 }
@@ -149,17 +153,18 @@ function PackageCreateModal({ open, onClose }: { open: boolean; onClose: () => v
       const next = buildItineraryRows(n);
       return next.map((row) => {
         const existing = prev.find((r) => r.key === row.key);
-        return existing ? { ...row, activityType: existing.activityType, activityDetails: existing.activityDetails } : row;
+        return existing ? { ...row, activityType: existing.activityType, activityDetails: existing.activityDetails, location: existing.location } : row;
       });
     });
   };
 
   const changeDays = (d: number) => changeNights(Math.max(1, d - 2));
 
-  const updateRow = (key: string, field: 'activityType' | 'activityDetails', value: string) => {
+  const updateRow = (key: string, field: 'activityType' | 'activityDetails' | 'location', value: string) => {
     setRows((prev) => prev.map((r) => {
       if (r.key !== key) return r;
       const updated = { ...r, [field]: value as ActivityType };
+      if (field === 'activityType' && value !== 'STAY') updated.location = '';
       if (field === 'activityType' && value === 'JOURNEY') updated.activityDetails = '';
       return updated;
     }));
@@ -179,6 +184,7 @@ function PackageCreateModal({ open, onClose }: { open: boolean; onClose: () => v
         title: r.label,
         activityType: r.activityType,
         activityDetails: r.activityDetails,
+        location: r.location,
       })),
     } as any, { onSuccess: handleClose });
   };
@@ -262,16 +268,18 @@ function PackageCreateModal({ open, onClose }: { open: boolean; onClose: () => v
         <div>
           <label className="label mb-2">Day Plan</label>
           {/* Column headers (desktop) */}
-          <div className="hidden sm:grid sm:grid-cols-[9rem_8rem_1fr] gap-x-3 mb-1.5 px-1">
+          <div className="hidden sm:grid sm:grid-cols-[9rem_8rem_1fr_10rem] gap-x-3 mb-1.5 px-1">
             <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Day / Night</p>
             <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Activity Type</p>
             <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Activity Details</p>
+            <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">City / Location</p>
           </div>
           <div className="space-y-1.5">
             {rows.map((row) => {
               const isDep = row.dayIndex === 0;
               const isRet = row.dayIndex === nights + 1;
               const isJourney = row.activityType === 'JOURNEY';
+              const isStay = row.activityType === 'STAY';
               const badgeColor = isDep
                 ? 'bg-amber-100 text-amber-700'
                 : isRet
@@ -279,7 +287,7 @@ function PackageCreateModal({ open, onClose }: { open: boolean; onClose: () => v
                 : row.rowType === 'day' ? 'bg-sky-100 text-sky-700' : 'bg-blue-100 text-blue-700';
               const badgeText = row.rowType === 'day' ? `D${row.dayIndex}` : `N${row.dayIndex}`;
               return (
-                <div key={row.key} className="grid grid-cols-1 sm:grid-cols-[9rem_8rem_1fr] gap-2 sm:gap-x-3 sm:items-center">
+                <div key={row.key} className="grid grid-cols-1 sm:grid-cols-[9rem_8rem_1fr_10rem] gap-2 sm:gap-x-3 sm:items-center">
                   <div className="flex items-center gap-2">
                     <span className={cn('text-[10px] font-bold px-1.5 py-0.5 rounded-full tabular-nums flex-shrink-0', badgeColor)}>
                       {badgeText}
@@ -306,6 +314,15 @@ function PackageCreateModal({ open, onClose }: { open: boolean; onClose: () => v
                       : 'Place or activity (e.g. Solang Valley, Rohtang Pass…)'
                     }
                     className={cn('input text-sm py-1.5', isJourney && 'bg-slate-50 text-slate-300 cursor-not-allowed')}
+                  />
+                  <input
+                    type="text"
+                    value={row.location}
+                    onChange={(e) => updateRow(row.key, 'location', e.target.value)}
+                    disabled={!isStay}
+                    placeholder={isStay ? 'City (e.g. Manali)' : '—'}
+                    title="Drives Operations' day-wise Hotel Required view"
+                    className={cn('input text-sm py-1.5', !isStay && 'bg-slate-50 text-slate-300 cursor-not-allowed')}
                   />
                 </div>
               );
@@ -695,8 +712,8 @@ function TravelDayEditor({ packageId, totalNights }: { packageId: string; totalN
   const { data, isLoading } = useItinerary(packageId);
   const updateItem = useUpdateItineraryItem(packageId);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState<{ activityType: string; activityDetails: string }>({
-    activityType: 'STAY', activityDetails: '',
+  const [editForm, setEditForm] = useState<{ activityType: string; activityDetails: string; location: string }>({
+    activityType: 'STAY', activityDetails: '', location: '',
   });
 
   const items = (data?.data ?? [])
@@ -717,12 +734,16 @@ function TravelDayEditor({ packageId, totalNights }: { packageId: string; totalN
     setEditForm({
       activityType: getActivityType(item) || 'STAY',
       activityDetails: item.description ?? '',
+      location: item.location ?? '',
     });
   };
 
   const saveEdit = (item: PackageItinerary) => {
     updateItem.mutate(
-      { id: item.id, title: item.title, description: editForm.activityDetails || undefined, notes: editForm.activityType },
+      {
+        id: item.id, title: item.title, description: editForm.activityDetails || undefined, notes: editForm.activityType,
+        location: editForm.activityType === 'STAY' ? (editForm.location || undefined) : undefined,
+      },
       { onSuccess: () => setEditingId(null) },
     );
   };
@@ -765,7 +786,7 @@ function TravelDayEditor({ packageId, totalNights }: { packageId: string; totalN
                   </span>
                   <p className="text-sm font-semibold text-slate-700">{item.title}</p>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
                     <label className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider mb-1 block">Activity Type</label>
                     <select
@@ -773,6 +794,7 @@ function TravelDayEditor({ packageId, totalNights }: { packageId: string; totalN
                       onChange={(e) => setEditForm((f) => ({
                         activityType: e.target.value,
                         activityDetails: e.target.value === 'JOURNEY' ? '' : f.activityDetails,
+                        location: e.target.value !== 'STAY' ? '' : f.location,
                       }))}
                       className="input text-sm"
                     >
@@ -796,6 +818,18 @@ function TravelDayEditor({ packageId, totalNights }: { packageId: string; totalN
                       className={cn('input text-sm', editForm.activityType === 'JOURNEY' && 'bg-slate-50 text-slate-300 cursor-not-allowed')}
                     />
                   </div>
+                  <div>
+                    <label className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider mb-1 block">City / Location</label>
+                    <input
+                      type="text"
+                      value={editForm.location}
+                      onChange={(e) => setEditForm((f) => ({ ...f, location: e.target.value }))}
+                      disabled={editForm.activityType !== 'STAY'}
+                      placeholder={editForm.activityType === 'STAY' ? 'City (e.g. Manali)' : '—'}
+                      title="Drives Operations' day-wise Hotel Required view"
+                      className={cn('input text-sm', editForm.activityType !== 'STAY' && 'bg-slate-50 text-slate-300 cursor-not-allowed')}
+                    />
+                  </div>
                 </div>
                 <div className="flex gap-2 justify-end">
                   <button type="button" onClick={() => setEditingId(null)} className="btn-secondary text-xs">Cancel</button>
@@ -815,6 +849,11 @@ function TravelDayEditor({ packageId, totalNights }: { packageId: string; totalN
                     {actType && (
                       <span className={cn('text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wide', ACTIVITY_BADGE[actType as ActivityType])}>
                         {actType.charAt(0) + actType.slice(1).toLowerCase()}
+                      </span>
+                    )}
+                    {item.location && (
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wide bg-emerald-50 text-emerald-600">
+                        📍 {item.location}
                       </span>
                     )}
                   </div>

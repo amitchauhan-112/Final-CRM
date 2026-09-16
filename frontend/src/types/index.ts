@@ -434,6 +434,7 @@ export interface PackageItinerary {
   taskType: TaskType;
   department: TaskDepartment;
   sortOrder: number;
+  location?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -848,6 +849,31 @@ export interface DepartureTask {
   updatedAt: string;
 }
 
+// Backs the Departure Detail page's "Others" tab — a manual requirement
+// checklist for anything that doesn't fit Trip Captain / Hotel / Vehicle.
+export interface DepartureRequirement {
+  id: string;
+  departureId: string;
+  title: string;
+  notes?: string;
+  status: 'PENDING' | 'DONE';
+  createdById: string;
+  createdBy: Pick<User, 'id' | 'name'>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// One "this city needs a hotel from checkIn to checkOut" block, derived from
+// a departure's package itinerary (see backend stayBlocks.service.ts).
+export interface HotelRequirementBlock {
+  location: string;
+  checkIn: string;  // YYYY-MM-DD
+  checkOut: string; // YYYY-MM-DD
+  nights: number;
+  roomsNeeded: number;
+  fulfilled: boolean;
+}
+
 export interface GroupSummary {
   totalTravelers: number;
   maleCount: number;
@@ -874,7 +900,7 @@ export interface Departure {
   id: string;
   organizationId?: string;
   packageId?: string;
-  package?: { id: string; name: string; code: string; nights?: number; days?: number };
+  package?: { id: string; name: string; code: string; nights?: number; days?: number; itineraryItems?: PackageItinerary[] };
   destination: string;
   departureDate: string;
   returnDate?: string;
@@ -888,11 +914,13 @@ export interface Departure {
   vehicles: Vehicle[];
   documents: OperationsDocument[];
   notes: OperationsNote[];
+  requirements: DepartureRequirement[];
   timeline: DepartureTask[];
   groupSummary?: GroupSummary;
   checklist?: Checklist;
   tripProfitability?: TripProfitability;
   journeySummaries?: JourneySummary[];
+  hotelRequirements?: HotelRequirementBlock[];
   createdAt: string;
   updatedAt: string;
 }
