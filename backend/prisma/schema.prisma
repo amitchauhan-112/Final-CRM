@@ -1228,16 +1228,27 @@ model Hotel {
   checkInDate        DateTime?
   checkOutDate       DateTime?
   numberOfRooms      Int?
+  roomPlan           String?                      // MAP | CP | EP — meal plan for the rooms booked
   roomAllocation     String?                      // free-text summary, e.g. "5 Double, 2 Triple"
   vendorName         String?                      // legacy free-text — kept for backward compatibility
   vendorContact      String?
   contactPerson      String?                      // snapshot of the vendor's contact person at allocation time
-  rate               Float?                       // negotiated rate for this booking — pre-filled from vendor.rate, editable
+  rate               Float?                       // PER-ROOM rate — pre-filled from vendor.rate, editable. Combined with
+                                                    // numberOfRooms to get the total (see totalAmount computation below).
+  totalRate          Float?                       // direct TOTAL rate — an alternative to rate x numberOfRooms when the
+                                                    // vendor quotes one lump sum instead of a per-room price. Exactly one
+                                                    // of rate/totalRate is required when saving.
   vendorId           String?                      // optional FK to the Vendor master list (Vendor Workspace)
   vendor             Vendor? @relation("VendorHotels", fields: [vendorId], references: [id], onDelete: SetNull)
   confirmationNumber String?
   status             String  @default("PENDING")  // PENDING | CONFIRMED | CANCELLED
   voucherUrl         String?
+
+  // Advance amount Ops expects from Finance before this hotel counts as
+  // confirmed. Threaded onto the synced VendorPayment below — once Finance
+  // records advancePaid >= this, the vendor-payment update handler flips
+  // this hotel's status to CONFIRMED automatically (see updateVendorPayment).
+  advanceRequired Float?
 
   // Set once a vendorId+rate(+numberOfRooms) is present — Operations→Finance
   // auto-sync creates/updates this VendorPayment instead of Finance having
@@ -1272,6 +1283,9 @@ model Vehicle {
   vendorId       String?                          // optional FK to the Vendor master list (Vendor Workspace)
   vendor         Vendor? @relation("VendorVehicles", fields: [vendorId], references: [id], onDelete: SetNull)
   status         String  @default("PENDING")      // PENDING | CONFIRMED | CANCELLED
+
+  // Same advance-required auto-confirm behavior as Hotel.advanceRequired above.
+  advanceRequired Float?
 
   // Cab vs Volvo — vehicleType above stays the free-text model/description
   // field underneath this coarse toggle (e.g. "Tempo Traveller 17-seater"
@@ -1626,6 +1640,11 @@ model VendorPayment {
   totalAmount Float
   advancePaid Float    @default(0)
   balanceAmount Float  @default(0)
+  // Set only when synced from Ops's Hotel/Vehicle.advanceRequired — the
+  // threshold updateVendorPayment checks against to auto-confirm the linked
+  // Hotel/Vehicle once Finance's advancePaid reaches it. Null for bills
+  // Finance enters directly (no linked Hotel/Vehicle to auto-confirm).
+  advanceRequired Float?
   dueDate     DateTime?
   status      String   @default("PENDING")    // PENDING | PARTIAL | PAID | OVERDUE
   invoiceUrl  String?

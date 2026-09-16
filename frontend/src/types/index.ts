@@ -694,6 +694,8 @@ export interface PortalBooking {
   paymentSchedule: PaymentScheduleItem[];
 }
 
+export type RoomPlan = 'MAP' | 'CP' | 'EP';
+
 export interface Hotel {
   id: string;
   departureId: string;
@@ -702,11 +704,14 @@ export interface Hotel {
   checkInDate?: string;
   checkOutDate?: string;
   numberOfRooms?: number;
+  roomPlan?: RoomPlan;
   roomAllocation?: string;
   vendorName?: string;
   vendorContact?: string;
   contactPerson?: string;
-  rate?: number;
+  rate?: number;       // per-room
+  totalRate?: number;  // direct total — alternative to rate x numberOfRooms
+  advanceRequired?: number;
   vendorId?: string;
   confirmationNumber?: string;
   status: OpsBookingStatus;
@@ -728,6 +733,7 @@ export interface Vehicle {
   vendorContact?: string;
   contactPerson?: string;
   rate?: number;
+  advanceRequired?: number;
   vendorId?: string;
   status: OpsBookingStatus;
   transportType: 'CAB' | 'VOLVO';
@@ -1113,6 +1119,9 @@ export interface VendorPayment {
   totalAmount: number;
   advancePaid: number;
   balanceAmount: number;
+  // Set only when auto-synced from a Hotel/Vehicle's advanceRequired — once
+  // advancePaid reaches this, that Hotel/Vehicle auto-confirms.
+  advanceRequired?: number;
   dueDate?: string;
   status: VendorPaymentStatus;
   invoiceUrl?: string;

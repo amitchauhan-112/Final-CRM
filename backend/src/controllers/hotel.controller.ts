@@ -31,8 +31,15 @@ export const createHotel = async (req: AuthenticatedRequest, res: Response): Pro
     const departure = await assertDepartureAccess(req, departureId);
     if (!departure) { res.status(404).json({ success: false, error: 'Departure not found' }); return; }
 
-    const { name, location, checkInDate, checkOutDate, numberOfRooms, roomAllocation, vendorName, vendorContact, contactPerson, rate, vendorId, confirmationNumber, status } = req.body;
+    const { name, location, checkInDate, checkOutDate, numberOfRooms, roomPlan, roomAllocation, vendorName, vendorContact, contactPerson, rate, totalRate, advanceRequired, vendorId, confirmationNumber, status } = req.body;
     if (!name?.trim()) { res.status(400).json({ success: false, error: 'Hotel name is required' }); return; }
+    // Exactly one of Per Room Rate / Total Rate is required — no more adding
+    // a hotel with no pricing at all.
+    const hasRate = rate !== undefined && rate !== '' && rate !== null && Number(rate) > 0;
+    const hasTotalRate = totalRate !== undefined && totalRate !== '' && totalRate !== null && Number(totalRate) > 0;
+    if (!hasRate && !hasTotalRate) {
+      res.status(400).json({ success: false, error: 'Enter either a Per Room Rate or a Total Rate' }); return;
+    }
 
     const resolvedStatus = status || 'PENDING';
     if (resolvedStatus === 'CONFIRMED' && numberOfRooms) {
@@ -58,11 +65,14 @@ export const createHotel = async (req: AuthenticatedRequest, res: Response): Pro
         checkInDate: checkInDate ? new Date(checkInDate) : null,
         checkOutDate: checkOutDate ? new Date(checkOutDate) : null,
         numberOfRooms: numberOfRooms !== undefined && numberOfRooms !== '' ? Number(numberOfRooms) : null,
+        roomPlan: roomPlan?.trim() || null,
         roomAllocation: roomAllocation?.trim() || null,
         vendorName: vendorName?.trim() || null,
         vendorContact: vendorContact?.trim() || null,
         contactPerson: contactPerson?.trim() || null,
-        rate: rate !== undefined && rate !== '' && rate !== null ? Number(rate) : null,
+        rate: hasRate ? Number(rate) : null,
+        totalRate: hasTotalRate ? Number(totalRate) : null,
+        advanceRequired: advanceRequired !== undefined && advanceRequired !== '' && advanceRequired !== null ? Number(advanceRequired) : null,
         vendorId: vendorId?.trim() || null,
         confirmationNumber: confirmationNumber?.trim() || null,
         status: status || 'PENDING',
@@ -81,7 +91,8 @@ export const createHotel = async (req: AuthenticatedRequest, res: Response): Pro
       vendorId: hotel.vendorId,
       departureId,
       serviceType: 'HOTEL',
-      totalAmount: hotel.rate && hotel.numberOfRooms ? hotel.rate * hotel.numberOfRooms : null,
+      totalAmount: hotel.totalRate ?? (hotel.rate && hotel.numberOfRooms ? hotel.rate * hotel.numberOfRooms : null),
+      advanceRequired: hotel.advanceRequired,
       existingVendorPaymentId: hotel.vendorPaymentId,
       createdById: req.user!.id,
       label: hotel.name,
@@ -108,6 +119,16 @@ export const updateHotel = async (req: AuthenticatedRequest, res: Response): Pro
 
     const b = req.body;
     const wasPending = existing.status === 'PENDING';
+
+    // Exactly one of Per Room Rate / Total Rate is required, considering
+    // whichever value ends up effective after this update (existing value
+    // when the field isn't touched, explicit clear-to-null still counts as
+    // "not set" here).
+    const effectiveRate = b.rate !== undefined ? (b.rate === '' || b.rate === null ? null : Number(b.rate)) : existing.rate;
+    const effectiveTotalRate = b.totalRate !== undefined ? (b.totalRate === '' || b.totalRate === null ? null : Number(b.totalRate)) : existing.totalRate;
+    if (!(effectiveRate && effectiveRate > 0) && !(effectiveTotalRate && effectiveTotalRate > 0)) {
+      res.status(400).json({ success: false, error: 'Enter either a Per Room Rate or a Total Rate' }); return;
+    }
 
     const resolvedStatus = b.status ?? existing.status;
     const resolvedRooms = b.numberOfRooms !== undefined
@@ -139,11 +160,14 @@ export const updateHotel = async (req: AuthenticatedRequest, res: Response): Pro
         checkInDate: b.checkInDate !== undefined ? (b.checkInDate ? new Date(b.checkInDate) : null) : existing.checkInDate,
         checkOutDate: b.checkOutDate !== undefined ? (b.checkOutDate ? new Date(b.checkOutDate) : null) : existing.checkOutDate,
         numberOfRooms: b.numberOfRooms !== undefined ? (b.numberOfRooms === '' || b.numberOfRooms === null ? null : Number(b.numberOfRooms)) : existing.numberOfRooms,
+        roomPlan: b.roomPlan !== undefined ? b.roomPlan?.trim() || null : existing.roomPlan,
         roomAllocation: b.roomAllocation !== undefined ? b.roomAllocation?.trim() || null : existing.roomAllocation,
         vendorName: b.vendorName !== undefined ? b.vendorName?.trim() || null : existing.vendorName,
         vendorContact: b.vendorContact !== undefined ? b.vendorContact?.trim() || null : existing.vendorContact,
         contactPerson: b.contactPerson !== undefined ? b.contactPerson?.trim() || null : existing.contactPerson,
-        rate: b.rate !== undefined ? (b.rate === '' || b.rate === null ? null : Number(b.rate)) : existing.rate,
+        rate: effectiveRate,
+        totalRate: effectiveTotalRate,
+        advanceRequired: b.advanceRequired !== undefined ? (b.advanceRequired === '' || b.advanceRequired === null ? null : Number(b.advanceRequired)) : existing.advanceRequired,
         vendorId: b.vendorId !== undefined ? b.vendorId?.trim() || null : existing.vendorId,
         confirmationNumber: b.confirmationNumber !== undefined ? b.confirmationNumber?.trim() || null : existing.confirmationNumber,
         status: b.status ?? existing.status,
@@ -161,7 +185,8 @@ export const updateHotel = async (req: AuthenticatedRequest, res: Response): Pro
       vendorId: hotel.vendorId,
       departureId: hotel.departureId,
       serviceType: 'HOTEL',
-      totalAmount: hotel.rate && hotel.numberOfRooms ? hotel.rate * hotel.numberOfRooms : null,
+      totalAmount: hotel.totalRate ?? (hotel.rate && hotel.numberOfRooms ? hotel.rate * hotel.numberOfRooms : null),
+      advanceRequired: hotel.advanceRequired,
       existingVendorPaymentId: hotel.vendorPaymentId,
       createdById: req.user!.id,
       label: hotel.name,

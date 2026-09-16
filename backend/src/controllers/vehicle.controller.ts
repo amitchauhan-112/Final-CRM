@@ -16,7 +16,7 @@ export const createVehicle = async (req: AuthenticatedRequest, res: Response): P
 
     const {
       transportType, vehicleType, vehicleNumber, driverName, driverMobile, pickupTime, pickupLocation,
-      vendorName, vendorContact, contactPerson, rate, vendorId, status,
+      vendorName, vendorContact, contactPerson, rate, advanceRequired, vendorId, status,
       operatorName, ticketReference, numberOfTickets, volvoDepartureTime,
     } = req.body;
 
@@ -34,6 +34,7 @@ export const createVehicle = async (req: AuthenticatedRequest, res: Response): P
         vendorContact: vendorContact?.trim() || null,
         contactPerson: contactPerson?.trim() || null,
         rate: rate !== undefined && rate !== '' && rate !== null ? Number(rate) : null,
+        advanceRequired: advanceRequired !== undefined && advanceRequired !== '' && advanceRequired !== null ? Number(advanceRequired) : null,
         vendorId: vendorId?.trim() || null,
         status: status || 'PENDING',
         operatorName: operatorName?.trim() || null,
@@ -56,6 +57,7 @@ export const createVehicle = async (req: AuthenticatedRequest, res: Response): P
       departureId,
       serviceType: 'VEHICLE',
       totalAmount: vehicle.rate,
+      advanceRequired: vehicle.advanceRequired,
       existingVendorPaymentId: vehicle.vendorPaymentId,
       createdById: req.user!.id,
       label: vehicle.vehicleType || vehicle.transportType,
@@ -96,6 +98,7 @@ export const updateVehicle = async (req: AuthenticatedRequest, res: Response): P
         vendorContact: b.vendorContact !== undefined ? b.vendorContact?.trim() || null : existing.vendorContact,
         contactPerson: b.contactPerson !== undefined ? b.contactPerson?.trim() || null : existing.contactPerson,
         rate: b.rate !== undefined ? (b.rate === '' || b.rate === null ? null : Number(b.rate)) : existing.rate,
+        advanceRequired: b.advanceRequired !== undefined ? (b.advanceRequired === '' || b.advanceRequired === null ? null : Number(b.advanceRequired)) : existing.advanceRequired,
         vendorId: b.vendorId !== undefined ? b.vendorId?.trim() || null : existing.vendorId,
         status: b.status ?? existing.status,
         operatorName: b.operatorName !== undefined ? b.operatorName?.trim() || null : existing.operatorName,
@@ -116,6 +119,7 @@ export const updateVehicle = async (req: AuthenticatedRequest, res: Response): P
       departureId: vehicle.departureId,
       serviceType: 'VEHICLE',
       totalAmount: vehicle.rate,
+      advanceRequired: vehicle.advanceRequired,
       existingVendorPaymentId: vehicle.vendorPaymentId,
       createdById: req.user!.id,
       label: vehicle.vehicleType || vehicle.transportType,

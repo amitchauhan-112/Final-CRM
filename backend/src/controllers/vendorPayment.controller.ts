@@ -1,7 +1,7 @@
 import { Response } from 'express';
 import prisma from '../lib/prisma.js';
 import { AuthenticatedRequest } from '../types/index.js';
-import { emitFinanceUpdated } from '../services/notification.service.js';
+import { emitFinanceUpdated, emitOperationsUpdated, notifyOperationsTeam } from '../services/notification.service.js';
 import { buildUploadUrl } from '../middleware/upload.js';
 import { isWholeAmount, WHOLE_AMOUNT_ERROR } from '../utils/amountValidation.js';
 
@@ -80,7 +80,10 @@ export const createVendorPayment = async (req: AuthenticatedRequest, res: Respon
 export const updateVendorPayment = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    const existing = await prisma.vendorPayment.findFirst({ where: { id, ...orgFilter(req) }, include: { vendor: true } });
+    const existing = await prisma.vendorPayment.findFirst({
+      where: { id, ...orgFilter(req) },
+      include: { vendor: true, hotel: true, vehicle: true },
+    });
     if (!existing) { res.status(404).json({ success: false, error: 'Vendor payment not found' }); return; }
 
     const b = req.body;
@@ -105,6 +108,24 @@ export const updateVendorPayment = async (req: AuthenticatedRequest, res: Respon
     await prisma.activityLog.create({
       data: { action: 'Vendor Payment Updated', details: `Bill for ${existing.vendor.name} updated by ${req.user?.name}`, entityType: 'VENDOR_PAYMENT', entityId: id, userId: req.user!.id },
     });
+
+    // Advance-required auto-confirm: this bill was auto-synced from a
+    // Hotel/Vehicle that set advanceRequired — once Finance's recorded
+    // advancePaid reaches it, that Hotel/Vehicle flips to CONFIRMED without
+    // Ops having to come back and do it by hand. Only ever moves PENDING ->
+    // CONFIRMED — never overrides an explicit CANCELLED.
+    if (existing.advanceRequired != null && advance >= existing.advanceRequired) {
+      if (existing.hotel && existing.hotel.status === 'PENDING') {
+        await prisma.hotel.update({ where: { id: existing.hotel.id }, data: { status: 'CONFIRMED' } });
+        await notifyOperationsTeam(existing.organizationId, 'HOTEL_CONFIRMED', 'Hotel Confirmed', `Hotel "${existing.hotel.name}" auto-confirmed — advance paid`, existing.hotel.departureId);
+        emitOperationsUpdated(existing.hotel.departureId);
+      }
+      if (existing.vehicle && existing.vehicle.status === 'PENDING') {
+        await prisma.vehicle.update({ where: { id: existing.vehicle.id }, data: { status: 'CONFIRMED' } });
+        emitOperationsUpdated(existing.vehicle.departureId);
+      }
+    }
+
     emitFinanceUpdated();
 
     res.json({ success: true, data: updated });

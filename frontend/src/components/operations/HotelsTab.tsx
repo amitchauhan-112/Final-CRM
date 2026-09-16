@@ -14,13 +14,20 @@ const STATUS_BADGE: Record<string, string> = {
   CANCELLED: 'bg-red-50 text-red-600',
 };
 
+const ROOM_PLAN_OPTIONS: { value: 'MAP' | 'CP' | 'EP'; label: string }[] = [
+  { value: 'MAP', label: 'MAP — room + breakfast + 1 meal' },
+  { value: 'CP', label: 'CP — room + breakfast' },
+  { value: 'EP', label: 'EP — room only' },
+];
+
 interface HotelForm {
   name: string; location?: string; checkInDate?: string; checkOutDate?: string;
-  numberOfRooms?: number; roomAllocation?: string;
+  numberOfRooms?: number; roomPlan?: string; roomAllocation?: string;
+  totalRate?: number;
   confirmationNumber?: string; status: string;
 }
 
-type HotelSubmitData = HotelForm & { vendorId?: string; vendorName?: string; vendorContact?: string; contactPerson?: string; rate?: number };
+type HotelSubmitData = HotelForm & { vendorId?: string; vendorName?: string; vendorContact?: string; contactPerson?: string; rate?: number; advanceRequired?: number };
 
 function HotelFormModal({ open, onClose, defaultValues, onSubmit, isLoading }: {
   open: boolean; onClose: () => void; defaultValues?: Partial<Hotel>;
@@ -33,7 +40,9 @@ function HotelFormModal({ open, onClose, defaultValues, onSubmit, isLoading }: {
       checkInDate: defaultValues?.checkInDate?.slice(0, 10) ?? '',
       checkOutDate: defaultValues?.checkOutDate?.slice(0, 10) ?? '',
       numberOfRooms: defaultValues?.numberOfRooms,
+      roomPlan: defaultValues?.roomPlan ?? '',
       roomAllocation: defaultValues?.roomAllocation ?? '',
+      totalRate: defaultValues?.totalRate,
       confirmationNumber: defaultValues?.confirmationNumber ?? '',
       status: defaultValues?.status ?? 'PENDING',
     },
@@ -45,9 +54,11 @@ function HotelFormModal({ open, onClose, defaultValues, onSubmit, isLoading }: {
     vendorContact: defaultValues?.vendorContact,
     contactPerson: defaultValues?.contactPerson,
     rate: defaultValues?.rate,
+    advanceRequired: defaultValues?.advanceRequired,
   });
   const [pendingData, setPendingData] = useState<HotelForm | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [rateError, setRateError] = useState('');
 
   async function finalizeSubmit(data: HotelForm) {
     const vendorFields = await alloc.resolve();
@@ -55,6 +66,15 @@ function HotelFormModal({ open, onClose, defaultValues, onSubmit, isLoading }: {
   }
 
   function handleFormSubmit(data: HotelForm) {
+    // Exactly one of Per Room Rate (alloc.values.rate) / Total Rate is
+    // required — mirrors the backend's own check.
+    const hasRate = alloc.values.rate.trim() !== '' && Number(alloc.values.rate) > 0;
+    const hasTotalRate = data.totalRate !== undefined && data.totalRate !== null && Number(data.totalRate) > 0;
+    if (!hasRate && !hasTotalRate) {
+      setRateError('Enter either a Per Room Rate or a Total Rate');
+      return;
+    }
+    setRateError('');
     if (alloc.hasDiverged()) {
       setPendingData(data);
       setConfirmOpen(true);
@@ -101,6 +121,15 @@ function HotelFormModal({ open, onClose, defaultValues, onSubmit, isLoading }: {
           <input type="number" {...register('numberOfRooms')} className="input" />
         </div>
         <div>
+          <label className="label">Room Plan</label>
+          <select {...register('roomPlan')} className="input">
+            <option value="">— Select Plan —</option>
+            {ROOM_PLAN_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
+        </div>
+        <div>
           <label className="label">Confirmation Number</label>
           <input {...register('confirmationNumber')} className="input" />
         </div>
@@ -108,6 +137,12 @@ function HotelFormModal({ open, onClose, defaultValues, onSubmit, isLoading }: {
           <label className="label">Room Allocation</label>
           <input {...register('roomAllocation')} className="input" placeholder="e.g. 5 Double, 2 Triple" />
         </div>
+        <div>
+          <label className="label">Total Rate (₹)</label>
+          <input type="number" step="1" {...register('totalRate')} className="input" placeholder="Lump sum, if not quoted per-room" />
+        </div>
+
+        {rateError && <p className="sm:col-span-2 text-red-500 text-xs -mt-2">{rateError}</p>}
 
         <VendorAllocationFields alloc={alloc} />
       </form>
@@ -358,11 +393,13 @@ export default function HotelsTab({ departureId, hotels, roomsRequired = 0, hote
               <div className="text-xs text-slate-500 space-y-1">
                 {h.checkInDate && <p>Check-in: {formatDate(h.checkInDate)}</p>}
                 {h.checkOutDate && <p>Check-out: {formatDate(h.checkOutDate)}</p>}
-                {h.numberOfRooms && <p>{h.numberOfRooms} room(s){h.roomAllocation ? ` — ${h.roomAllocation}` : ''}</p>}
+                {h.numberOfRooms && <p>{h.numberOfRooms} room(s){h.roomPlan ? ` · ${h.roomPlan}` : ''}{h.roomAllocation ? ` — ${h.roomAllocation}` : ''}</p>}
                 {h.confirmationNumber && <p className="flex items-center gap-1"><FileCheck className="w-3 h-3" />{h.confirmationNumber}</p>}
                 {h.vendorName && <p className="flex items-center gap-1"><Phone className="w-3 h-3" />{h.vendorName} {h.vendorContact && `· ${h.vendorContact}`}</p>}
                 {h.contactPerson && <p className="flex items-center gap-1"><User className="w-3 h-3" />{h.contactPerson}</p>}
-                {h.rate != null && <p className="flex items-center gap-1"><IndianRupee className="w-3 h-3" />{h.rate.toLocaleString('en-IN')}</p>}
+                {h.totalRate != null && <p className="flex items-center gap-1"><IndianRupee className="w-3 h-3" />{h.totalRate.toLocaleString('en-IN')} total</p>}
+                {h.rate != null && <p className="flex items-center gap-1"><IndianRupee className="w-3 h-3" />{h.rate.toLocaleString('en-IN')}/room</p>}
+                {h.advanceRequired != null && <p className="text-amber-600">Advance required: ₹{h.advanceRequired.toLocaleString('en-IN')}</p>}
               </div>
               <div className="flex items-center gap-2 pt-1">
                 <button onClick={() => setEditHotel(h)} className="text-xs font-medium text-primary-600 hover:text-primary-700 flex items-center gap-1">

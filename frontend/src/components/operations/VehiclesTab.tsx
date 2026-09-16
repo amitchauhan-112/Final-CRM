@@ -105,6 +105,7 @@ function VehicleFormModal({ open, onClose, defaultValues, onSubmit, isLoading }:
     vendorContact: defaultValues?.vendorContact,
     contactPerson: defaultValues?.contactPerson,
     rate: defaultValues?.rate,
+    advanceRequired: defaultValues?.advanceRequired,
   });
   const [pendingData, setPendingData] = useState<VehicleForm | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -288,6 +289,7 @@ export default function VehiclesTab({
                 {v.vendorName && <p className="flex items-center gap-1"><Phone className="w-3 h-3" />{v.vendorName} {v.vendorContact && `· ${v.vendorContact}`}</p>}
                 {v.contactPerson && <p className="flex items-center gap-1"><User className="w-3 h-3" />{v.contactPerson}</p>}
                 {v.rate != null && <p className="flex items-center gap-1"><IndianRupee className="w-3 h-3" />{v.rate.toLocaleString('en-IN')}</p>}
+                {v.advanceRequired != null && <p className="text-amber-600">Advance required: ₹{v.advanceRequired.toLocaleString('en-IN')}</p>}
               </div>
               <div className="flex items-center gap-2 pt-1">
                 <button onClick={() => setEditVehicle(v)} className="text-xs font-medium text-primary-600 hover:text-primary-700 flex items-center gap-1">

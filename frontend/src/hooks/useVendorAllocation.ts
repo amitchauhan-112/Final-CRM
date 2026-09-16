@@ -8,9 +8,10 @@ export interface VendorAllocationValues {
   vendorContact: string;
   contactPerson: string;
   rate: string;           // kept as string for form inputs, parsed to number on save
+  advanceRequired: string; // advance amount expected before Finance's payment auto-confirms this
 }
 
-const EMPTY: VendorAllocationValues = { vendorId: '', vendorName: '', vendorContact: '', contactPerson: '', rate: '' };
+const EMPTY: VendorAllocationValues = { vendorId: '', vendorName: '', vendorContact: '', contactPerson: '', rate: '', advanceRequired: '' };
 
 function fromVendor(v: Vendor): VendorAllocationValues {
   return {
@@ -19,6 +20,9 @@ function fromVendor(v: Vendor): VendorAllocationValues {
     vendorContact: v.contact ?? '',
     contactPerson: v.contactPerson ?? '',
     rate: v.rate != null ? String(v.rate) : '',
+    // advanceRequired is booking-specific, not part of the vendor directory
+    // profile — never autofilled/overwritten by selecting a vendor.
+    advanceRequired: '',
   };
 }
 
@@ -29,7 +33,7 @@ function fromVendor(v: Vendor): VendorAllocationValues {
  * detect when autofilled fields have been hand-edited so the caller can warn
  * before saving instead of silently diverging from the vendor's profile.
  */
-export function useVendorAllocation(vendorType: 'HOTEL' | 'VEHICLE', initial?: Partial<{ vendorId: string; vendorName: string; vendorContact: string; contactPerson: string; rate: number }>) {
+export function useVendorAllocation(vendorType: 'HOTEL' | 'VEHICLE', initial?: Partial<{ vendorId: string; vendorName: string; vendorContact: string; contactPerson: string; rate: number; advanceRequired: number }>) {
   const { data } = useVendors({ type: vendorType, status: 'ACTIVE' });
   const vendors = data?.data ?? [];
   const createVendor = useCreateVendor();
@@ -40,6 +44,7 @@ export function useVendorAllocation(vendorType: 'HOTEL' | 'VEHICLE', initial?: P
     vendorContact: initial?.vendorContact ?? '',
     contactPerson: initial?.contactPerson ?? '',
     rate: initial?.rate != null ? String(initial.rate) : '',
+    advanceRequired: initial?.advanceRequired != null ? String(initial.advanceRequired) : '',
   };
 
   const [values, setValues] = useState<VendorAllocationValues>(initialValues);
@@ -51,21 +56,23 @@ export function useVendorAllocation(vendorType: 'HOTEL' | 'VEHICLE', initial?: P
   const [saveAsNewVendor, setSaveAsNewVendor] = useState(false);
 
   function selectVendorId(vendorId: string) {
+    // advanceRequired is never vendor-linked (see fromVendor) — carry
+    // whatever's already typed across a vendor change instead of wiping it.
     if (!vendorId) {
-      setValues(EMPTY);
+      setValues({ ...EMPTY, advanceRequired: values.advanceRequired });
       setSnapshot(null);
       setSaveAsNewVendor(false);
       return;
     }
     if (vendorId === '__new__') {
-      setValues({ ...EMPTY, vendorId: '__new__' });
+      setValues({ ...EMPTY, vendorId: '__new__', advanceRequired: values.advanceRequired });
       setSnapshot(null);
       setSaveAsNewVendor(true);
       return;
     }
     const v = vendors.find((x) => x.id === vendorId);
     if (!v) return;
-    const next = fromVendor(v);
+    const next = { ...fromVendor(v), advanceRequired: values.advanceRequired };
     setValues(next);
     setSnapshot(next);
     setSaveAsNewVendor(false);
@@ -86,8 +93,9 @@ export function useVendorAllocation(vendorType: 'HOTEL' | 'VEHICLE', initial?: P
   }
 
   /** Resolves the final vendorId/name/contact/rate to submit, creating a new Vendor record first if needed. */
-  async function resolve(): Promise<{ vendorId?: string; vendorName?: string; vendorContact?: string; contactPerson?: string; rate?: number }> {
+  async function resolve(): Promise<{ vendorId?: string; vendorName?: string; vendorContact?: string; contactPerson?: string; rate?: number; advanceRequired?: number }> {
     const rateNum = values.rate.trim() ? Number(values.rate) : undefined;
+    const advanceRequiredNum = values.advanceRequired.trim() ? Number(values.advanceRequired) : undefined;
 
     if (values.vendorId === '__new__' && values.vendorName.trim()) {
       if (saveAsNewVendor) {
@@ -99,9 +107,9 @@ export function useVendorAllocation(vendorType: 'HOTEL' | 'VEHICLE', initial?: P
           rate: rateNum,
           status: 'ACTIVE',
         });
-        return { vendorId: created.id, vendorName: values.vendorName.trim(), vendorContact: values.vendorContact.trim() || undefined, contactPerson: values.contactPerson.trim() || undefined, rate: rateNum };
+        return { vendorId: created.id, vendorName: values.vendorName.trim(), vendorContact: values.vendorContact.trim() || undefined, contactPerson: values.contactPerson.trim() || undefined, rate: rateNum, advanceRequired: advanceRequiredNum };
       }
-      return { vendorId: undefined, vendorName: values.vendorName.trim(), vendorContact: values.vendorContact.trim() || undefined, contactPerson: values.contactPerson.trim() || undefined, rate: rateNum };
+      return { vendorId: undefined, vendorName: values.vendorName.trim(), vendorContact: values.vendorContact.trim() || undefined, contactPerson: values.contactPerson.trim() || undefined, rate: rateNum, advanceRequired: advanceRequiredNum };
     }
 
     return {
@@ -110,6 +118,7 @@ export function useVendorAllocation(vendorType: 'HOTEL' | 'VEHICLE', initial?: P
       vendorContact: values.vendorContact.trim() || undefined,
       contactPerson: values.contactPerson.trim() || undefined,
       rate: rateNum,
+      advanceRequired: advanceRequiredNum,
     };
   }
 

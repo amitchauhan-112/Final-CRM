@@ -12,6 +12,7 @@ export type SyncVendorPaymentInput = {
   departureId: string;
   serviceType: 'HOTEL' | 'VEHICLE';
   totalAmount: number | null | undefined; // null/0/undefined means "not enough info to sync yet"
+  advanceRequired: number | null | undefined; // threshold updateVendorPayment auto-confirms against
   existingVendorPaymentId: string | null | undefined;
   createdById: string;
   label: string; // hotel/vehicle name, used in the auto-generated note
@@ -21,7 +22,7 @@ export type SyncVendorPaymentInput = {
 // Hotel/Vehicle row (null if nothing should be synced yet — e.g. no vendor
 // chosen or no rate entered).
 export async function syncVendorPayment(input: SyncVendorPaymentInput): Promise<string | null> {
-  const { organizationId, vendorId, departureId, serviceType, totalAmount, existingVendorPaymentId, createdById, label } = input;
+  const { organizationId, vendorId, departureId, serviceType, totalAmount, advanceRequired, existingVendorPaymentId, createdById, label } = input;
 
   if (!vendorId || !totalAmount || totalAmount <= 0) {
     // Not enough info to sync (no vendor yet, or rate/rooms not entered).
@@ -38,7 +39,7 @@ export async function syncVendorPayment(input: SyncVendorPaymentInput): Promise<
       const status = balanceAmount <= 0 ? 'PAID' : existing.advancePaid > 0 ? 'PARTIAL' : (existing.status === 'OVERDUE' ? 'OVERDUE' : 'PENDING');
       await prisma.vendorPayment.update({
         where: { id: existingVendorPaymentId },
-        data: { vendorId, totalAmount, balanceAmount, status },
+        data: { vendorId, totalAmount, balanceAmount, status, advanceRequired: advanceRequired ?? null },
       });
       return existingVendorPaymentId;
     }
@@ -53,6 +54,7 @@ export async function syncVendorPayment(input: SyncVendorPaymentInput): Promise<
       totalAmount,
       advancePaid: 0,
       balanceAmount: totalAmount,
+      advanceRequired: advanceRequired ?? null,
       status: 'PENDING',
       notes: `Auto-synced from Operations — ${label}`,
       createdById,
