@@ -3,11 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import {
   BookOpen, Search, IndianRupee, Users, TrendingUp, AlertCircle,
   ChevronLeft, ChevronRight, ExternalLink, Calendar, MapPin,
-  CheckCircle, Clock, XCircle,
+  CheckCircle, Clock, XCircle, Edit,
 } from 'lucide-react';
 import { useAllBookings } from '../../hooks/useErp';
+import { useLead } from '../../hooks/useLeads';
 import { BookingWithLead } from '../../types/index';
 import { Skeleton } from '../../components/ui/Skeleton';
+import BookingConfirmModal from '../../components/leads/BookingConfirmModal';
 import { formatCurrency, formatDate, cn } from '../../utils/helpers';
 
 // ─── Payment status badge ─────────────────────────────────────────────────────
@@ -45,6 +47,13 @@ export default function MyBookingsPage() {
 
   const bookings = data?.data ?? [];
   const meta = data?.meta;
+
+  // Edit Booking reuses the exact same form shown at confirmation time
+  // (BookingConfirmModal in edit mode) — needs the full Lead, not just the
+  // trimmed lead fields this page's booking list already carries.
+  const [editingLeadId, setEditingLeadId] = useState<string | null>(null);
+  const { data: editLeadData } = useLead(editingLeadId);
+  const editingBooking = bookings.find((b) => b.leadId === editingLeadId) ?? null;
 
   const totals = bookings.reduce(
     (acc, b) => ({
@@ -201,13 +210,22 @@ export default function MyBookingsPage() {
                       <PaymentBadge booking={b} />
                     </td>
                     <td className="px-4 py-3 align-top text-right">
-                      <button
-                        onClick={() => navigate(`/employee/leads?id=${b.leadId}`)}
-                        className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-primary-600 transition-colors"
-                        title="View lead"
-                      >
-                        <ExternalLink className="w-3.5 h-3.5" />
-                      </button>
+                      <div className="flex items-center justify-end gap-0.5">
+                        <button
+                          onClick={() => setEditingLeadId(b.leadId)}
+                          className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-primary-600 transition-colors"
+                          title="Edit booking"
+                        >
+                          <Edit className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => navigate(`/employee/leads?id=${b.leadId}`)}
+                          className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-primary-600 transition-colors"
+                          title="View lead"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -240,6 +258,15 @@ export default function MyBookingsPage() {
             </div>
           )}
         </>
+      )}
+
+      {editingBooking && editLeadData?.data && (
+        <BookingConfirmModal
+          open={!!editingLeadId}
+          onClose={() => setEditingLeadId(null)}
+          lead={editLeadData.data}
+          existingBooking={editingBooking}
+        />
       )}
     </div>
   );
