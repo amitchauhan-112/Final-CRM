@@ -50,6 +50,10 @@ type BookingPayload = {
   finalPrice: number;
   amountPaid: number;
   balanceDueDate?: string;
+  paymentMode?: 'CASH' | 'ONLINE';
+  paymentMethod?: 'UPI' | 'BANK_TRANSFER';
+  paymentReference?: string;
+  handoverToId?: string;
 };
 
 export function useCreateBooking() {

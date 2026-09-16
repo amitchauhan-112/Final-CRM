@@ -8,6 +8,8 @@ import Modal from '../ui/Modal';
 import { Lead, Booking, FoodPreference, RoomSharing, TourType } from '../../types/index';
 import { useCreateBooking, useUpdateBooking } from '../../hooks/useBookings';
 import { usePackages, usePackage, useCreatePackage } from '../../hooks/usePackages';
+import { useUsers } from '../../hooks/useUsers';
+import { useAuthStore } from '../../store/authStore';
 import { formatCurrency, cn, blockDecimalKey, wholeNumberRule } from '../../utils/helpers';
 import toast from 'react-hot-toast';
 
@@ -29,7 +31,7 @@ interface BookingForm {
   paymentMode: 'CASH' | 'ONLINE';
   paymentMethod: 'UPI' | 'BANK_TRANSFER';
   paymentReference: string;
-  handedOverTo: string;
+  handoverToId: string;
 }
 
 interface Props {
@@ -145,6 +147,12 @@ function PkgItineraryTable({ rows, nights, onUpdateRow }: {
 export default function BookingConfirmModal({ open, onClose, lead, existingBooking }: Props) {
   const createBooking = useCreateBooking();
   const updateBooking = useUpdateBooking();
+  const { user } = useAuthStore();
+  const { data: usersData } = useUsers({ limit: 100 });
+  // Any active employee can hold cash, not just Sales — a real dropdown,
+  // never free text (see createBooking in booking.controller.ts, which
+  // rejects anything that isn't an active user's id).
+  const activeEmployees = (usersData?.data ?? []).filter((u) => u.isActive);
   const isEdit = !!existingBooking;
   const todayDate = new Date().toISOString().split('T')[0];
 
@@ -206,7 +214,7 @@ export default function BookingConfirmModal({ open, onClose, lead, existingBooki
       paymentMode: 'CASH',
       paymentMethod: 'UPI',
       paymentReference: '',
-      handedOverTo: '',
+      handoverToId: user?.id ?? '',
     },
   });
 
@@ -274,7 +282,7 @@ export default function BookingConfirmModal({ open, onClose, lead, existingBooki
       setValue('paymentMode', 'CASH');
       setValue('paymentMethod', 'UPI');
       setValue('paymentReference', '');
-      setValue('handedOverTo', '');
+      setValue('handoverToId', user?.id ?? '');
       setSplitEnabled(false);
       setRoomSplit([{ count: 0, roomSharing: 'DOUBLE' }]);
       setSplitError(null);
@@ -323,7 +331,7 @@ export default function BookingConfirmModal({ open, onClose, lead, existingBooki
       paymentMode: data.paymentMode,
       paymentMethod: data.paymentMethod,
       paymentReference: data.paymentReference || undefined,
-      handedOverTo: data.handedOverTo || undefined,
+      handoverToId: data.paymentMode === 'CASH' ? data.handoverToId || undefined : undefined,
     };
 
     if (isEdit && existingBooking) {
@@ -859,16 +867,20 @@ export default function BookingConfirmModal({ open, onClose, lead, existingBooki
               {watchedPaymentMode === 'CASH' && (
                 <div>
                   <label className="label">Cash Handed Over To *</label>
-                  <input
-                    {...register('handedOverTo', {
+                  <select
+                    {...register('handoverToId', {
                       validate: (v) =>
-                        watchedPaymentMode !== 'CASH' || Number(amountPaid) <= 0 || !!v?.trim() ||
-                        'Enter the name of the person who received the cash',
+                        watchedPaymentMode !== 'CASH' || Number(amountPaid) <= 0 || !!v ||
+                        'Select who received the cash',
                     })}
                     className="input bg-white"
-                    placeholder="Enter name of person who received the cash"
-                  />
-                  {errors.handedOverTo && <p className="text-red-500 text-xs mt-1">{errors.handedOverTo.message}</p>}
+                  >
+                    <option value="">Select employee…</option>
+                    {activeEmployees.map((emp) => (
+                      <option key={emp.id} value={emp.id}>{emp.name}{emp.id === user?.id ? ' (Me)' : ''}</option>
+                    ))}
+                  </select>
+                  {errors.handoverToId && <p className="text-red-500 text-xs mt-1">{errors.handoverToId.message}</p>}
                 </div>
               )}
             </div>

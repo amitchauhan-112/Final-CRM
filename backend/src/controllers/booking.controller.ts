@@ -70,7 +70,7 @@ export const createBooking = async (req: AuthenticatedRequest, res: Response): P
       foodPreference, roomSharing, roomSplit, departureLocation, departurePackage,
       tourType, specialRequest, finalPrice, amountPaid, balanceDueDate,
       packageId, departureDate, returnDate, bookingNotes,
-      paymentMode, paymentMethod, paymentReference, handedOverTo,
+      paymentMode, paymentMethod, paymentReference, handoverToId,
     } = req.body;
 
     if (!leadId) { res.status(400).json({ success: false, error: 'leadId is required' }); return; }
@@ -101,6 +101,17 @@ export const createBooking = async (req: AuthenticatedRequest, res: Response): P
     }
     if (amountPaid !== undefined && Number(amountPaid) > Number(finalPrice)) {
       res.status(400).json({ success: false, error: 'Amount paid cannot exceed the final price' }); return;
+    }
+    // Cash needs a named, real employee to hold it — no free text, no
+    // anonymous cash. Same rule as recordPayment in payment.controller.ts.
+    if (paymentMode === 'CASH' && Number(amountPaid) > 0) {
+      if (!handoverToId) {
+        res.status(400).json({ success: false, error: 'Handover To is required for cash payments' }); return;
+      }
+      const handoverTarget = await prisma.user.findUnique({ where: { id: handoverToId } });
+      if (!handoverTarget || handoverTarget.organizationId !== orgId(req) || !handoverTarget.isActive) {
+        res.status(400).json({ success: false, error: 'Handover To must be an active employee' }); return;
+      }
     }
     if (departureDate && returnDate && new Date(returnDate) < new Date(departureDate)) {
       res.status(400).json({ success: false, error: 'Return date cannot be before departure date' }); return;
@@ -195,19 +206,17 @@ export const createBooking = async (req: AuthenticatedRequest, res: Response): P
     // Finance verifies it (see payment.controller.ts approvePayment).
     if (paid > 0) {
       const resolvedMethod = paymentMode === 'CASH' ? 'CASH' : (paymentMethod === 'BANK_TRANSFER' ? 'BANK_TRANSFER' : 'UPI');
-      const resolvedNotes = paymentMode === 'CASH' && handedOverTo
-        ? `Cash received — handed to: ${handedOverTo}`
-        : 'Initial payment at booking';
       await prisma.payment.create({
         data: {
           bookingId: booking.id,
           amount: paid,
           type: 'ADVANCE',
           method: resolvedMethod,
-          notes: resolvedNotes,
+          notes: 'Initial payment at booking',
           reference: paymentReference || null,
           status: 'PENDING',
           recordedById: req.user!.id,
+          handoverToId: resolvedMethod === 'CASH' ? handoverToId : null,
         },
       });
       await notifyFinanceTeam(
