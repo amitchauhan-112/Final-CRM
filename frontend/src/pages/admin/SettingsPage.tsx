@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -108,16 +108,26 @@ function ChangePasswordSection() {
 function ListEditor({
   title, icon: Icon, items, onSave, description,
 }: {
-  title: string; icon: any; items: string[]; onSave: (items: string[]) => void; description?: string;
+  title: string; icon: any; items: string[]; onSave: (items: string[]) => Promise<unknown>; description?: string;
 }) {
   const [list, setList] = useState(items);
   const [newItem, setNewItem] = useState('');
   const [editingIdx, setEditingIdx] = useState<number | null>(null);
   const [editText, setEditText] = useState('');
   const [dirty, setDirty] = useState(false);
+  const [saving, setSaving] = useState(false);
 
-  // Sync with prop when parent updates
-  if (JSON.stringify(list) !== JSON.stringify(items) && !dirty) setList(items);
+  // Sync with the prop only when it actually changes (e.g. our own save
+  // landing, or someone else's) — not on every render. The old version did
+  // this inline during render, gated on `!dirty`: the instant handleSave set
+  // dirty back to false, that gate opened on the very next render — often
+  // before the PUT had actually returned and updated `items` — and silently
+  // reverted whatever was just added, even though the save request itself
+  // had already gone out with the right payload moments earlier.
+  useEffect(() => {
+    if (!dirty) setList(items);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items]);
 
   const add = () => {
     const t = newItem.trim();
@@ -143,7 +153,23 @@ function ListEditor({
     setDirty(true);
   };
 
-  const handleSave = () => { onSave(list); setDirty(false); };
+  // Only clears `dirty` (and lets the effect above sync `list` back to the
+  // now-fresh `items`) once the save has actually confirmed success — not
+  // the instant the button is clicked. A failed save now visibly stays
+  // failed (Save Changes button remains, item stays in the list) instead of
+  // silently looking identical to a successful one.
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await onSave(list);
+      setDirty(false);
+    } catch {
+      // onSave's own .catch already toasts the error — just leave dirty
+      // state as-is so the pending edit and Save button both stay visible.
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <div className="card p-5">
@@ -181,7 +207,9 @@ function ListEditor({
 
       {dirty && (
         <div className="flex justify-end mt-3">
-          <button onClick={handleSave} className="btn-primary py-1.5 text-sm">Save Changes</button>
+          <button onClick={handleSave} disabled={saving} className="btn-primary py-1.5 text-sm disabled:opacity-60">
+            {saving ? 'Saving…' : 'Save Changes'}
+          </button>
         </div>
       )}
     </div>
@@ -251,11 +279,14 @@ function OrgSettingsSection() {
   if (isLoading) return <div className="card p-6 animate-pulse h-32" />;
   if (!settings) return null;
 
-  const save = (key: string) => (value: any) => {
+  // Returns the mutation's promise (and re-throws on failure) so callers
+  // like ListEditor can actually await it — previously this fired the
+  // request and returned nothing, so a caller had no way to know whether
+  // the save had landed before treating the UI as "saved."
+  const save = (key: string) => (value: any) =>
     update.mutateAsync({ [key]: value })
-      .then(() => toast.success('Saved'))
-      .catch(() => toast.error('Failed to save'));
-  };
+      .then(() => { toast.success('Saved'); })
+      .catch((err) => { toast.error('Failed to save'); throw err; });
 
   return (
     <div className="space-y-5">
