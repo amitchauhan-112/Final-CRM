@@ -433,7 +433,24 @@ export const updateBooking = async (req: AuthenticatedRequest, res: Response): P
         if (pkg?.destination?.name) destination = pkg.destination.name;
         if (pkg?.days) tripDays = pkg.days;
       }
-      await linkBookingToDeparture(booking.id, orgId(req), booking.packageId || null, booking.departureDate, destination, tripDays).catch(console.error);
+      const newDepartureId = await linkBookingToDeparture(booking.id, orgId(req), booking.packageId || null, booking.departureDate, destination, tripDays).catch(console.error);
+      // linkBookingToDeparture updates the DB row directly — reflect that on
+      // the in-memory object too, so the API response (and the auto-cleanup
+      // check right below) see the departure this booking actually ends up
+      // on, not the one it had before this request.
+      if (newDepartureId) booking.departureId = newDepartureId;
+
+      // A package or departure-date change moves this booking onto a
+      // different Departure (linkBookingToDeparture finds-or-creates one
+      // keyed on the new packageId+date) — the one it left behind would
+      // otherwise sit there empty forever, same orphan class as the one
+      // deleteBooking already cleans up.
+      if (existing.departureId && newDepartureId && existing.departureId !== newDepartureId) {
+        const remaining = await prisma.booking.count({ where: { departureId: existing.departureId } });
+        if (remaining === 0) {
+          await prisma.departure.delete({ where: { id: existing.departureId } }).catch(() => {});
+        }
+      }
     }
 
     // Top up traveler placeholders if the headcount grew, and back-fill a
