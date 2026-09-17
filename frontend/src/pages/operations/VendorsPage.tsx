@@ -13,6 +13,7 @@ const TYPE_LABELS: Record<VendorType, string> = {
   VEHICLE: 'Vehicle Vendor',
   LOCAL_GUIDE: 'Local Guide',
   LOCAL_VENDOR: 'Local Vendor',
+  B2B: 'B2B Company',
   OTHER: 'Other',
 };
 
@@ -56,6 +57,7 @@ function VendorFormModal({ open, onClose, defaultValues, onSubmit, isLoading }: 
               <option value="VEHICLE">Vehicle Vendor</option>
               <option value="LOCAL_GUIDE">Local Guide</option>
               <option value="LOCAL_VENDOR">Local Vendor</option>
+              <option value="B2B">B2B Company</option>
               <option value="OTHER">Other</option>
             </select>
           </div>

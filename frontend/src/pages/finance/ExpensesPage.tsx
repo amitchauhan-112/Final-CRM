@@ -47,6 +47,7 @@ function ExpenseCard({ expense }: { expense: Expense }) {
         <div><p className="text-slate-400">Logged By</p><p className="font-semibold text-slate-700">{expense.createdBy.name}</p></div>
         <div><p className="text-slate-400">Date</p><p className="font-semibold text-slate-700">{formatDate(expense.createdAt)}</p></div>
         {expense.approvedBy && <div><p className="text-slate-400">{expense.status === 'REJECTED' ? 'Rejected By' : 'Approved By'}</p><p className="font-semibold text-slate-700">{expense.approvedBy.name}</p></div>}
+        {expense.paidByPartner && <div><p className="text-slate-400">Paid By</p><p className="font-semibold text-slate-700">{expense.paidByPartner.name}</p></div>}
       </div>
       {expense.description && <p className="text-xs text-slate-500">{expense.description}</p>}
       {expense.rejectionReason && <p className="text-xs text-red-500">Reason: {expense.rejectionReason}</p>}

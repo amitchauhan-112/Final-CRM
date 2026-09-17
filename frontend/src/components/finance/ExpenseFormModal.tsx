@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { useFinanceDepartures, useFinancePackages } from '../../hooks/useExpenses';
+import { useFinanceDepartures, useFinancePackages, usePartners, useCreatePartner } from '../../hooks/useExpenses';
 import { useFinanceVendors } from '../../hooks/useFinance';
 import { ExpenseCategory } from '../../types/index';
 import Modal from '../ui/Modal';
@@ -18,6 +18,7 @@ interface ExpenseFormValues {
   departureId?: string;
   packageId?: string;
   vendorId?: string;
+  paidByPartnerId?: string;
 }
 
 export default function ExpenseFormModal({ open, onClose, onSubmit, isLoading }: {
@@ -27,12 +28,17 @@ export default function ExpenseFormModal({ open, onClose, onSubmit, isLoading }:
   const { data: departuresData } = useFinanceDepartures();
   const { data: packagesData } = useFinancePackages();
   const { data: vendorsData } = useFinanceVendors();
+  const { data: partnersData } = usePartners();
+  const createPartner = useCreatePartner();
   const departures = departuresData?.data ?? [];
   const packages = packagesData?.data ?? [];
   const vendors = vendorsData?.data ?? [];
+  const partners = partnersData?.data ?? [];
   const [billFile, setBillFile] = useState<File | null>(null);
+  const [addingPartner, setAddingPartner] = useState(false);
+  const [newPartnerName, setNewPartnerName] = useState('');
 
-  const { register, handleSubmit, reset } = useForm<ExpenseFormValues>({
+  const { register, handleSubmit, reset, setValue } = useForm<ExpenseFormValues>({
     defaultValues: { category: 'MISCELLANEOUS' },
   });
 
@@ -40,6 +46,17 @@ export default function ExpenseFormModal({ open, onClose, onSubmit, isLoading }:
     onSubmit({ ...data, bill: billFile ?? undefined });
     reset();
     setBillFile(null);
+  };
+
+  const handleAddPartner = () => {
+    if (!newPartnerName.trim()) return;
+    createPartner.mutate(newPartnerName.trim(), {
+      onSuccess: (partner: any) => {
+        setValue('paidByPartnerId', partner.id);
+        setAddingPartner(false);
+        setNewPartnerName('');
+      },
+    });
   };
 
   return (
@@ -81,6 +98,31 @@ export default function ExpenseFormModal({ open, onClose, onSubmit, isLoading }:
             <option value="">—</option>
             {vendors.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
           </select>
+        </div>
+        <div>
+          <label className="label">Paid By (optional)</label>
+          {addingPartner ? (
+            <div className="flex gap-2">
+              <input
+                autoFocus value={newPartnerName} onChange={(e) => setNewPartnerName(e.target.value)}
+                placeholder="Partner name" className="input"
+              />
+              <button type="button" onClick={handleAddPartner} disabled={createPartner.isPending} className="btn-secondary text-sm px-3 flex-shrink-0">
+                {createPartner.isPending ? '…' : 'Add'}
+              </button>
+              <button type="button" onClick={() => { setAddingPartner(false); setNewPartnerName(''); }} className="text-slate-400 hover:text-slate-600 text-sm px-1 flex-shrink-0">✕</button>
+            </div>
+          ) : (
+            <select
+              {...register('paidByPartnerId')}
+              onChange={(e) => { if (e.target.value === '__new__') { setAddingPartner(true); setValue('paidByPartnerId', ''); } else { register('paidByPartnerId').onChange(e); } }}
+              className="input"
+            >
+              <option value="">Company funds (not a partner)</option>
+              {partners.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+              <option value="__new__">+ Add New Partner</option>
+            </select>
+          )}
         </div>
         <div>
           <label className="label">Bill / Receipt</label>

@@ -38,6 +38,7 @@ model Organization {
   financeDocuments FinanceDocument[]
   metaAdMaps    MetaAdMap[]
   employeeCashLedgers EmployeeCashLedger[]
+  partners      Partner[]
 
   @@map("organizations")
 }
@@ -1191,6 +1192,23 @@ model Departure {
   tripCaptainUserId String?
   tripCaptainUser   User?   @relation("TripCaptainDepartures", fields: [tripCaptainUserId], references: [id], onDelete: SetNull)
 
+  // Set when this whole trip was subcontracted/resold to another travel
+  // company at a wholesale (B2B) rate, instead of Operations fulfilling it
+  // directly — e.g. a customer was sold the trip for ₹7,000 but it was
+  // handed off to another company to actually run for ₹5,000. b2bRate is
+  // that wholesale figure, not the original customer-facing price (which
+  // stays on the Booking as usual). The company is a Vendor (type: "B2B")
+  // like any other — same directory, same "who do we pay" concept as
+  // Hotel/Vehicle vendors — and b2bRate syncs to a VendorPayment exactly the
+  // way Hotel.rate/Vehicle.rate already do, so Finance sees it as a normal
+  // bill to pay and it's automatically included in the P&L report's vendor
+  // cost total, no separate reporting path needed.
+  b2bVendorId        String?
+  b2bVendor          Vendor?        @relation("VendorB2BDepartures", fields: [b2bVendorId], references: [id], onDelete: SetNull)
+  b2bRate            Float?
+  b2bVendorPaymentId String?        @unique
+  b2bVendorPayment   VendorPayment? @relation("DepartureB2BPayment", fields: [b2bVendorPaymentId], references: [id], onDelete: SetNull)
+
   // Checklist Engine — only holds the handful of items with no natural backing
   // field (welcome kit, passenger list printed, emergency contacts, medical kit).
   // Every other checklist item is computed live from existing fields.
@@ -1316,7 +1334,7 @@ model Vendor {
   organization   Organization? @relation(fields: [organizationId], references: [id])
 
   name          String
-  type          String  @default("OTHER")  // HOTEL | VEHICLE | LOCAL_GUIDE | LOCAL_VENDOR | OTHER
+  type          String  @default("OTHER")  // HOTEL | VEHICLE | LOCAL_GUIDE | LOCAL_VENDOR | B2B | OTHER
   contact       String?                    // phone number
   contactPerson String?                    // name of the point of contact
   rate          Float?                     // default/base rate — pre-fills Hotel/Vehicle allocation forms
@@ -1331,6 +1349,7 @@ model Vendor {
   payments  VendorPayment[]
   hotels    Hotel[]         @relation("VendorHotels")
   vehicles  Vehicle[]       @relation("VendorVehicles")
+  b2bDepartures Departure[] @relation("VendorB2BDepartures")
   documents VendorDocument[]
   expenses  Expense[]
 
@@ -1636,7 +1655,7 @@ model VendorPayment {
   departureId String?
   departure   Departure? @relation(fields: [departureId], references: [id], onDelete: SetNull)
 
-  serviceType String                          // HOTEL | VEHICLE | TRIP_CAPTAIN | LOCAL_GUIDE | LOCAL_VENDOR | ACTIVITY
+  serviceType String                          // HOTEL | VEHICLE | TRIP_CAPTAIN | LOCAL_GUIDE | LOCAL_VENDOR | B2B | ACTIVITY
   totalAmount Float
   advancePaid Float    @default(0)
   balanceAmount Float  @default(0)
@@ -1657,11 +1676,12 @@ model VendorPayment {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // Back-relations for the Operations→Finance auto-sync — the Hotel/Vehicle
-  // row that this payment was generated from, if any (manually-entered
-  // Finance bills have neither).
-  hotel   Hotel?
-  vehicle Vehicle?
+  // Back-relations for the Operations→Finance auto-sync — the Hotel/Vehicle/
+  // Departure row that this payment was generated from, if any
+  // (manually-entered Finance bills have none of these).
+  hotel       Hotel?
+  vehicle     Vehicle?
+  b2bDeparture Departure? @relation("DepartureB2BPayment")
 
   @@index([vendorId])
   @@index([departureId])
@@ -1692,6 +1712,12 @@ model Expense {
   vendorId    String?
   vendor      Vendor?    @relation(fields: [vendorId], references: [id], onDelete: SetNull)
 
+  // Which business partner personally paid for this, if any — distinct from
+  // createdById (who logged it in the system). Null means paid from company
+  // funds / not a partner-out-of-pocket expense.
+  paidByPartnerId String?
+  paidByPartner   Partner? @relation(fields: [paidByPartnerId], references: [id], onDelete: SetNull)
+
   billUrl String?
 
   status       String    @default("PENDING") // PENDING | APPROVED | REJECTED
@@ -1712,6 +1738,25 @@ model Expense {
   @@index([category])
   @@index([status])
   @@map("expenses")
+}
+
+// A business partner/co-owner who can personally pay for expenses —
+// tracked here just to attribute "who paid what", not a login account.
+model Partner {
+  id             String        @id @default(uuid())
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+
+  name     String
+  isActive Boolean @default(true)
+
+  expenses Expense[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId])
+  @@map("partners")
 }
 
 // ─── Sales Targets, Salary & Incentives ───────────────────────────────────────

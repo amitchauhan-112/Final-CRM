@@ -632,7 +632,7 @@ export type DepartureStatus = 'UPCOMING' | 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
 export type TripCaptainStatus = 'UNASSIGNED' | 'ASSIGNED' | 'CONFIRMED';
 export type OpsBookingStatus = 'PENDING' | 'CONFIRMED' | 'CANCELLED';
 export type DepartureTaskStatus = 'PENDING' | 'IN_PROGRESS' | 'COMPLETED';
-export type VendorType = 'HOTEL' | 'VEHICLE' | 'LOCAL_GUIDE' | 'LOCAL_VENDOR' | 'OTHER';
+export type VendorType = 'HOTEL' | 'VEHICLE' | 'LOCAL_GUIDE' | 'LOCAL_VENDOR' | 'B2B' | 'OTHER';
 export type OpsDocumentType = 'HOTEL_VOUCHER' | 'VEHICLE_VOUCHER' | 'CUSTOMER_LIST' | 'ROOMING_LIST' | 'TRIP_CAPTAIN_SHEET' | 'EMERGENCY_CONTACT_LIST' | 'VENDOR_BILL' | 'OTHER';
 export type Gender = 'MALE' | 'FEMALE' | 'OTHER';
 
@@ -915,6 +915,14 @@ export interface Departure {
   tripCaptainPhone?: string;
   tripCaptainStatus: TripCaptainStatus;
   tripCaptainUserId?: string;
+  // Set when this whole trip was resold/subcontracted to another travel
+  // company at a wholesale (B2B) rate instead of being fulfilled directly.
+  // The company is a Vendor (type "B2B") like any other, and b2bRate syncs
+  // to a VendorPayment the same way Hotel/Vehicle rates already do — so
+  // Finance sees it as a normal bill and it's already in the P&L totals.
+  b2bVendorId?: string;
+  b2bVendor?: { id: string; name: string; contact?: string; contactPerson?: string };
+  b2bRate?: number;
   bookings: DepartureBooking[];
   hotels: Hotel[];
   vehicles: Vehicle[];
@@ -1147,6 +1155,8 @@ export interface Expense {
   package?: { id: string; name: string; code: string };
   vendorId?: string;
   vendor?: { id: string; name: string };
+  paidByPartnerId?: string;
+  paidByPartner?: { id: string; name: string };
   billUrl?: string;
   status: ExpenseStatus;
   approvedById?: string;
@@ -1157,6 +1167,21 @@ export interface Expense {
   createdBy: Pick<User, 'id' | 'name'>;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface Partner {
+  id: string;
+  name: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PartnerPaymentSummary {
+  id: string;
+  name: string;
+  totalPaid: number;
+  count: number;
 }
 
 export type PaymentScheduleItemStatus = 'PENDING' | 'PARTIAL' | 'PAID';

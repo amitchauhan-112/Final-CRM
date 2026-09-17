@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../services/api';
-import { ApiResponse, Expense } from '../types/index';
+import { ApiResponse, Expense, Partner, PartnerPaymentSummary } from '../types/index';
 import toast from 'react-hot-toast';
 
 export interface ExpenseFilters {
@@ -24,7 +24,7 @@ export function useExpenses(filters: ExpenseFilters = {}) {
 
 interface CreateExpensePayload {
   category: string; amount: number; description?: string;
-  departureId?: string; packageId?: string; vendorId?: string; bill?: File;
+  departureId?: string; packageId?: string; vendorId?: string; paidByPartnerId?: string; bill?: File;
 }
 
 export function useCreateExpense() {
@@ -97,5 +97,38 @@ export function useFinancePackages() {
   return useQuery<ApiResponse<Array<{ id: string; name: string; code: string }>>>({
     queryKey: ['finance', 'packages'],
     queryFn: async () => (await api.get('/finance/packages')).data,
+  });
+}
+
+// ─── Partners — "who personally paid what" attribution on expenses ─────────
+
+export function usePartners() {
+  return useQuery<ApiResponse<Partner[]>>({
+    queryKey: ['finance', 'partners'],
+    queryFn: async () => (await api.get('/finance/partners')).data,
+  });
+}
+
+export function useCreatePartner() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (name: string) => (await api.post('/finance/partners', { name })).data.data,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['finance', 'partners'] }),
+    onError: (e: any) => toast.error(e?.response?.data?.error || 'Failed to add partner'),
+  });
+}
+
+// Only used within the currently-selected date range on the Reports page —
+// mirrors getProfitLossReport's "APPROVED expenses only" rule.
+export function usePartnerPaymentsSummary(range: { start?: string; end?: string } = {}) {
+  return useQuery<ApiResponse<PartnerPaymentSummary[]>>({
+    queryKey: ['finance', 'partners', 'summary', range],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (range.start) params.set('start', range.start);
+      if (range.end) params.set('end', range.end);
+      const { data } = await api.get(`/finance/partners/summary?${params.toString()}`);
+      return data;
+    },
   });
 }

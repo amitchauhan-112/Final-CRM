@@ -25,6 +25,7 @@ export const listExpenses = async (req: AuthenticatedRequest, res: Response): Pr
         vendor: { select: { id: true, name: true } },
         createdBy: { select: { id: true, name: true } },
         approvedBy: { select: { id: true, name: true } },
+        paidByPartner: { select: { id: true, name: true } },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -40,7 +41,7 @@ export const listExpenses = async (req: AuthenticatedRequest, res: Response): Pr
 
 export const createExpense = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
-    const { category, amount, description, departureId, packageId, vendorId } = req.body;
+    const { category, amount, description, departureId, packageId, vendorId, paidByPartnerId } = req.body;
     if (!category?.trim()) { res.status(400).json({ success: false, error: 'Category is required' }); return; }
     if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) {
       res.status(400).json({ success: false, error: 'Valid amount is required' }); return;
@@ -58,11 +59,12 @@ export const createExpense = async (req: AuthenticatedRequest, res: Response): P
         departureId: departureId || null,
         packageId: packageId || null,
         vendorId: vendorId || null,
+        paidByPartnerId: paidByPartnerId || null,
         billUrl,
         status: 'PENDING',
         createdById: req.user!.id,
       },
-      include: { createdBy: { select: { id: true, name: true } } },
+      include: { createdBy: { select: { id: true, name: true } }, paidByPartner: { select: { id: true, name: true } } },
     });
 
     await prisma.activityLog.create({

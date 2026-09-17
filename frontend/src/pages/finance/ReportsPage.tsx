@@ -5,6 +5,7 @@ import {
   useOutstandingReport, useVendorPaymentReport, useRefundReport, useExpenseReport,
   useTripProfitabilityReport, usePackageProfitabilityReport, useProfitLossReport,
 } from '../../hooks/useFinance';
+import { usePartnerPaymentsSummary } from '../../hooks/useExpenses';
 import { exportRowsToExcel, exportRowsToCSV, exportRowsToPDF } from '../../utils/reportExport';
 import { formatCurrency } from '../../utils/helpers';
 
@@ -61,6 +62,7 @@ export default function FinanceReportsPage() {
   const tripProfit = useTripProfitabilityReport();
   const packageProfit = usePackageProfitabilityReport();
   const pnl = useProfitLossReport({});
+  const partnerPayments = usePartnerPaymentsSummary();
 
   const handlePrint = () => {
     document.body.classList.add('printing');
@@ -236,6 +238,21 @@ export default function FinanceReportsPage() {
             ))
           ) : (
             <div className="empty-state col-span-full"><FileBarChart className="w-10 h-10 text-slate-300 mx-auto mb-2" /></div>
+          )}
+
+          {(partnerPayments.data?.data?.length ?? 0) > 0 && (
+            <div className="sm:col-span-2 lg:col-span-3 card p-4">
+              <p className="text-xs font-semibold text-slate-500 uppercase mb-3">Paid By Partners</p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {partnerPayments.data!.data.map((p) => (
+                  <div key={p.id} className="rounded-xl bg-slate-50 border border-slate-100 p-3">
+                    <p className="text-sm font-semibold text-slate-700">{p.name}</p>
+                    <p className="text-lg font-bold text-slate-800">{formatCurrency(p.totalPaid)}</p>
+                    <p className="text-xs text-slate-400">{p.count} expense{p.count !== 1 ? 's' : ''}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
         </div>
       )}

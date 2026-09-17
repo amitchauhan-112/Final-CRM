@@ -504,3 +504,7 @@ export function useDeleteRequirement(departureId: string) {
     onError: (err: any) => toast.error(err?.response?.data?.error || 'Failed to remove requirement'),
   });
 }
+
+// B2B companies reuse the existing Vendor directory (useVendors/useCreateVendor
+// below, type: "B2B") — same "who do we pay" concept as Hotel/Vehicle vendors,
+// so this doesn't need its own list/endpoint.

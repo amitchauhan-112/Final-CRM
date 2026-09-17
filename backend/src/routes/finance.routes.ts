@@ -16,6 +16,7 @@ import { getPackages } from '../controllers/packages.controller.js';
 import {
   listExpenses, createExpense, approveExpense, rejectExpense, deleteExpense,
 } from '../controllers/expense.controller.js';
+import { listPartners, createPartner, updatePartner, getPartnerPaymentsSummary } from '../controllers/partner.controller.js';
 import { getPaymentSchedule, updateScheduleItem } from '../controllers/paymentSchedule.controller.js';
 import { createFinanceDocument, listFinanceDocuments } from '../controllers/financeDocument.controller.js';
 import {
@@ -78,6 +79,12 @@ router.post('/expenses', uploadExpenseBill.single('bill'), createExpense);
 router.put('/expenses/:id/approve', approveExpense);
 router.put('/expenses/:id/reject', rejectExpense);
 router.delete('/expenses/:id', deleteExpense);
+
+// Partners — "who personally paid what" attribution on expenses
+router.get('/partners', listPartners);
+router.post('/partners', createPartner);
+router.put('/partners/:id', updatePartner);
+router.get('/partners/summary', getPartnerPaymentsSummary);
 
 // Reports
 router.get('/reports/collections', getCollectionReport);

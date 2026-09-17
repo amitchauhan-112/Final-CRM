@@ -9,6 +9,7 @@ import HotelsTab from '../../components/operations/HotelsTab';
 import VehiclesTab from '../../components/operations/VehiclesTab';
 import TripCaptainTab from '../../components/operations/TripCaptainTab';
 import OthersTab from '../../components/operations/OthersTab';
+import B2BSaleCard from '../../components/operations/B2BSaleCard';
 import { cn } from '../../utils/helpers';
 
 const STATUS_BADGE: Record<string, string> = {
@@ -101,6 +102,8 @@ export default function DepartureDetailPage() {
       </div>
 
       {/* Tabs */}
+      <B2BSaleCard departure={departure} />
+
       <Tabs tabs={TABS} active={tab} onChange={setTab} />
 
       {tab === 'captain' && <TripCaptainTab departure={departure} />}

@@ -8,6 +8,7 @@ import { computeJourney } from './journey.controller.js';
 import { validateTravelerInput } from '../utils/travelerValidation.js';
 import { roomsForBookingList, computeFitGitRoomRequirement, emptyRoomCounts, addRoomCounts, ROOM_CAPACITY } from '../services/roomRequirement.service.js';
 import { deriveStayBlocks } from '../services/stayBlocks.service.js';
+import { syncVendorPayment } from '../services/vendorPaymentSync.service.js';
 
 const orgId = (req: AuthenticatedRequest) => req.user?.organizationId ?? null;
 const orgFilter = (req: AuthenticatedRequest) => (orgId(req) ? { organizationId: orgId(req) } : {});
@@ -496,6 +497,7 @@ export const getDepartureDetail = async (req: AuthenticatedRequest, res: Respons
           },
         },
         requirements: { include: { createdBy: { select: { id: true, name: true } } }, orderBy: { createdAt: 'desc' } },
+        b2bVendor: { select: { id: true, name: true, contact: true, contactPerson: true } },
         bookings: {
           include: {
             lead: {
@@ -751,7 +753,7 @@ export const updateDeparture = async (req: AuthenticatedRequest, res: Response):
     const existing = await prisma.departure.findFirst({ where: { id, ...orgFilter(req) } });
     if (!existing) { res.status(404).json({ success: false, error: 'Departure not found' }); return; }
 
-    const { status, tripCaptainName, tripCaptainPhone, tripCaptainStatus, tripCaptainUserId, returnDate } = req.body;
+    const { status, tripCaptainName, tripCaptainPhone, tripCaptainStatus, tripCaptainUserId, returnDate, b2bVendorId, b2bRate } = req.body;
 
     // Assigning a real TRIP_CAPTAIN-role account is now the preferred path —
     // tripCaptainName/tripCaptainPhone are kept synced from it so every
@@ -793,7 +795,7 @@ export const updateDeparture = async (req: AuthenticatedRequest, res: Response):
       }
     }
 
-    const departure = await prisma.departure.update({
+    let departure = await prisma.departure.update({
       where: { id },
       data: {
         status: status ?? existing.status,
@@ -802,8 +804,28 @@ export const updateDeparture = async (req: AuthenticatedRequest, res: Response):
         tripCaptainStatus: tripCaptainStatus ?? existing.tripCaptainStatus,
         tripCaptainUserId: tripCaptainUserId !== undefined ? (tripCaptainUserId || null) : existing.tripCaptainUserId,
         returnDate: returnDate !== undefined ? (returnDate ? new Date(returnDate) : null) : existing.returnDate,
+        b2bVendorId: b2bVendorId !== undefined ? (b2bVendorId || null) : existing.b2bVendorId,
+        b2bRate: b2bRate !== undefined ? (b2bRate === '' || b2bRate === null ? null : Number(b2bRate)) : existing.b2bRate,
       },
     });
+
+    // Operations → Finance auto-sync, same as Hotel/Vehicle: a B2B vendor +
+    // rate here means Finance sees a normal bill to pay, and it's already
+    // included in the P&L report's vendor-cost total automatically.
+    const b2bVendorPaymentId = await syncVendorPayment({
+      organizationId: existing.organizationId,
+      vendorId: departure.b2bVendorId,
+      departureId: id,
+      serviceType: 'B2B',
+      totalAmount: departure.b2bRate,
+      advanceRequired: null,
+      existingVendorPaymentId: departure.b2bVendorPaymentId,
+      createdById: req.user!.id,
+      label: `${departure.destination} (B2B resale)`,
+    });
+    if (b2bVendorPaymentId !== departure.b2bVendorPaymentId) {
+      departure = await prisma.departure.update({ where: { id }, data: { b2bVendorPaymentId } });
+    }
 
     await prisma.activityLog.create({
       data: {

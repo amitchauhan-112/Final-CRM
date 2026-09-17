@@ -10,7 +10,7 @@ export type SyncVendorPaymentInput = {
   organizationId: string | null;
   vendorId: string | null | undefined;
   departureId: string;
-  serviceType: 'HOTEL' | 'VEHICLE';
+  serviceType: 'HOTEL' | 'VEHICLE' | 'B2B';
   totalAmount: number | null | undefined; // null/0/undefined means "not enough info to sync yet"
   advanceRequired: number | null | undefined; // threshold updateVendorPayment auto-confirms against
   existingVendorPaymentId: string | null | undefined;
