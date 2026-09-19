@@ -1,4 +1,4 @@
-export type Role = 'ADMIN' | 'EMPLOYEE' | 'OPERATIONS' | 'FINANCE';
+export type Role = 'ADMIN' | 'EMPLOYEE' | 'OPERATIONS' | 'FINANCE' | 'TRIP_CAPTAIN';
 export type LeadSource = 'WHATSAPP' | 'INSTAGRAM' | 'MANUAL' | 'WEBSITE' | 'META_ADS';
 export type LeadStatus = 'NEW' | 'NOT_CONTACTED' | 'CONTACTED' | 'INTERESTED' | 'FOLLOW_UP_SCHEDULED' | 'CONFIRMED' | 'LOST';
 export type LeadPriority = 'HIGH' | 'MEDIUM' | 'LOW';
@@ -703,6 +703,10 @@ export interface Hotel {
   location?: string;
   checkInDate?: string;
   checkOutDate?: string;
+  // Actual arrival/departure timestamps the Trip Captain sets — distinct
+  // from the planned checkInDate/checkOutDate above.
+  checkedInAt?: string;
+  checkedOutAt?: string;
   numberOfRooms?: number;
   roomPlan?: RoomPlan;
   roomAllocation?: string;
@@ -871,6 +875,21 @@ export interface DepartureRequirement {
   updatedAt: string;
 }
 
+export type MealType = 'BREAKFAST' | 'LUNCH' | 'DINNER';
+
+// Daily meal-menu update posted by the Trip Captain, read by Operations on
+// the same departure (see Departure.mealUpdates).
+export interface MealUpdate {
+  id: string;
+  departureId: string;
+  mealType: MealType;
+  forDate: string;
+  menu: string;
+  postedById: string;
+  postedBy: Pick<User, 'id' | 'name'>;
+  createdAt: string;
+}
+
 // One "this city needs a hotel from checkIn to checkOut" block, derived from
 // a departure's package itinerary (see backend stayBlocks.service.ts).
 export interface HotelRequirementBlock {
@@ -932,6 +951,7 @@ export interface Departure {
   documents: OperationsDocument[];
   notes: OperationsNote[];
   requirements: DepartureRequirement[];
+  mealUpdates: MealUpdate[];
   timeline: DepartureTask[];
   groupSummary?: GroupSummary;
   checklist?: Checklist;
@@ -940,6 +960,30 @@ export interface Departure {
   hotelRequirements?: HotelRequirementBlock[];
   createdAt: string;
   updatedAt: string;
+}
+
+// Lean, Trip-Captain-scoped shape — no financial fields, unlike the full
+// Departure type Operations/Admin see.
+export interface TripCaptainDepartureListItem {
+  id: string;
+  destination: string;
+  departureDate: string;
+  returnDate?: string;
+  status: DepartureStatus;
+  _count: { bookings: number };
+}
+
+export interface TripCaptainDepartureDetail {
+  id: string;
+  destination: string;
+  departureDate: string;
+  returnDate?: string;
+  status: DepartureStatus;
+  package?: { id: string; name: string; itineraryItems: PackageItinerary[] };
+  hotels: Hotel[];
+  vehicles: Vehicle[];
+  mealUpdates: MealUpdate[];
+  totalTravelers: number;
 }
 
 export interface TripProfitability {

@@ -100,6 +100,7 @@ model User {
   opsNotes            OperationsNote[]   @relation("OpsNoteAuthor")
   createdRequirements DepartureRequirement[] @relation("DepartureRequirementCreator")
   updatedDepartureTasks DepartureTask[]  @relation("DepartureTaskUpdater")
+  postedMealUpdates     MealUpdate[]     @relation("MealUpdatePoster")
   verifiedPayments     Payment[]        @relation("PaymentVerifier")
   handedOverPayments   Payment[]        @relation("PaymentHandover")
   cashLedgerEntries    EmployeeCashLedger[] @relation("CashLedgerEmployee")
@@ -1227,6 +1228,7 @@ model Departure {
   vendorPayments VendorPayment[]
   notifications  Notification[]
   expenses       Expense[]
+  mealUpdates    MealUpdate[]
 
   @@index([organizationId])
   @@index([packageId])
@@ -1245,6 +1247,11 @@ model Hotel {
   location           String?
   checkInDate        DateTime?
   checkOutDate       DateTime?
+  // Actual arrival/departure timestamps the Trip Captain sets from the Trip
+  // Captain portal — distinct from checkInDate/checkOutDate above, which are
+  // Ops's *planned* dates.
+  checkedInAt        DateTime?
+  checkedOutAt       DateTime?
   numberOfRooms      Int?
   roomPlan           String?                      // MAP | CP | EP — meal plan for the rooms booked
   roomAllocation     String?                      // free-text summary, e.g. "5 Double, 2 Triple"
@@ -1462,6 +1469,27 @@ model DepartureTask {
 
   @@index([departureId])
   @@map("departure_tasks")
+}
+
+// Daily breakfast/lunch/dinner menu updates posted by the Trip Captain from
+// the field — Operations reads the same feed on the Departure Detail page
+// (see getDepartureDetail's mealUpdates include).
+model MealUpdate {
+  id          String    @id @default(uuid())
+  departureId String
+  departure   Departure @relation(fields: [departureId], references: [id], onDelete: Cascade)
+
+  mealType String   // BREAKFAST | LUNCH | DINNER
+  forDate  DateTime // which day's meal this is
+  menu     String
+
+  postedById String
+  postedBy   User   @relation("MealUpdatePoster", fields: [postedById], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([departureId])
+  @@map("meal_updates")
 }
 
 // ─── Finance Panel ──────────────────────────────────────────────────────────

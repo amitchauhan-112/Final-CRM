@@ -4,6 +4,7 @@ import AdminLayout from './components/layout/AdminLayout';
 import EmployeeLayout from './components/layout/EmployeeLayout';
 import OperationsLayout from './components/layout/OperationsLayout';
 import FinanceLayout from './components/layout/FinanceLayout';
+import TripCaptainLayout from './components/layout/TripCaptainLayout';
 import LoginPage from './pages/LoginPage';
 import WelcomePage from './pages/WelcomePage';
 import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
@@ -59,6 +60,8 @@ import FinancePayrollPage from './pages/finance/PayrollPage';
 import MyTargetsPage from './pages/employee/MyTargetsPage';
 import AdminWhatsAppInboxPage from './pages/admin/WhatsAppInboxPage';
 import EmployeeWhatsAppInboxPage from './pages/employee/WhatsAppInboxPage';
+import TripCaptainDashboardPage from './pages/tripCaptain/DashboardPage';
+import TripCaptainTripDetailPage from './pages/tripCaptain/TripDetailPage';
 
 function RoleRedirect() {
   const { user, isAuthenticated } = useAuthStore();
@@ -66,10 +69,11 @@ function RoleRedirect() {
   if (user?.role === 'ADMIN') return <Navigate to="/admin/dashboard" replace />;
   if (user?.role === 'OPERATIONS') return <Navigate to="/operations/dashboard" replace />;
   if (user?.role === 'FINANCE') return <Navigate to="/finance/dashboard" replace />;
+  if (user?.role === 'TRIP_CAPTAIN') return <Navigate to="/trip-captain/dashboard" replace />;
   return <Navigate to="/employee/dashboard" replace />;
 }
 
-function RequireAuth({ children, role }: { children: React.ReactNode; role?: 'ADMIN' | 'EMPLOYEE' | 'OPERATIONS' | 'FINANCE' }) {
+function RequireAuth({ children, role }: { children: React.ReactNode; role?: 'ADMIN' | 'EMPLOYEE' | 'OPERATIONS' | 'FINANCE' | 'TRIP_CAPTAIN' }) {
   const { isAuthenticated, user } = useAuthStore();
   if (!isAuthenticated) return <Navigate to="/login" replace />;
   if (role && user?.role !== role) return <Navigate to="/" replace />;
@@ -200,6 +204,19 @@ export default function App() {
         <Route path="targets" element={<MyTargetsPage />} />
         <Route path="whatsapp" element={<EmployeeWhatsAppInboxPage />} />
         <Route path="settings" element={<EmployeeSettingsPage />} />
+      </Route>
+
+      <Route
+        path="/trip-captain"
+        element={
+          <RequireAuth role="TRIP_CAPTAIN">
+            <TripCaptainLayout />
+          </RequireAuth>
+        }
+      >
+        <Route index element={<Navigate to="/trip-captain/dashboard" replace />} />
+        <Route path="dashboard" element={<TripCaptainDashboardPage />} />
+        <Route path="trips/:id" element={<TripCaptainTripDetailPage />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />

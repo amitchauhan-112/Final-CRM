@@ -6,7 +6,7 @@ import { useVendorAllocation } from '../../hooks/useVendorAllocation';
 import { VendorAllocationFields, VendorDivergenceConfirm } from './VendorAllocationFields';
 import { Hotel, HotelRequirementBlock } from '../../types/index';
 import Modal from '../ui/Modal';
-import { formatDate, cn } from '../../utils/helpers';
+import { formatDate, formatRelativeTime, cn } from '../../utils/helpers';
 
 const STATUS_BADGE: Record<string, string> = {
   PENDING: 'bg-amber-50 text-amber-700',
@@ -409,6 +409,8 @@ export default function HotelsTab({ departureId, hotels, roomsRequired = 0, hote
                 {h.totalRate != null && <p className="flex items-center gap-1"><IndianRupee className="w-3 h-3" />{h.totalRate.toLocaleString('en-IN')} total</p>}
                 {h.rate != null && <p className="flex items-center gap-1"><IndianRupee className="w-3 h-3" />{h.rate.toLocaleString('en-IN')}/room</p>}
                 {h.advanceRequired != null && <p className="text-amber-600">Advance required: ₹{h.advanceRequired.toLocaleString('en-IN')}</p>}
+                {h.checkedInAt && <p className="text-emerald-600">Trip Captain checked in {formatRelativeTime(h.checkedInAt)}</p>}
+                {h.checkedOutAt && <p className="text-emerald-600">Trip Captain checked out {formatRelativeTime(h.checkedOutAt)}</p>}
               </div>
               <div className="flex items-center gap-2 pt-1">
                 <button onClick={() => setEditHotel(h)} className="text-xs font-medium text-primary-600 hover:text-primary-700 flex items-center gap-1">

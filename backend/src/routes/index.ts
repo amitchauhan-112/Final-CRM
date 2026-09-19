@@ -34,6 +34,7 @@ import hrRoutes from './hr.routes.js';
 import whatsappAccountRoutes from './whatsappAccount.routes.js';
 import whatsappConversationRoutes from './whatsappConversation.routes.js';
 import employeeCashRoutes from './employeeCash.routes.js';
+import tripCaptainRoutes from './tripCaptain.routes.js';
 
 const router = Router();
 
@@ -74,5 +75,6 @@ router.use('/hr', hrRoutes);
 router.use('/whatsapp-accounts', whatsappAccountRoutes);
 router.use('/whatsapp', whatsappConversationRoutes);
 router.use('/employee-cash', employeeCashRoutes);
+router.use('/trip-captain', tripCaptainRoutes);
 
 export default router;

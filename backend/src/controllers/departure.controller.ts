@@ -497,6 +497,7 @@ export const getDepartureDetail = async (req: AuthenticatedRequest, res: Respons
           },
         },
         requirements: { include: { createdBy: { select: { id: true, name: true } } }, orderBy: { createdAt: 'desc' } },
+        mealUpdates: { include: { postedBy: { select: { id: true, name: true } } }, orderBy: { createdAt: 'desc' } },
         b2bVendor: { select: { id: true, name: true, contact: true, contactPerson: true } },
         bookings: {
           include: {
