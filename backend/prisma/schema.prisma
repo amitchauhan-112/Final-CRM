@@ -1294,6 +1294,11 @@ model Vehicle {
   driverMobile   String?
   pickupTime     DateTime?
   pickupLocation String?
+  // Which day of the trip this vehicle covers — lets different days use
+  // different vehicles (e.g. a transfer cab on Day 1, a different local car
+  // on Day 2) instead of one vehicle implicitly covering the whole trip.
+  // Null means "whole trip" (the old behavior), unchanged for existing rows.
+  serviceDate    DateTime?
   vendorName     String?                          // legacy free-text — kept for backward compatibility
   vendorContact  String?
   contactPerson  String?                          // snapshot of the vendor's contact person at allocation time

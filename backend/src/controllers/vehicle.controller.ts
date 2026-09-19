@@ -15,7 +15,7 @@ export const createVehicle = async (req: AuthenticatedRequest, res: Response): P
     if (!departure) { res.status(404).json({ success: false, error: 'Departure not found' }); return; }
 
     const {
-      transportType, vehicleType, vehicleNumber, driverName, driverMobile, pickupTime, pickupLocation,
+      transportType, vehicleType, vehicleNumber, driverName, driverMobile, pickupTime, pickupLocation, serviceDate,
       vendorName, vendorContact, contactPerson, rate, advanceRequired, vendorId, status,
       operatorName, ticketReference, numberOfTickets, volvoDepartureTime,
     } = req.body;
@@ -30,6 +30,7 @@ export const createVehicle = async (req: AuthenticatedRequest, res: Response): P
         driverMobile: driverMobile?.trim() || null,
         pickupTime: pickupTime ? new Date(pickupTime) : null,
         pickupLocation: pickupLocation?.trim() || null,
+        serviceDate: serviceDate ? new Date(serviceDate) : null,
         vendorName: vendorName?.trim() || null,
         vendorContact: vendorContact?.trim() || null,
         contactPerson: contactPerson?.trim() || null,
@@ -94,6 +95,7 @@ export const updateVehicle = async (req: AuthenticatedRequest, res: Response): P
         driverMobile: b.driverMobile !== undefined ? b.driverMobile?.trim() || null : existing.driverMobile,
         pickupTime: b.pickupTime !== undefined ? (b.pickupTime ? new Date(b.pickupTime) : null) : existing.pickupTime,
         pickupLocation: b.pickupLocation !== undefined ? b.pickupLocation?.trim() || null : existing.pickupLocation,
+        serviceDate: b.serviceDate !== undefined ? (b.serviceDate ? new Date(b.serviceDate) : null) : existing.serviceDate,
         vendorName: b.vendorName !== undefined ? b.vendorName?.trim() || null : existing.vendorName,
         vendorContact: b.vendorContact !== undefined ? b.vendorContact?.trim() || null : existing.vendorContact,
         contactPerson: b.contactPerson !== undefined ? b.contactPerson?.trim() || null : existing.contactPerson,

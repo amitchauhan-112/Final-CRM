@@ -729,6 +729,8 @@ export interface Vehicle {
   driverMobile?: string;
   pickupTime?: string;
   pickupLocation?: string;
+  // Which day of the trip this vehicle covers — null means "whole trip".
+  serviceDate?: string;
   vendorName?: string;
   vendorContact?: string;
   contactPerson?: string;
@@ -878,6 +880,7 @@ export interface HotelRequirementBlock {
   nights: number;
   roomsNeeded: number;
   fulfilled: boolean;
+  matchedHotelId?: string;
 }
 
 export interface GroupSummary {

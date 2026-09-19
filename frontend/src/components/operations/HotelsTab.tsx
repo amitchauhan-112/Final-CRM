@@ -224,9 +224,10 @@ function formatDateStr(dateStr: string) {
   return new Date(`${dateStr}T00:00:00`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-function HotelRequirementsByStay({ blocks, onFillDetails }: {
+function HotelRequirementsByStay({ blocks, onFillDetails, onEdit }: {
   blocks: HotelRequirementBlock[];
   onFillDetails: (block: HotelRequirementBlock) => void;
+  onEdit: (hotelId: string) => void;
 }) {
   if (blocks.length === 0) {
     return (
@@ -263,9 +264,13 @@ function HotelRequirementsByStay({ blocks, onFillDetails }: {
             <p className="text-xs text-slate-500 flex items-center gap-1.5">
               <BedDouble className="w-3.5 h-3.5" />{b.roomsNeeded} room{b.roomsNeeded !== 1 ? 's' : ''} needed
             </p>
-            {!b.fulfilled && (
+            {!b.fulfilled ? (
               <button onClick={() => onFillDetails(b)} className="text-xs font-medium text-primary-600 hover:text-primary-700 flex items-center gap-1 pt-1">
                 <Plus className="w-3 h-3" />Fill Details
+              </button>
+            ) : b.matchedHotelId && (
+              <button onClick={() => onEdit(b.matchedHotelId!)} className="text-xs font-medium text-primary-600 hover:text-primary-700 flex items-center gap-1 pt-1">
+                <Pencil className="w-3 h-3" />Edit
               </button>
             )}
           </div>
@@ -362,7 +367,11 @@ export default function HotelsTab({ departureId, hotels, roomsRequired = 0, hote
 
   return (
     <div className="space-y-4">
-      <HotelRequirementsByStay blocks={hotelRequirements} onFillDetails={handleFillDetails} />
+      <HotelRequirementsByStay
+        blocks={hotelRequirements}
+        onFillDetails={handleFillDetails}
+        onEdit={(hotelId) => { const h = hotels.find((x) => x.id === hotelId); if (h) setEditHotel(h); }}
+      />
       <RoomRequirements roomsRequired={roomsRequired} hotels={hotels} />
 
       <div className="flex items-center gap-2 flex-wrap">

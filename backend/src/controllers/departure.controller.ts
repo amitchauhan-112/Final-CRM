@@ -614,20 +614,21 @@ export const getDepartureDetail = async (req: AuthenticatedRequest, res: Respons
     // that case rather than an error.
     const itineraryItems = departure.package?.itineraryItems ?? [];
     const roomsNeeded = roomsForBookingList(departure.bookings).total;
-    const hotelRequirements = deriveStayBlocks(itineraryItems, departure.departureDate, departure.destination).map((block) => ({
-      ...block,
-      roomsNeeded,
+    const hotelRequirements = deriveStayBlocks(itineraryItems, departure.departureDate, departure.destination).map((block) => {
       // Fulfilled once a CONFIRMED hotel exists at this location whose stay
       // covers the block — a simple overlap check, not an exact date match,
-      // so a slightly earlier check-in/later check-out still counts.
-      fulfilled: departure.hotels.some((h) =>
+      // so a slightly earlier check-in/later check-out still counts. Also
+      // surface which Hotel row matched, so Ops can jump straight to editing
+      // it instead of hunting for it in the flat list below.
+      const matchedHotel = departure.hotels.find((h) =>
         h.status === 'CONFIRMED' &&
         (h.location ?? '').trim().toLowerCase() === block.location.trim().toLowerCase() &&
         h.checkInDate && h.checkOutDate &&
         h.checkInDate.toISOString().slice(0, 10) <= block.checkIn &&
         h.checkOutDate.toISOString().slice(0, 10) >= block.checkOut
-      ),
-    }));
+      );
+      return { ...block, roomsNeeded, fulfilled: !!matchedHotel, matchedHotelId: matchedHotel?.id };
+    });
 
     res.json({ success: true, data: { ...departure, groupSummary, checklist, tripProfitability, journeySummaries, hotelRequirements } });
   } catch (e) {

@@ -69,7 +69,7 @@ function VehicleRequirements({ totalTravelers }: { totalTravelers: number }) {
 interface VehicleForm {
   transportType: 'CAB' | 'VOLVO';
   vehicleType?: string; vehicleNumber?: string; driverName?: string; driverMobile?: string;
-  pickupTime?: string; pickupLocation?: string; status: string;
+  pickupTime?: string; pickupLocation?: string; serviceDate?: string; status: string;
   operatorName?: string; ticketReference?: string; numberOfTickets?: number; volvoDepartureTime?: string;
 }
 
@@ -88,6 +88,7 @@ function VehicleFormModal({ open, onClose, defaultValues, onSubmit, isLoading }:
       driverMobile: defaultValues?.driverMobile ?? '',
       pickupTime: defaultValues?.pickupTime ? defaultValues.pickupTime.slice(0, 16) : '',
       pickupLocation: defaultValues?.pickupLocation ?? '',
+      serviceDate: defaultValues?.serviceDate ? defaultValues.serviceDate.slice(0, 10) : '',
       status: defaultValues?.status ?? 'PENDING',
       operatorName: defaultValues?.operatorName ?? '',
       ticketReference: defaultValues?.ticketReference ?? '',
@@ -160,6 +161,11 @@ function VehicleFormModal({ open, onClose, defaultValues, onSubmit, isLoading }:
             <option value="CONFIRMED">Confirmed</option>
             <option value="CANCELLED">Cancelled</option>
           </select>
+        </div>
+
+        <div>
+          <label className="label">Day of Trip (optional)</label>
+          <input type="date" {...register('serviceDate')} className="input" title="Leave blank if this vehicle covers the whole trip, not just one day" />
         </div>
 
         {!isVolvo ? (
@@ -249,6 +255,15 @@ export default function VehiclesTab({
   const updateVehicle = useUpdateVehicle(departureId);
   const deleteVehicle = useDeleteVehicle(departureId);
 
+  // Whole-trip vehicles (no serviceDate) sort first, then day-tagged ones in
+  // date order — so a mixed list reads naturally instead of by creation order.
+  const sortedVehicles = [...vehicles].sort((a, b) => {
+    if (!a.serviceDate && !b.serviceDate) return 0;
+    if (!a.serviceDate) return -1;
+    if (!b.serviceDate) return 1;
+    return a.serviceDate.localeCompare(b.serviceDate);
+  });
+
   return (
     <div className="space-y-4">
       <VehicleRequirements totalTravelers={totalTravelers} />
@@ -264,10 +279,15 @@ export default function VehiclesTab({
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {vehicles.map((v) => (
+          {sortedVehicles.map((v) => (
             <div key={v.id} className="card p-4 space-y-2">
               <div className="flex items-start justify-between">
                 <div>
+                  {v.serviceDate && (
+                    <span className="badge bg-primary-50 text-primary-700 mb-1">
+                      {new Date(v.serviceDate).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })}
+                    </span>
+                  )}
                   <p className="font-semibold text-slate-800 text-sm flex items-center gap-1.5">
                     {v.transportType === 'VOLVO' ? <Bus className="w-3.5 h-3.5 text-slate-400" /> : <Truck className="w-3.5 h-3.5 text-slate-400" />}
                     {v.transportType === 'VOLVO' ? (v.operatorName || 'Volvo') : (v.vehicleType || 'Cab')}
