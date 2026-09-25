@@ -313,6 +313,69 @@ export const requestCorrection = async (req: AuthenticatedRequest, res: Response
   }
 };
 
+// Finance types the exact corrected amount/method/reference/notes instead of
+// just leaving a note — routes to the recording Sales person (or Admin) as a
+// one-click Approve, so nobody has to blindly re-enter the whole payment via
+// requestCorrection + resubmitPayment above.
+export const proposeCorrection = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const { amount, method, reference, notes, note } = req.body;
+
+    const payment = await prisma.payment.findUnique({ where: { id }, include: { booking: { include: { lead: true } } } });
+    if (!payment) { res.status(404).json({ success: false, error: 'Payment not found' }); return; }
+    if (orgId(req) && payment.booking.organizationId !== orgId(req)) { res.status(404).json({ success: false, error: 'Payment not found' }); return; }
+    if (payment.status === 'VERIFIED') { res.status(400).json({ success: false, error: 'Cannot propose a correction on an already-verified payment' }); return; }
+
+    const existingPending = await prisma.approvalRequest.findFirst({
+      where: { entityType: 'PAYMENT', entityId: id, type: 'PAYMENT_CORRECTION', status: 'PENDING' },
+    });
+    if (existingPending) { res.status(409).json({ success: false, error: 'A correction on this payment is already pending approval' }); return; }
+
+    // Only include fields that actually differ, so the recipient sees a clean
+    // old→new diff instead of every field re-stated.
+    const changes: Record<string, unknown> = {};
+    const previous: Record<string, unknown> = {};
+    if (amount !== undefined && Number(amount) !== payment.amount) { changes.amount = Number(amount); previous.amount = payment.amount; }
+    if (method !== undefined && method !== payment.method) { changes.method = method; previous.method = payment.method; }
+    if (reference !== undefined && (reference?.trim() || null) !== payment.reference) { changes.reference = reference?.trim() || null; previous.reference = payment.reference; }
+    if (notes !== undefined && (notes?.trim() || null) !== payment.notes) { changes.notes = notes?.trim() || null; previous.notes = payment.notes; }
+
+    if (Object.keys(changes).length === 0) {
+      res.status(400).json({ success: false, error: 'Nothing to correct — the proposed values match the current payment' });
+      return;
+    }
+
+    const approval = await prisma.approvalRequest.create({
+      data: {
+        organizationId: orgId(req),
+        type: 'PAYMENT_CORRECTION',
+        entityType: 'PAYMENT',
+        entityId: id,
+        payload: JSON.stringify({ changes, previous }),
+        note: note?.trim() || null,
+        requestedById: req.user!.id,
+        approverId: payment.recordedById,
+      },
+    });
+
+    await prisma.payment.update({
+      where: { id },
+      data: { status: 'CORRECTION_REQUESTED', financeNote: note?.trim() || 'Finance proposed a correction — awaiting your confirmation.' },
+    });
+
+    await createNotification(payment.recordedById, 'PAYMENT_CORRECTION_PENDING', 'Payment Correction Needs Your Confirmation',
+      `Finance proposed a correction on the ₹${payment.amount.toLocaleString()} payment for ${payment.booking.lead.name} — review and confirm.`,
+      payment.booking.leadId);
+    emitFinanceUpdated();
+
+    res.status(202).json({ success: true, data: { pending: true, approvalRequestId: approval.id } });
+  } catch (e) {
+    console.error('[payment] proposeCorrection error:', e);
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+};
+
 // Sales edits a REJECTED/CORRECTION_REQUESTED payment and resubmits it as PENDING.
 export const resubmitPayment = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {

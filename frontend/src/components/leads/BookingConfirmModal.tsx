@@ -2,11 +2,12 @@ import { useEffect, useMemo, useState } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import {
   IndianRupee, Users, MapPin, Package, Utensils, BedDouble, Calendar, FileText,
-  ChevronRight, Info,
+  ChevronRight, Info, Clock,
 } from 'lucide-react';
 import Modal from '../ui/Modal';
 import { Lead, Booking, FoodPreference, RoomSharing, TourType } from '../../types/index';
-import { useCreateBooking, useUpdateBooking } from '../../hooks/useBookings';
+import { useCreateBooking, useUpdateBooking, usePendingBookingChange } from '../../hooks/useBookings';
+import { useCancelRequest } from '../../hooks/useApprovals';
 import { usePackages, usePackage, useCreatePackage } from '../../hooks/usePackages';
 import { useUsers } from '../../hooks/useUsers';
 import { useBookingPayments, useUpdatePendingPayment } from '../../hooks/usePayments';
@@ -445,6 +446,14 @@ export default function BookingConfirmModal({ open, onClose, lead, existingBooki
 
   const isPending = createBooking.isPending || updateBooking.isPending || updatePendingPayment.isPending;
 
+  // A non-admin's edit to this booking doesn't apply immediately — it needs
+  // Admin approval first (see updateBooking on the backend). Show what's
+  // already awaiting approval instead of letting them queue up a conflicting
+  // second proposal, with an option to pull it back.
+  const { data: pendingChangeData } = usePendingBookingChange(open && isEdit ? existingBooking!.id : undefined);
+  const pendingChange = pendingChangeData?.data ?? null;
+  const cancelRequest = useCancelRequest();
+
   // Itinerary preview items (TRIP_DAY type only, sorted by dayOffset)
   const itineraryPreview = (selectedPkg?.itineraryItems ?? [])
     .filter((i) => i.taskType === 'TRIP_DAY')
@@ -473,6 +482,26 @@ export default function BookingConfirmModal({ open, onClose, lead, existingBooki
           <div className="flex items-center gap-2 px-3 py-2 bg-primary-50 border border-primary-200 rounded-xl">
             <span className="text-xs font-semibold text-primary-600">Booking #</span>
             <span className="font-mono text-sm font-bold text-primary-800">{existingBooking.bookingNumber}</span>
+          </div>
+        )}
+
+        {pendingChange && (
+          <div className="px-3 py-2.5 bg-amber-50 border border-amber-200 rounded-xl space-y-1.5">
+            <div className="flex items-center gap-2">
+              <Clock className="w-4 h-4 text-amber-600 flex-shrink-0" />
+              <p className="text-sm font-semibold text-amber-800">A change is awaiting Admin approval</p>
+            </div>
+            <p className="text-xs text-amber-700">
+              Proposed by {pendingChange.requestedBy.name}: {Object.keys(pendingChange.payload.changes).join(', ')}
+            </p>
+            <button
+              type="button"
+              onClick={() => cancelRequest.mutate(pendingChange.id)}
+              disabled={cancelRequest.isPending}
+              className="text-xs font-medium text-amber-700 hover:text-amber-900 underline"
+            >
+              {cancelRequest.isPending ? 'Cancelling…' : 'Cancel this request'}
+            </button>
           </div>
         )}
 

@@ -6,10 +6,11 @@ import {
   MessageSquarePlus, Activity, BarChart2, Building2,
   UserCheck, Database, ChevronRight, Package, BookOpen,
   Contact, Wallet, Map, Home, Gauge, LineChart, FolderKanban, Settings2, Zap, HeartPulse, IndianRupee,
-  MessageCircle, Radar,
+  MessageCircle, Radar, ShieldCheck,
 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import { useNotifications, useMarkAllAsRead, useMarkAsRead } from '../../hooks/useNotifications';
+import { usePendingApprovals } from '../../hooks/useApprovals';
 import Avatar from '../ui/Avatar';
 import FeedbackButton from '../feedback/FeedbackButton';
 import { formatRelativeTime, cn } from '../../utils/helpers';
@@ -41,6 +42,7 @@ const NAV: NavEntry[] = [
     ],
   },
   { type: 'item', to: '/admin/organization', label: 'Organization', icon: Building2 },
+  { type: 'item', to: '/admin/approvals', label: 'Approvals', icon: ShieldCheck },
 
   { type: 'divider', label: 'ERP' },
   {
@@ -195,6 +197,8 @@ export default function AdminLayout() {
   const userMenuRef = useRef<HTMLDivElement>(null);
 
   const { data: notifData } = useNotifications(1, 10);
+  const { data: pendingApprovalsData } = usePendingApprovals();
+  const pendingApprovalsCount = pendingApprovalsData?.data?.length ?? 0;
   const markAllRead = useMarkAllAsRead();
   const markOneRead = useMarkAsRead();
 
@@ -288,6 +292,11 @@ export default function AdminLayout() {
               >
                 <Icon className="w-5 h-5 flex-shrink-0" />
                 {entry.label}
+                {entry.to === '/admin/approvals' && pendingApprovalsCount > 0 && (
+                  <span className="ml-auto w-5 h-5 bg-red-500 text-white text-[10px] rounded-full flex items-center justify-center font-bold flex-shrink-0">
+                    {pendingApprovalsCount > 9 ? '9+' : pendingApprovalsCount}
+                  </span>
+                )}
               </NavLink>
             );
           })}

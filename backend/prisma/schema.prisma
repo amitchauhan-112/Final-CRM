@@ -39,6 +39,7 @@ model Organization {
   metaAdMaps    MetaAdMap[]
   employeeCashLedgers EmployeeCashLedger[]
   partners      Partner[]
+  approvalRequests ApprovalRequest[]
 
   @@map("organizations")
 }
@@ -132,6 +133,11 @@ model User {
   // WhatsApp coexistence — one connected number per employee
   whatsappAccount      WhatsAppAccount?
   sentWhatsappMessages WhatsAppMessage[]     @relation("WhatsAppMessageSender")
+
+  // Approval queue (booking-change / payment-correction requests)
+  requestedApprovals   ApprovalRequest[] @relation("ApprovalRequester")
+  approverForRequests  ApprovalRequest[] @relation("ApprovalApprover")
+  resolvedApprovals    ApprovalRequest[] @relation("ApprovalResolver")
 
   @@index([organizationId])
   @@index([departmentId])
@@ -1067,6 +1073,48 @@ model Payment {
   @@index([createdAt])
   @@index([status])
   @@map("payments")
+}
+
+// ─── Approval Queue ──────────────────────────────────────────────────────────
+// Generic "someone proposed a change, a specific person/role must sign off
+// before it applies" mechanism. Currently powers two flows:
+//   BOOKING_CHANGE     — non-admin edits to a CONFIRMED booking need Admin approval
+//   PAYMENT_CORRECTION — Finance's proposed fix to a Payment needs the recording
+//                        Sales person's (or Admin's) approval
+// Meant to be reused for future approval types without schema changes.
+model ApprovalRequest {
+  id             String        @id @default(uuid())
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+
+  type       String // BOOKING_CHANGE | PAYMENT_CORRECTION
+  entityType String // BOOKING | PAYMENT
+  entityId   String
+
+  payload String  // JSON-encoded proposed field changes
+  note    String? // optional context from whoever's requesting
+
+  requestedById String
+  requestedBy   User   @relation("ApprovalRequester", fields: [requestedById], references: [id])
+
+  // Who can resolve this — a role (any user with that role) or one specific
+  // user. Admin can always resolve any request as an override.
+  approverRole String?
+  approverId   String?
+  approver     User?   @relation("ApprovalApprover", fields: [approverId], references: [id])
+
+  status       String    @default("PENDING") // PENDING | APPROVED | REJECTED
+  reviewNote   String?
+  resolvedById String?
+  resolvedBy   User?     @relation("ApprovalResolver", fields: [resolvedById], references: [id])
+  resolvedAt   DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([organizationId])
+  @@index([status])
+  @@index([entityType, entityId])
+  @@map("approval_requests")
 }
 
 // ─── Employee Cash Ledger ───────────────────────────────────────────────────

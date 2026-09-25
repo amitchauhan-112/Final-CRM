@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { useAuthStore } from './store/authStore';
+import { useIdleLogout } from './hooks/useIdleLogout';
 import AdminLayout from './components/layout/AdminLayout';
 import EmployeeLayout from './components/layout/EmployeeLayout';
 import OperationsLayout from './components/layout/OperationsLayout';
@@ -20,6 +21,7 @@ import EmployeeDashboard from './components/dashboard/EmployeeDashboard';
 import AdminLeadsPage from './pages/admin/LeadsPage';
 import AdminCampaignsPage from './pages/admin/CampaignsPage';
 import OrganizationPage from './pages/admin/OrganizationPage';
+import ApprovalsPage from './pages/admin/ApprovalsPage';
 import AdminSettingsPage from './pages/admin/SettingsPage';
 import AdminFeedbackPage from './pages/admin/FeedbackPage';
 import AdminActivityFeedPage from './pages/admin/ActivityFeedPage';
@@ -81,6 +83,8 @@ function RequireAuth({ children, role }: { children: React.ReactNode; role?: 'AD
 }
 
 export default function App() {
+  useIdleLogout();
+
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
@@ -111,6 +115,7 @@ export default function App() {
         <Route path="employee-monitoring" element={<EmployeeMonitoringPage />} />
         <Route path="employees" element={<Navigate to="/admin/organization" replace />} />
         <Route path="organization" element={<OrganizationPage />} />
+        <Route path="approvals" element={<ApprovalsPage />} />
         <Route path="settings" element={<AdminSettingsPage />} />
         <Route path="feedback" element={<AdminFeedbackPage />} />
         <Route path="activity" element={<AdminActivityFeedPage />} />

@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Phone, Map, User, IndianRupee, Hash, Image, Check, X, MessageSquareWarning } from 'lucide-react';
-import { useApprovePayment, useRejectPayment, useRequestCorrection } from '../../hooks/useFinance';
+import { Phone, Map, User, IndianRupee, Hash, Image, Check, X, MessageSquareWarning, PencilLine } from 'lucide-react';
+import { useApprovePayment, useRejectPayment, useRequestCorrection, useProposeCorrection } from '../../hooks/useFinance';
 import { Payment } from '../../types/index';
 import Modal from '../ui/Modal';
 import { formatCurrency, formatDate, cn } from '../../utils/helpers';
@@ -11,10 +11,16 @@ export default function PaymentVerificationCard({ payment }: { payment: Payment 
   const approve = useApprovePayment();
   const reject = useRejectPayment();
   const requestCorrection = useRequestCorrection();
+  const proposeCorrection = useProposeCorrection();
   const [rejectOpen, setRejectOpen] = useState(false);
   const [correctionOpen, setCorrectionOpen] = useState(false);
+  const [proposeOpen, setProposeOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
   const [correctionNote, setCorrectionNote] = useState('');
+  const [proposedAmount, setProposedAmount] = useState(String(payment.amount));
+  const [proposedMethod, setProposedMethod] = useState(payment.method);
+  const [proposedReference, setProposedReference] = useState(payment.reference ?? '');
+  const [proposedNote, setProposedNote] = useState('');
 
   const booking = payment.booking;
   const fullProofUrl = payment.proofUrl?.startsWith('/') ? `${window.location.origin}${payment.proofUrl}` : payment.proofUrl;
@@ -90,6 +96,9 @@ export default function PaymentVerificationCard({ payment }: { payment: Payment 
           <button onClick={() => setCorrectionOpen(true)} className="btn-secondary text-xs">
             <MessageSquareWarning className="w-3.5 h-3.5" />Request Correction
           </button>
+          <button onClick={() => setProposeOpen(true)} className="btn-secondary text-xs">
+            <PencilLine className="w-3.5 h-3.5" />Propose Correction
+          </button>
         </div>
       )}
 
@@ -123,6 +132,46 @@ export default function PaymentVerificationCard({ payment }: { payment: Payment 
       >
         <label className="label">What needs correcting? *</label>
         <textarea value={correctionNote} onChange={(e) => setCorrectionNote(e.target.value)} rows={3} className="input" placeholder="e.g. UTR number doesn't match the proof..." />
+      </Modal>
+
+      <Modal
+        open={proposeOpen} onClose={() => setProposeOpen(false)} title="Propose Correction" size="sm"
+        footer={<>
+          <button onClick={() => setProposeOpen(false)} className="btn-secondary">Cancel</button>
+          <button
+            onClick={() => proposeCorrection.mutate(
+              { id: payment.id, amount: Number(proposedAmount), method: proposedMethod, reference: proposedReference, note: proposedNote },
+              { onSuccess: () => setProposeOpen(false) }
+            )}
+            disabled={proposeCorrection.isPending} className="btn-primary"
+          >
+            {proposeCorrection.isPending ? 'Sending…' : 'Send to Sales for Confirmation'}
+          </button>
+        </>}
+      >
+        <div className="space-y-3">
+          <p className="text-xs text-slate-500">
+            Type the correct values — {payment.recordedBy.name} will see exactly what changed and confirm it with one click, no re-entry needed.
+          </p>
+          <div>
+            <label className="label">Correct Amount (₹)</label>
+            <input type="number" value={proposedAmount} onChange={(e) => setProposedAmount(e.target.value)} className="input" />
+          </div>
+          <div>
+            <label className="label">Correct Payment Mode</label>
+            <select value={proposedMethod} onChange={(e) => setProposedMethod(e.target.value as Payment['method'])} className="input">
+              {Object.entries(METHOD_LABEL).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="label">Reference / UTR</label>
+            <input value={proposedReference} onChange={(e) => setProposedReference(e.target.value)} className="input" />
+          </div>
+          <div>
+            <label className="label">Note (optional)</label>
+            <textarea value={proposedNote} onChange={(e) => setProposedNote(e.target.value)} rows={2} className="input" placeholder="Why this correction is needed..." />
+          </div>
+        </div>
       </Modal>
     </div>
   );

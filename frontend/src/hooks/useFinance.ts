@@ -85,6 +85,25 @@ export function useRequestCorrection() {
   });
 }
 
+// Finance types the exact corrected values instead of just leaving a note —
+// routes to the recording Sales person for a one-click confirm (see
+// proposeCorrection in payment.controller.ts). Lighter than
+// requestCorrection + resubmitPayment, which makes Sales re-enter everything.
+export function useProposeCorrection() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, ...payload }: { id: string; amount?: number; method?: string; reference?: string; notes?: string; note?: string }) =>
+      (await api.put(`/finance/payments/${id}/propose-correction`, payload)).data,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['finance'] });
+      qc.invalidateQueries({ queryKey: ['payments'] });
+      qc.invalidateQueries({ queryKey: ['approvals'] });
+      toast('Correction sent to Sales for confirmation', { icon: '⏳' });
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.error || 'Failed to propose correction'),
+  });
+}
+
 // ─── Customer ledger ─────────────────────────────────────────────────────────
 
 export function useCustomerLedger(bookingId: string | undefined) {

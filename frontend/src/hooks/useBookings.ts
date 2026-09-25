@@ -86,12 +86,33 @@ export function useUpdateBooking() {
       const { data } = await api.put(`/bookings/${id}`, payload);
       return data;
     },
-    onSuccess: (_data, vars) => {
+    onSuccess: (data, vars) => {
       qc.invalidateQueries({ queryKey: ['booking', vars.leadId] });
+      qc.invalidateQueries({ queryKey: ['booking', vars.id, 'pending-change'] });
+      qc.invalidateQueries({ queryKey: ['approvals'] });
+      // A non-admin edit to an active booking doesn't apply immediately — it
+      // creates an Admin approval request instead (see updateBooking on the
+      // backend). Nothing in the booking actually changed yet, so skip the
+      // erp-bookings list refresh and give a distinct "pending" toast.
+      if (data?.data?.pending) {
+        toast('Change submitted — waiting on Admin approval', { icon: '⏳' });
+        return;
+      }
       qc.invalidateQueries({ queryKey: ['erp-bookings'] });
       toast.success('Booking updated');
     },
     onError: (e: any) => toast.error(e?.response?.data?.error || 'Failed to update booking'),
+  });
+}
+
+// The current pending BOOKING_CHANGE request on this booking, if any — lets
+// the edit form show "you have a change awaiting Admin approval" instead of
+// letting someone queue up a second, conflicting proposal.
+export function usePendingBookingChange(bookingId: string | undefined) {
+  return useQuery<ApiResponse<import('../types/index').ApprovalRequest | null>>({
+    queryKey: ['booking', bookingId, 'pending-change'],
+    queryFn: async () => (await api.get(`/bookings/${bookingId}/pending-change`)).data,
+    enabled: !!bookingId,
   });
 }
 

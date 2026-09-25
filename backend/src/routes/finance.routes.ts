@@ -4,7 +4,7 @@ import { createUpload } from '../middleware/upload.js';
 const uploadVendorPaymentProof = createUpload('vendor-payment-proofs');
 const uploadExpenseBill = createUpload('expense-bills');
 import { getDashboardStats } from '../controllers/financeDashboard.controller.js';
-import { listPaymentsForVerification, approvePayment, rejectPayment, requestCorrection } from '../controllers/payment.controller.js';
+import { listPaymentsForVerification, approvePayment, rejectPayment, requestCorrection, proposeCorrection } from '../controllers/payment.controller.js';
 import { getCustomerLedger, getPendingTracker } from '../controllers/ledger.controller.js';
 import { listRefunds, createRefund, approveRefund, markRefundPaid, rejectRefund } from '../controllers/refund.controller.js';
 import {
@@ -36,6 +36,7 @@ router.get('/payments', listPaymentsForVerification);
 router.put('/payments/:id/approve', approvePayment);
 router.put('/payments/:id/reject', rejectPayment);
 router.put('/payments/:id/request-correction', requestCorrection);
+router.put('/payments/:id/propose-correction', proposeCorrection);
 
 // Customer ledger + pending tracker
 router.get('/ledger/:bookingId', getCustomerLedger);

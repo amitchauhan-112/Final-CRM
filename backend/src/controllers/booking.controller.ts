@@ -4,7 +4,7 @@ import { AuthenticatedRequest } from '../types/index.js';
 import { generateTasksFromItinerary } from './bookingTask.controller.js';
 import { linkBookingToDeparture, createPlaceholderTravelers, issueTravelerPortalToken } from './departure.controller.js';
 import { generatePaymentSchedule } from './paymentSchedule.controller.js';
-import { notifyFinanceTeam } from '../services/notification.service.js';
+import { notifyFinanceTeam, createNotification } from '../services/notification.service.js';
 import { fireEvent } from '../services/automationEngine.service.js';
 import { isWholeAmount, WHOLE_AMOUNT_ERROR } from '../utils/amountValidation.js';
 
@@ -314,6 +314,164 @@ export const createBooking = async (req: AuthenticatedRequest, res: Response): P
 
 // ─── Update booking ───────────────────────────────────────────────────────────
 
+// Same field-validation `updateBooking` has always done — pulled out so both
+// the direct-apply path (Admin) and the propose-for-approval path (everyone
+// else) reject a bad payload up front, before an ApprovalRequest is ever created.
+function validateBookingChangePayload(existing: { departureDate: Date | null; returnDate: Date | null; balanceDueDate: Date | null }, body: Record<string, unknown>): string | null {
+  const { aadharNumber, finalPrice, foodPreference, roomSharing, departureDate, returnDate, balanceDueDate } = body as any;
+
+  if (aadharNumber && !/^\d{12}$/.test(String(aadharNumber).replace(/\s/g, ''))) return 'Aadhar number must be 12 digits';
+  if (!isWholeAmount(finalPrice)) return WHOLE_AMOUNT_ERROR;
+  if (foodPreference !== undefined && !FOOD_PREFERENCES.includes(foodPreference)) return 'A valid food preference is required';
+  if (roomSharing !== undefined && !ROOM_SHARINGS.includes(roomSharing)) return 'A valid room sharing type is required';
+
+  const effectiveDepartureDate = departureDate !== undefined ? departureDate : existing.departureDate;
+  const effectiveReturnDate = returnDate !== undefined ? returnDate : existing.returnDate;
+  const effectiveBalanceDueDate = balanceDueDate !== undefined ? balanceDueDate : existing.balanceDueDate;
+  if (effectiveDepartureDate && effectiveReturnDate && new Date(effectiveReturnDate) < new Date(effectiveDepartureDate)) return 'Return date cannot be before departure date';
+  if (effectiveDepartureDate && effectiveBalanceDueDate && new Date(effectiveBalanceDueDate) > new Date(effectiveDepartureDate)) return 'Balance due date must be before the departure date';
+
+  // Only block a past departure date when it's actively being changed to a
+  // new value — editing other fields on a booking whose trip already
+  // happened shouldn't be blocked by its (correctly) past departure date.
+  if (departureDate) {
+    const existingDateStr = existing.departureDate ? existing.departureDate.toISOString().slice(0, 10) : null;
+    const newDateStr = new Date(departureDate).toISOString().slice(0, 10);
+    if (newDateStr !== existingDateStr) {
+      const todayStr = new Date().toISOString().slice(0, 10);
+      if (newDateStr < todayStr) return 'Departure date cannot be in the past';
+    }
+  }
+  return null;
+}
+
+// The actual write + every side effect `updateBooking` has always performed —
+// extracted so it can run either immediately (Admin edits, or an Admin
+// approving someone else's proposed change) from the same code path.
+// `actingUser` is who caused this write to actually happen (for the activity
+// log) — the Admin who approved it, not necessarily who originally proposed it.
+export async function applyBookingChanges(
+  id: string,
+  changes: Record<string, any>,
+  actingUser: { id: string; name: string },
+  orgIdVal: string | null,
+  activityDetail?: string
+) {
+  const existing = await prisma.booking.findFirst({ where: { id, ...(orgIdVal ? { organizationId: orgIdVal } : {}) } });
+  if (!existing) throw new Error('Booking not found');
+
+  const {
+    travelerName, numberOfTravelers, aadharNumber,
+    foodPreference, roomSharing, departureLocation, departurePackage,
+    tourType, specialRequest, bookingNotes, finalPrice,
+    balanceDueDate, status, packageId, departureDate, returnDate,
+  } = changes;
+
+  // amountPaid is intentionally not accepted here — it only changes via
+  // Finance payment verification (payment.controller.ts) or a paid Refund.
+  // finalPrice can still change, so balance is recomputed against the
+  // existing (verified) amountPaid, not a client-supplied one.
+  const price = finalPrice !== undefined ? Number(finalPrice) : existing.finalPrice;
+  const paid = existing.amountPaid;
+  const balance = Math.max(0, price - paid);
+
+  const booking = await prisma.booking.update({
+    where: { id },
+    data: {
+      travelerName: travelerName?.trim() ?? existing.travelerName,
+      numberOfTravelers: numberOfTravelers !== undefined ? Number(numberOfTravelers) : existing.numberOfTravelers,
+      aadharNumber: aadharNumber !== undefined ? aadharNumber?.trim() || null : existing.aadharNumber,
+      foodPreference: foodPreference ?? existing.foodPreference,
+      roomSharing: roomSharing ?? existing.roomSharing,
+      departureLocation: departureLocation !== undefined ? departureLocation?.trim() || null : existing.departureLocation,
+      departurePackage: departurePackage !== undefined ? departurePackage?.trim() || null : existing.departurePackage,
+      tourType: tourType ?? existing.tourType,
+      specialRequest: specialRequest !== undefined ? specialRequest?.trim() || null : existing.specialRequest,
+      bookingNotes: bookingNotes !== undefined ? bookingNotes?.trim() || null : existing.bookingNotes,
+      finalPrice: price,
+      amountPaid: paid,
+      balanceAmount: balance,
+      balanceDueDate: balanceDueDate !== undefined ? (balanceDueDate ? new Date(balanceDueDate) : null) : existing.balanceDueDate,
+      status: status ?? existing.status,
+      packageId: packageId !== undefined ? packageId || null : existing.packageId,
+      departureDate: departureDate !== undefined ? (departureDate ? new Date(departureDate) : null) : existing.departureDate,
+      returnDate: returnDate !== undefined ? (returnDate ? new Date(returnDate) : null) : existing.returnDate,
+    },
+    include: {
+      package: { select: { id: true, name: true, code: true } },
+      payments: { include: { recordedBy: { select: { id: true, name: true } } }, orderBy: { createdAt: 'desc' } },
+      tasks: { include: { assignee: { select: { id: true, name: true } } }, orderBy: [{ dueDate: 'asc' }] },
+    },
+  });
+
+  // Diff the fields an Admin/audit trail would actually care about — not
+  // every column, just the ones that carry meaning when they change.
+  const diffFields = ['travelerName', 'numberOfTravelers', 'finalPrice', 'status', 'packageId', 'departureDate', 'returnDate', 'balanceDueDate'] as const;
+  const oldValue: Record<string, unknown> = {};
+  const newValue: Record<string, unknown> = {};
+  for (const field of diffFields) {
+    const before = (existing as any)[field];
+    const after = (booking as any)[field];
+    const beforeStr = before instanceof Date ? before.toISOString() : before;
+    const afterStr = after instanceof Date ? after.toISOString() : after;
+    if (beforeStr !== afterStr) { oldValue[field] = before; newValue[field] = after; }
+  }
+
+  await prisma.activityLog.create({
+    data: {
+      action: 'Booking Updated',
+      details: activityDetail ?? `Booking details updated by ${actingUser.name}`,
+      userId: actingUser.id,
+      leadId: existing.leadId,
+      oldValue: Object.keys(oldValue).length ? oldValue : undefined,
+      newValue: Object.keys(newValue).length ? newValue : undefined,
+    },
+  });
+
+  // Re-link to a Departure if the departure date or package changed.
+  const leadForDest = await prisma.lead.findUnique({ where: { id: existing.leadId }, select: { destination: true, phone: true, email: true } });
+  if (booking.departureDate) {
+    let destination = booking.departureLocation?.trim() || leadForDest?.destination || 'Unspecified';
+    let tripDays = 1;
+    if (booking.packageId) {
+      const pkg = await prisma.package.findUnique({ where: { id: booking.packageId }, include: { destination: true } });
+      if (pkg?.destination?.name) destination = pkg.destination.name;
+      if (pkg?.days) tripDays = pkg.days;
+    }
+    const newDepartureId = await linkBookingToDeparture(booking.id, orgIdVal, booking.packageId || null, booking.departureDate, destination, tripDays).catch(console.error);
+    // linkBookingToDeparture updates the DB row directly — reflect that on
+    // the in-memory object too, so the API response (and the auto-cleanup
+    // check right below) see the departure this booking actually ends up
+    // on, not the one it had before this request.
+    if (newDepartureId) booking.departureId = newDepartureId;
+
+    // A package or departure-date change moves this booking onto a
+    // different Departure (linkBookingToDeparture finds-or-creates one
+    // keyed on the new packageId+date) — the one it left behind would
+    // otherwise sit there empty forever, same orphan class as the one
+    // deleteBooking already cleans up.
+    if (existing.departureId && newDepartureId && existing.departureId !== newDepartureId) {
+      const remaining = await prisma.booking.count({ where: { departureId: existing.departureId } });
+      if (remaining === 0) {
+        await prisma.departure.delete({ where: { id: existing.departureId } }).catch(() => {});
+      }
+    }
+  }
+
+  // Top up traveler placeholders if the headcount grew, and back-fill a
+  // Traveler Portal link for any booking confirmed before this feature shipped.
+  await createPlaceholderTravelers(booking.id, booking.numberOfTravelers, {
+    name: booking.travelerName, mobile: leadForDest?.phone, email: leadForDest?.email,
+  }).catch(console.error);
+  await generatePaymentSchedule(booking.id, booking.finalPrice, booking.departureDate).catch(console.error);
+  let travelerPortalToken: string | null = null;
+  if (!booking.travelerPortalTokenHash) {
+    travelerPortalToken = await issueTravelerPortalToken(booking.id, booking.departureDate).catch(() => null);
+  }
+
+  return { booking, travelerPortalToken };
+}
+
 export const updateBooking = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
@@ -322,149 +480,73 @@ export const updateBooking = async (req: AuthenticatedRequest, res: Response): P
     });
     if (!existing) { res.status(404).json({ success: false, error: 'Booking not found' }); return; }
 
-    const {
-      travelerName, numberOfTravelers, aadharNumber,
-      foodPreference, roomSharing, departureLocation, departurePackage,
-      tourType, specialRequest, bookingNotes, finalPrice,
-      balanceDueDate, status, packageId, departureDate, returnDate,
-    } = req.body;
+    const validationError = validateBookingChangePayload(existing, req.body);
+    if (validationError) { res.status(400).json({ success: false, error: validationError }); return; }
 
-    if (aadharNumber && !/^\d{12}$/.test(String(aadharNumber).replace(/\s/g, ''))) {
-      res.status(400).json({ success: false, error: 'Aadhar number must be 12 digits' }); return;
-    }
-    if (!isWholeAmount(finalPrice)) { res.status(400).json({ success: false, error: WHOLE_AMOUNT_ERROR }); return; }
-    if (foodPreference !== undefined && !FOOD_PREFERENCES.includes(foodPreference)) {
-      res.status(400).json({ success: false, error: 'A valid food preference is required' }); return;
-    }
-    if (roomSharing !== undefined && !ROOM_SHARINGS.includes(roomSharing)) {
-      res.status(400).json({ success: false, error: 'A valid room sharing type is required' }); return;
-    }
-    const effectiveDepartureDate = departureDate !== undefined ? departureDate : existing.departureDate;
-    const effectiveReturnDate = returnDate !== undefined ? returnDate : existing.returnDate;
-    const effectiveBalanceDueDate = balanceDueDate !== undefined ? balanceDueDate : existing.balanceDueDate;
-    if (effectiveDepartureDate && effectiveReturnDate && new Date(effectiveReturnDate) < new Date(effectiveDepartureDate)) {
-      res.status(400).json({ success: false, error: 'Return date cannot be before departure date' }); return;
-    }
-    if (effectiveDepartureDate && effectiveBalanceDueDate && new Date(effectiveBalanceDueDate) > new Date(effectiveDepartureDate)) {
-      res.status(400).json({ success: false, error: 'Balance due date must be before the departure date' }); return;
-    }
-    // Only block a past departure date when it's actively being changed to a
-    // new value — editing other fields on a booking whose trip already
-    // happened shouldn't be blocked by its (correctly) past departure date.
-    if (departureDate) {
-      const existingDateStr = existing.departureDate ? existing.departureDate.toISOString().slice(0, 10) : null;
-      const newDateStr = new Date(departureDate).toISOString().slice(0, 10);
-      if (newDateStr !== existingDateStr) {
-        const todayStr = new Date().toISOString().slice(0, 10);
-        if (newDateStr < todayStr) {
-          res.status(400).json({ success: false, error: 'Departure date cannot be in the past' }); return;
-        }
+    // A Booking row only ever exists once a lead's booking is confirmed (there's
+    // no separate "draft" Booking status) — so any edit to an ACTIVE booking by
+    // anyone other than Admin needs Admin sign-off before it applies. Admin's own
+    // edits, and edits to CANCELLED/COMPLETED bookings, still apply immediately.
+    if (existing.status === 'ACTIVE' && req.user?.role !== 'ADMIN') {
+      const alreadyPending = await prisma.approvalRequest.findFirst({
+        where: { entityType: 'BOOKING', entityId: id, status: 'PENDING' },
+      });
+      if (alreadyPending) {
+        res.status(409).json({ success: false, error: 'A change to this booking is already pending Admin approval' });
+        return;
       }
+
+      // Capture the current value of every field being changed alongside the
+      // proposed new value, so Admin's approval queue can show an accurate
+      // old→new diff without re-fetching (and being confused by) whatever the
+      // booking's live state happens to be by the time they review it.
+      const previous: Record<string, unknown> = {};
+      for (const key of Object.keys(req.body)) previous[key] = (existing as any)[key];
+
+      const approval = await prisma.approvalRequest.create({
+        data: {
+          organizationId: orgId(req),
+          type: 'BOOKING_CHANGE',
+          entityType: 'BOOKING',
+          entityId: id,
+          payload: JSON.stringify({ changes: req.body, previous }),
+          requestedById: req.user!.id,
+          approverRole: 'ADMIN',
+        },
+      });
+
+      const admins = await prisma.user.findMany({
+        where: { role: 'ADMIN', deletedAt: null, ...(orgId(req) ? { organizationId: orgId(req) } : {}) },
+        select: { id: true },
+      });
+      await Promise.all(admins.map((a) =>
+        createNotification(a.id, 'BOOKING_CHANGE_PENDING', 'Booking Change Awaiting Approval',
+          `${req.user?.name} proposed a change to booking ${existing.bookingNumber ?? existing.id.slice(0, 8)} (${existing.travelerName}) — needs your approval.`,
+          existing.leadId).catch(() => null)
+      ));
+
+      res.status(202).json({ success: true, data: { pending: true, approvalRequestId: approval.id } });
+      return;
     }
 
-    // amountPaid is intentionally not accepted here — it only changes via
-    // Finance payment verification (payment.controller.ts) or a paid Refund.
-    // finalPrice can still change, so balance is recomputed against the
-    // existing (verified) amountPaid, not a client-supplied one.
-    const price = finalPrice !== undefined ? Number(finalPrice) : existing.finalPrice;
-    const paid = existing.amountPaid;
-    const balance = Math.max(0, price - paid);
-
-    const booking = await prisma.booking.update({
-      where: { id },
-      data: {
-        travelerName: travelerName?.trim() ?? existing.travelerName,
-        numberOfTravelers: numberOfTravelers !== undefined ? Number(numberOfTravelers) : existing.numberOfTravelers,
-        aadharNumber: aadharNumber !== undefined ? aadharNumber?.trim() || null : existing.aadharNumber,
-        foodPreference: foodPreference ?? existing.foodPreference,
-        roomSharing: roomSharing ?? existing.roomSharing,
-        departureLocation: departureLocation !== undefined ? departureLocation?.trim() || null : existing.departureLocation,
-        departurePackage: departurePackage !== undefined ? departurePackage?.trim() || null : existing.departurePackage,
-        tourType: tourType ?? existing.tourType,
-        specialRequest: specialRequest !== undefined ? specialRequest?.trim() || null : existing.specialRequest,
-        bookingNotes: bookingNotes !== undefined ? bookingNotes?.trim() || null : existing.bookingNotes,
-        finalPrice: price,
-        amountPaid: paid,
-        balanceAmount: balance,
-        balanceDueDate: balanceDueDate !== undefined ? (balanceDueDate ? new Date(balanceDueDate) : null) : existing.balanceDueDate,
-        status: status ?? existing.status,
-        packageId: packageId !== undefined ? packageId || null : existing.packageId,
-        departureDate: departureDate !== undefined ? (departureDate ? new Date(departureDate) : null) : existing.departureDate,
-        returnDate: returnDate !== undefined ? (returnDate ? new Date(returnDate) : null) : existing.returnDate,
-      },
-      include: {
-        package: { select: { id: true, name: true, code: true } },
-        payments: { include: { recordedBy: { select: { id: true, name: true } } }, orderBy: { createdAt: 'desc' } },
-        tasks: { include: { assignee: { select: { id: true, name: true } } }, orderBy: [{ dueDate: 'asc' }] },
-      },
-    });
-
-    // Diff the fields an Admin/audit trail would actually care about — not
-    // every column, just the ones that carry meaning when they change.
-    const diffFields = ['travelerName', 'numberOfTravelers', 'finalPrice', 'status', 'packageId', 'departureDate', 'returnDate', 'balanceDueDate'] as const;
-    const oldValue: Record<string, unknown> = {};
-    const newValue: Record<string, unknown> = {};
-    for (const field of diffFields) {
-      const before = existing[field];
-      const after = booking[field];
-      const beforeStr = before instanceof Date ? before.toISOString() : before;
-      const afterStr = after instanceof Date ? after.toISOString() : after;
-      if (beforeStr !== afterStr) { oldValue[field] = before; newValue[field] = after; }
-    }
-
-    await prisma.activityLog.create({
-      data: {
-        action: 'Booking Updated',
-        details: `Booking details updated by ${req.user?.name}`,
-        userId: req.user!.id,
-        leadId: existing.leadId,
-        oldValue: Object.keys(oldValue).length ? oldValue : undefined,
-        newValue: Object.keys(newValue).length ? newValue : undefined,
-      },
-    });
-
-    // Re-link to a Departure if the departure date or package changed.
-    const leadForDest = await prisma.lead.findUnique({ where: { id: existing.leadId }, select: { destination: true, phone: true, email: true } });
-    if (booking.departureDate) {
-      let destination = booking.departureLocation?.trim() || leadForDest?.destination || 'Unspecified';
-      let tripDays = 1;
-      if (booking.packageId) {
-        const pkg = await prisma.package.findUnique({ where: { id: booking.packageId }, include: { destination: true } });
-        if (pkg?.destination?.name) destination = pkg.destination.name;
-        if (pkg?.days) tripDays = pkg.days;
-      }
-      const newDepartureId = await linkBookingToDeparture(booking.id, orgId(req), booking.packageId || null, booking.departureDate, destination, tripDays).catch(console.error);
-      // linkBookingToDeparture updates the DB row directly — reflect that on
-      // the in-memory object too, so the API response (and the auto-cleanup
-      // check right below) see the departure this booking actually ends up
-      // on, not the one it had before this request.
-      if (newDepartureId) booking.departureId = newDepartureId;
-
-      // A package or departure-date change moves this booking onto a
-      // different Departure (linkBookingToDeparture finds-or-creates one
-      // keyed on the new packageId+date) — the one it left behind would
-      // otherwise sit there empty forever, same orphan class as the one
-      // deleteBooking already cleans up.
-      if (existing.departureId && newDepartureId && existing.departureId !== newDepartureId) {
-        const remaining = await prisma.booking.count({ where: { departureId: existing.departureId } });
-        if (remaining === 0) {
-          await prisma.departure.delete({ where: { id: existing.departureId } }).catch(() => {});
-        }
-      }
-    }
-
-    // Top up traveler placeholders if the headcount grew, and back-fill a
-    // Traveler Portal link for any booking confirmed before this feature shipped.
-    await createPlaceholderTravelers(booking.id, booking.numberOfTravelers, {
-      name: booking.travelerName, mobile: leadForDest?.phone, email: leadForDest?.email,
-    }).catch(console.error);
-    await generatePaymentSchedule(booking.id, booking.finalPrice, booking.departureDate).catch(console.error);
-    let travelerPortalToken: string | null = null;
-    if (!booking.travelerPortalTokenHash) {
-      travelerPortalToken = await issueTravelerPortalToken(booking.id, booking.departureDate).catch(() => null);
-    }
-
+    const { booking, travelerPortalToken } = await applyBookingChanges(id, req.body, { id: req.user!.id, name: req.user!.name }, orgId(req));
     res.json({ success: true, data: { ...booking, travelerPortalToken } });
+  } catch {
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+};
+
+// ─── Pending change (for the edit form to show "awaiting approval") ─────────
+
+export const getPendingBookingChange = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const pending = await prisma.approvalRequest.findFirst({
+      where: { entityType: 'BOOKING', entityId: id, type: 'BOOKING_CHANGE', status: 'PENDING' },
+      include: { requestedBy: { select: { id: true, name: true } } },
+    });
+    if (!pending) { res.json({ success: true, data: null }); return; }
+    res.json({ success: true, data: { ...pending, payload: JSON.parse(pending.payload) } });
   } catch {
     res.status(500).json({ success: false, error: 'Internal server error' });
   }

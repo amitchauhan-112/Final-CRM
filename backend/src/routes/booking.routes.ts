@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getBookingByLead, getBookingDocuments, createBooking, updateBooking, deleteBooking, markReviewCollected, markReferralReceived } from '../controllers/booking.controller.js';
+import { getBookingByLead, getBookingDocuments, createBooking, updateBooking, deleteBooking, markReviewCollected, markReferralReceived, getPendingBookingChange } from '../controllers/booking.controller.js';
 import { authenticate, requireAdmin } from '../middleware/auth.js';
 
 const router = Router();
@@ -7,6 +7,7 @@ router.use(authenticate);
 
 router.get('/lead/:leadId', getBookingByLead);
 router.get('/:id/documents', getBookingDocuments);
+router.get('/:id/pending-change', getPendingBookingChange);
 router.post('/', createBooking);
 router.put('/:id', updateBooking);
 router.delete('/:id', requireAdmin, deleteBooking);

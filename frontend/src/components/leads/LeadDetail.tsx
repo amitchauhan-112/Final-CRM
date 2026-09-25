@@ -4,7 +4,7 @@ import {
   Users, MapPin, MessageSquare, Clock, CheckCircle, Edit, ArrowRightLeft,
   Star, Save, FileText, Activity, X, Utensils, BedDouble, Package,
   IndianRupee, ChevronRight, CreditCard, Trash2, Plus, CheckSquare, AlertTriangle, Download,
-  MessageCircle,
+  MessageCircle, Check,
 } from 'lucide-react';
 import { Lead, LeadStatus, Booking, Payment, BookingTask, TaskStatus, TaskType, TaskDepartment, FinanceDocumentType } from '../../types/index';
 import { useLead, useUpdateLead, useTransferLead, useLeadJourney } from '../../hooks/useLeads';
@@ -31,6 +31,7 @@ import {
   blockDecimalKey,
 } from '../../utils/helpers';
 import { useAuthStore } from '../../store/authStore';
+import { usePendingApprovals, useApproveRequest, useRejectRequest } from '../../hooks/useApprovals';
 import toast from 'react-hot-toast';
 
 interface LeadDetailProps {
@@ -553,6 +554,13 @@ function PaymentsTab({ booking }: { booking: Booking }) {
   const { data: usersData } = useUsers({ limit: 100, allRoles: true });
   const recordPayment = useRecordPayment();
   const deletePayment = useDeletePayment();
+  // Finance's proposed payment corrections that are waiting on me (the
+  // person who originally recorded that payment) or Admin to confirm.
+  const { data: approvalsData } = usePendingApprovals();
+  const approveRequest = useApproveRequest();
+  const rejectRequest = useRejectRequest();
+  const pendingCorrectionFor = (paymentId: string) =>
+    (approvalsData?.data ?? []).find((a) => a.type === 'PAYMENT_CORRECTION' && a.entityId === paymentId && a.status === 'PENDING');
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ amount: '', type: 'PARTIAL', method: 'CASH', reference: '', notes: '', handoverToId: user?.id ?? '' });
   const [proofFile, setProofFile] = useState<File | null>(null);
@@ -733,6 +741,40 @@ function PaymentsTab({ booking }: { booking: Booking }) {
                 {p.financeNote && (
                   <p className="text-[10px] text-orange-600 mt-1">{p.financeNote}</p>
                 )}
+                {(() => {
+                  const correction = pendingCorrectionFor(p.id);
+                  if (!correction) return null;
+                  const fieldLabel: Record<string, string> = { amount: 'Amount', method: 'Mode', reference: 'Reference', notes: 'Notes' };
+                  return (
+                    <div className="mt-2 p-2.5 rounded-lg bg-orange-50 border border-orange-200 space-y-1.5">
+                      <p className="text-[10px] font-bold text-orange-700 uppercase tracking-wide">Finance proposes a correction</p>
+                      {Object.keys(correction.payload.changes).map((field) => (
+                        <div key={field} className="flex items-center gap-1.5 text-xs">
+                          <span className="text-slate-400">{fieldLabel[field] ?? field}:</span>
+                          <span className="text-slate-400 line-through">{String(correction.payload.previous[field] ?? '—')}</span>
+                          <ChevronRight className="w-3 h-3 text-slate-300" />
+                          <span className="font-semibold text-slate-700">{String(correction.payload.changes[field] ?? '—')}</span>
+                        </div>
+                      ))}
+                      <div className="flex items-center gap-2 pt-1">
+                        <button
+                          onClick={() => approveRequest.mutate(correction.id)}
+                          disabled={approveRequest.isPending}
+                          className="btn-primary text-[11px] py-1 px-2"
+                        >
+                          <Check className="w-3 h-3" />Confirm
+                        </button>
+                        <button
+                          onClick={() => rejectRequest.mutate({ id: correction.id })}
+                          disabled={rejectRequest.isPending}
+                          className="btn-secondary text-[11px] py-1 px-2"
+                        >
+                          <X className="w-3 h-3" />Reject
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
               {p.status !== 'VERIFIED' && (
                 <button

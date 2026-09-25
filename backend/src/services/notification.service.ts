@@ -42,6 +42,10 @@ const TYPE_META: Record<string, { category: string; severity: string }> = {
   EXPENSE_APPROVED: { category: 'FINANCE', severity: 'SUCCESS' },
   EXPENSE_REJECTED: { category: 'FINANCE', severity: 'WARNING' },
   REFUND_REQUESTED: { category: 'FINANCE', severity: 'INFO' },
+  BOOKING_CHANGE_PENDING: { category: 'SYSTEM', severity: 'WARNING' },
+  PAYMENT_CORRECTION_PENDING: { category: 'FINANCE', severity: 'WARNING' },
+  APPROVAL_APPROVED: { category: 'SYSTEM', severity: 'SUCCESS' },
+  APPROVAL_REJECTED: { category: 'SYSTEM', severity: 'WARNING' },
 };
 const DEFAULT_META = { category: 'SYSTEM', severity: 'INFO' };
 

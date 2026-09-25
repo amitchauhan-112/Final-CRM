@@ -567,6 +567,29 @@ export interface Journey {
   currentStage: string | null;
 }
 
+// ─── Approval Queue ──────────────────────────────────────────────────────────
+
+export type ApprovalType = 'BOOKING_CHANGE' | 'PAYMENT_CORRECTION';
+export type ApprovalStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
+
+export interface ApprovalRequest {
+  id: string;
+  type: ApprovalType;
+  entityType: 'BOOKING' | 'PAYMENT';
+  entityId: string;
+  payload: { changes: Record<string, unknown>; previous: Record<string, unknown> };
+  note?: string;
+  requestedById: string;
+  requestedBy: Pick<User, 'id' | 'name'>;
+  approverRole?: string;
+  approverId?: string;
+  status: ApprovalStatus;
+  reviewNote?: string;
+  resolvedById?: string;
+  resolvedAt?: string;
+  createdAt: string;
+}
+
 export interface BookingWithLead extends Booking {
   lead: Pick<Lead, 'id' | 'name' | 'phone' | 'email' | 'destination' | 'preferredDate'> & {
     assignedTo?: Pick<User, 'id' | 'name'>;

@@ -35,6 +35,7 @@ import whatsappAccountRoutes from './whatsappAccount.routes.js';
 import whatsappConversationRoutes from './whatsappConversation.routes.js';
 import employeeCashRoutes from './employeeCash.routes.js';
 import tripCaptainRoutes from './tripCaptain.routes.js';
+import approvalRoutes from './approval.routes.js';
 
 const router = Router();
 
@@ -76,5 +77,6 @@ router.use('/whatsapp-accounts', whatsappAccountRoutes);
 router.use('/whatsapp', whatsappConversationRoutes);
 router.use('/employee-cash', employeeCashRoutes);
 router.use('/trip-captain', tripCaptainRoutes);
+router.use('/approvals', approvalRoutes);
 
 export default router;
