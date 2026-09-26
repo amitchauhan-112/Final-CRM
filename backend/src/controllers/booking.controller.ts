@@ -131,9 +131,18 @@ export const createBooking = async (req: AuthenticatedRequest, res: Response): P
     // must be collected to lock in a booking) — but not on later edits to an
     // already-confirmed booking, where amountPaid is intentionally not
     // resubmitted (see the upsert below).
-    const existingBookingForLead = await prisma.booking.findUnique({ where: { leadId }, select: { id: true } });
+    const existingBookingForLead = await prisma.booking.findUnique({ where: { leadId }, select: { id: true, status: true } });
     if (!existingBookingForLead && (amountPaid === undefined || Number(amountPaid) <= 0)) {
       res.status(400).json({ success: false, error: 'Amount paid is required to confirm a booking — enter the advance received.' }); return;
+    }
+    // This endpoint's upsert is meant for confirming a lead's booking for the
+    // FIRST time — an already-ACTIVE booking must go through updateBooking
+    // instead, which is what actually routes a non-Admin's edit through the
+    // Admin approval queue. Without this, anyone could bypass that gate
+    // entirely by resubmitting the confirm form as if it were brand new.
+    if (existingBookingForLead && existingBookingForLead.status === 'ACTIVE' && req.user?.role !== 'ADMIN') {
+      res.status(409).json({ success: false, error: 'This booking is already confirmed — use Edit Booking Details to propose a change.' });
+      return;
     }
 
     // amountPaid is never credited directly — it only increases once Finance
@@ -317,7 +326,7 @@ export const createBooking = async (req: AuthenticatedRequest, res: Response): P
 // Same field-validation `updateBooking` has always done — pulled out so both
 // the direct-apply path (Admin) and the propose-for-approval path (everyone
 // else) reject a bad payload up front, before an ApprovalRequest is ever created.
-function validateBookingChangePayload(existing: { departureDate: Date | null; returnDate: Date | null; balanceDueDate: Date | null }, body: Record<string, unknown>): string | null {
+export function validateBookingChangePayload(existing: { departureDate: Date | null; returnDate: Date | null; balanceDueDate: Date | null }, body: Record<string, unknown>): string | null {
   const { aadharNumber, finalPrice, foodPreference, roomSharing, departureDate, returnDate, balanceDueDate } = body as any;
 
   if (aadharNumber && !/^\d{12}$/.test(String(aadharNumber).replace(/\s/g, ''))) return 'Aadhar number must be 12 digits';
@@ -472,6 +481,60 @@ export async function applyBookingChanges(
   return { booking, travelerPortalToken };
 }
 
+// The exact set of fields applyBookingChanges actually reads — anything else
+// in the request body (leadId, amountPaid, paymentMode, etc., all of which
+// BookingConfirmModal submits on every save) must never leak into a proposed
+// change: it isn't a real Booking field, doesn't belong in an approval diff,
+// and would otherwise turn a one-field edit into a wall of no-op rows.
+const BOOKING_CHANGE_FIELDS = [
+  'travelerName', 'numberOfTravelers', 'aadharNumber', 'foodPreference', 'roomSharing',
+  'departureLocation', 'departurePackage', 'tourType', 'specialRequest', 'bookingNotes',
+  'finalPrice', 'balanceDueDate', 'status', 'packageId', 'departureDate', 'returnDate',
+] as const;
+const BOOKING_DATE_ONLY_FIELDS = new Set(['balanceDueDate', 'departureDate', 'returnDate']);
+
+// Builds the {changes, previous} pair for a proposed booking edit — only the
+// fields that are (a) actually editable on a Booking and (b) actually
+// different from the current row, normalized the same way applyBookingChanges
+// itself normalizes them, so the diff Admin reviews matches what would really
+// change and a no-op resubmission never creates an empty approval request.
+function computeBookingChangeDiff(existing: Record<string, any>, body: Record<string, unknown>) {
+  const changes: Record<string, unknown> = {};
+  const previous: Record<string, unknown> = {};
+
+  for (const field of BOOKING_CHANGE_FIELDS) {
+    if (!(field in body)) continue;
+    const raw = (body as any)[field];
+    let normalizedNew: unknown;
+    let normalizedOld: unknown;
+
+    if (BOOKING_DATE_ONLY_FIELDS.has(field)) {
+      normalizedNew = raw ? new Date(raw as string).toISOString().slice(0, 10) : null;
+      const oldDate = existing[field] as Date | null;
+      normalizedOld = oldDate ? oldDate.toISOString().slice(0, 10) : null;
+    } else if (field === 'finalPrice' || field === 'numberOfTravelers') {
+      normalizedNew = Number(raw);
+      normalizedOld = existing[field];
+    } else if (field === 'packageId') {
+      normalizedNew = raw || null;
+      normalizedOld = existing[field];
+    } else if (['aadharNumber', 'departureLocation', 'departurePackage', 'specialRequest', 'bookingNotes'].includes(field)) {
+      normalizedNew = (raw as string | undefined)?.trim() || null;
+      normalizedOld = existing[field];
+    } else {
+      normalizedNew = raw;
+      normalizedOld = existing[field];
+    }
+
+    if (normalizedNew !== normalizedOld) {
+      changes[field] = raw;
+      previous[field] = existing[field];
+    }
+  }
+
+  return { changes, previous };
+}
+
 export const updateBooking = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
@@ -488,20 +551,22 @@ export const updateBooking = async (req: AuthenticatedRequest, res: Response): P
     // anyone other than Admin needs Admin sign-off before it applies. Admin's own
     // edits, and edits to CANCELLED/COMPLETED bookings, still apply immediately.
     if (existing.status === 'ACTIVE' && req.user?.role !== 'ADMIN') {
+      const { changes, previous } = computeBookingChangeDiff(existing, req.body);
+
+      if (Object.keys(changes).length === 0) {
+        // Nothing actually changed (e.g. the form was resubmitted as-is) —
+        // no need to create a no-op approval request or bother Admin with it.
+        res.json({ success: true, data: existing });
+        return;
+      }
+
       const alreadyPending = await prisma.approvalRequest.findFirst({
-        where: { entityType: 'BOOKING', entityId: id, status: 'PENDING' },
+        where: { entityType: 'BOOKING', entityId: id, type: 'BOOKING_CHANGE', status: 'PENDING' },
       });
       if (alreadyPending) {
         res.status(409).json({ success: false, error: 'A change to this booking is already pending Admin approval' });
         return;
       }
-
-      // Capture the current value of every field being changed alongside the
-      // proposed new value, so Admin's approval queue can show an accurate
-      // old→new diff without re-fetching (and being confused by) whatever the
-      // booking's live state happens to be by the time they review it.
-      const previous: Record<string, unknown> = {};
-      for (const key of Object.keys(req.body)) previous[key] = (existing as any)[key];
 
       const approval = await prisma.approvalRequest.create({
         data: {
@@ -509,7 +574,7 @@ export const updateBooking = async (req: AuthenticatedRequest, res: Response): P
           type: 'BOOKING_CHANGE',
           entityType: 'BOOKING',
           entityId: id,
-          payload: JSON.stringify({ changes: req.body, previous }),
+          payload: JSON.stringify({ changes, previous }),
           requestedById: req.user!.id,
           approverRole: 'ADMIN',
         },
@@ -541,6 +606,12 @@ export const updateBooking = async (req: AuthenticatedRequest, res: Response): P
 export const getPendingBookingChange = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
+    const booking = await prisma.booking.findFirst({
+      where: { id, ...(orgId(req) ? { organizationId: orgId(req) } : {}) },
+      select: { id: true },
+    });
+    if (!booking) { res.status(404).json({ success: false, error: 'Booking not found' }); return; }
+
     const pending = await prisma.approvalRequest.findFirst({
       where: { entityType: 'BOOKING', entityId: id, type: 'BOOKING_CHANGE', status: 'PENDING' },
       include: { requestedBy: { select: { id: true, name: true } } },
@@ -573,6 +644,14 @@ export const deleteBooking = async (req: AuthenticatedRequest, res: Response): P
       select: { id: true, bookingNumber: true, travelerName: true, leadId: true, departureId: true },
     });
     if (!existing) { res.status(404).json({ success: false, error: 'Booking not found' }); return; }
+
+    // Admin already has full authority to resolve any approval directly —
+    // don't leave a pending BOOKING_CHANGE request permanently stuck
+    // (unable to apply, reject, or cancel) once its booking is gone.
+    await prisma.approvalRequest.updateMany({
+      where: { entityType: 'BOOKING', entityId: id, status: 'PENDING' },
+      data: { status: 'REJECTED', reviewNote: 'Booking was deleted', resolvedById: req.user!.id, resolvedAt: new Date() },
+    });
 
     await prisma.booking.delete({ where: { id } });
 

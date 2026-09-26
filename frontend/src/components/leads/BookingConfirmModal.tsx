@@ -494,6 +494,7 @@ export default function BookingConfirmModal({ open, onClose, lead, existingBooki
             <p className="text-xs text-amber-700">
               Proposed by {pendingChange.requestedBy.name}: {Object.keys(pendingChange.payload.changes).join(', ')}
             </p>
+            {(pendingChange.requestedById === user?.id || user?.role === 'ADMIN') && (
             <button
               type="button"
               onClick={() => cancelRequest.mutate(pendingChange.id)}
@@ -502,6 +503,7 @@ export default function BookingConfirmModal({ open, onClose, lead, existingBooki
             >
               {cancelRequest.isPending ? 'Cancelling…' : 'Cancel this request'}
             </button>
+            )}
           </div>
         )}
 

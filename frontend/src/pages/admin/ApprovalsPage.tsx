@@ -16,7 +16,7 @@ const FIELD_LABEL: Record<string, string> = {
   departurePackage: 'Departure Package', tourType: 'Tour Type', specialRequest: 'Special Request',
   bookingNotes: 'Booking Notes', finalPrice: 'Final Price', balanceDueDate: 'Balance Due Date',
   status: 'Status', packageId: 'Package', departureDate: 'Departure Date', returnDate: 'Return Date',
-  amount: 'Amount', method: 'Payment Method', reference: 'Reference', notes: 'Notes',
+  amount: 'Amount', method: 'Payment Method', reference: 'Reference', notes: 'Notes', handoverToId: 'Handover To',
 };
 
 const CURRENCY_FIELDS = new Set(['finalPrice', 'amount']);

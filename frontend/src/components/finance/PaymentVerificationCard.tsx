@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { Phone, Map, User, IndianRupee, Hash, Image, Check, X, MessageSquareWarning, PencilLine } from 'lucide-react';
 import { useApprovePayment, useRejectPayment, useRequestCorrection, useProposeCorrection } from '../../hooks/useFinance';
+import { useUsers } from '../../hooks/useUsers';
 import { Payment } from '../../types/index';
 import Modal from '../ui/Modal';
-import { formatCurrency, formatDate, cn } from '../../utils/helpers';
+import { formatCurrency, formatDate, cn, blockDecimalKey } from '../../utils/helpers';
 
 const METHOD_LABEL: Record<string, string> = { CASH: 'Cash', UPI: 'UPI', BANK_TRANSFER: 'Bank Transfer', CHEQUE: 'Cheque', ONLINE: 'Online' };
 
@@ -12,6 +13,8 @@ export default function PaymentVerificationCard({ payment }: { payment: Payment 
   const reject = useRejectPayment();
   const requestCorrection = useRequestCorrection();
   const proposeCorrection = useProposeCorrection();
+  const { data: usersData } = useUsers({ limit: 100, allRoles: true });
+  const activeEmployees = (usersData?.data ?? []).filter((u) => u.isActive);
   const [rejectOpen, setRejectOpen] = useState(false);
   const [correctionOpen, setCorrectionOpen] = useState(false);
   const [proposeOpen, setProposeOpen] = useState(false);
@@ -20,7 +23,11 @@ export default function PaymentVerificationCard({ payment }: { payment: Payment 
   const [proposedAmount, setProposedAmount] = useState(String(payment.amount));
   const [proposedMethod, setProposedMethod] = useState(payment.method);
   const [proposedReference, setProposedReference] = useState(payment.reference ?? '');
+  const [proposedHandoverToId, setProposedHandoverToId] = useState(payment.handoverToId ?? '');
   const [proposedNote, setProposedNote] = useState('');
+
+  const proposedAmountValid = proposedAmount.trim() !== '' && Number.isInteger(Number(proposedAmount)) && Number(proposedAmount) > 0;
+  const proposedHandoverValid = proposedMethod !== 'CASH' || !!proposedHandoverToId;
 
   const booking = payment.booking;
   const fullProofUrl = payment.proofUrl?.startsWith('/') ? `${window.location.origin}${payment.proofUrl}` : payment.proofUrl;
@@ -140,10 +147,13 @@ export default function PaymentVerificationCard({ payment }: { payment: Payment 
           <button onClick={() => setProposeOpen(false)} className="btn-secondary">Cancel</button>
           <button
             onClick={() => proposeCorrection.mutate(
-              { id: payment.id, amount: Number(proposedAmount), method: proposedMethod, reference: proposedReference, note: proposedNote },
+              {
+                id: payment.id, amount: Number(proposedAmount), method: proposedMethod, reference: proposedReference,
+                handoverToId: proposedMethod === 'CASH' ? proposedHandoverToId : undefined, note: proposedNote,
+              },
               { onSuccess: () => setProposeOpen(false) }
             )}
-            disabled={proposeCorrection.isPending} className="btn-primary"
+            disabled={proposeCorrection.isPending || !proposedAmountValid || !proposedHandoverValid} className="btn-primary"
           >
             {proposeCorrection.isPending ? 'Sending…' : 'Send to Sales for Confirmation'}
           </button>
@@ -155,7 +165,8 @@ export default function PaymentVerificationCard({ payment }: { payment: Payment 
           </p>
           <div>
             <label className="label">Correct Amount (₹)</label>
-            <input type="number" value={proposedAmount} onChange={(e) => setProposedAmount(e.target.value)} className="input" />
+            <input type="number" min={1} step="1" onKeyDown={blockDecimalKey} value={proposedAmount} onChange={(e) => setProposedAmount(e.target.value)} className="input" />
+            {!proposedAmountValid && <p className="text-xs text-red-500 mt-1">Enter a whole number greater than 0</p>}
           </div>
           <div>
             <label className="label">Correct Payment Mode</label>
@@ -163,6 +174,15 @@ export default function PaymentVerificationCard({ payment }: { payment: Payment 
               {Object.entries(METHOD_LABEL).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
             </select>
           </div>
+          {proposedMethod === 'CASH' && (
+            <div>
+              <label className="label">Handover To *</label>
+              <select value={proposedHandoverToId} onChange={(e) => setProposedHandoverToId(e.target.value)} className="input">
+                <option value="">Select employee…</option>
+                {activeEmployees.map((emp) => <option key={emp.id} value={emp.id}>{emp.name}</option>)}
+              </select>
+            </div>
+          )}
           <div>
             <label className="label">Reference / UTR</label>
             <input value={proposedReference} onChange={(e) => setProposedReference(e.target.value)} className="input" />

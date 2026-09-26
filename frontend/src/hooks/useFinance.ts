@@ -92,7 +92,7 @@ export function useRequestCorrection() {
 export function useProposeCorrection() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, ...payload }: { id: string; amount?: number; method?: string; reference?: string; notes?: string; note?: string }) =>
+    mutationFn: async ({ id, ...payload }: { id: string; amount?: number; method?: string; reference?: string; notes?: string; handoverToId?: string; note?: string }) =>
       (await api.put(`/finance/payments/${id}/propose-correction`, payload)).data,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['finance'] });

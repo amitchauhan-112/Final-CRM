@@ -744,7 +744,7 @@ function PaymentsTab({ booking }: { booking: Booking }) {
                 {(() => {
                   const correction = pendingCorrectionFor(p.id);
                   if (!correction) return null;
-                  const fieldLabel: Record<string, string> = { amount: 'Amount', method: 'Mode', reference: 'Reference', notes: 'Notes' };
+                  const fieldLabel: Record<string, string> = { amount: 'Amount', method: 'Mode', reference: 'Reference', notes: 'Notes', handoverToId: 'Handover To' };
                   return (
                     <div className="mt-2 p-2.5 rounded-lg bg-orange-50 border border-orange-200 space-y-1.5">
                       <p className="text-[10px] font-bold text-orange-700 uppercase tracking-wide">Finance proposes a correction</p>

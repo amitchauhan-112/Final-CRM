@@ -9,6 +9,18 @@ import { isWholeAmount, WHOLE_AMOUNT_ERROR } from '../utils/amountValidation.js'
 
 const orgId = (req: AuthenticatedRequest) => req.user?.organizationId ?? null;
 
+const PAYMENT_METHODS = ['CASH', 'UPI', 'BANK_TRANSFER', 'CHEQUE', 'ONLINE'];
+
+// A pending PAYMENT_CORRECTION approval "owns" this payment's status until
+// it's resolved — every other action that would also touch status/financeNote
+// (verify, reject, resubmit, or a plain request-correction note) must wait,
+// otherwise the correction could be silently applied on top of (or under)
+// whatever that other action just did, double-crediting or losing the fix.
+const hasPendingCorrection = (paymentId: string) =>
+  prisma.approvalRequest.findFirst({
+    where: { entityType: 'PAYMENT', entityId: paymentId, type: 'PAYMENT_CORRECTION', status: 'PENDING' },
+  });
+
 // Whoever submitted the payment proof isn't always the lead's actual Sales
 // owner — Ops/Finance sometimes enter a payment on the customer's behalf.
 // Notify both: the submitter (so they know what happened to what they
@@ -149,13 +161,17 @@ export const deletePayment = async (req: AuthenticatedRequest, res: Response): P
   try {
     const { bookingId, id } = req.params;
     const payment = await prisma.payment.findFirst({
-      where: { id, bookingId },
+      where: { id, bookingId, ...(orgId(req) ? { booking: { organizationId: orgId(req) } } : {}) },
       include: { booking: true },
     });
     if (!payment) { res.status(404).json({ success: false, error: 'Payment not found' }); return; }
 
     if (payment.status === 'VERIFIED') {
       res.status(400).json({ success: false, error: 'Verified payments cannot be deleted — use the Refund workflow instead' });
+      return;
+    }
+    if (await hasPendingCorrection(id)) {
+      res.status(409).json({ success: false, error: 'A correction is pending approval on this payment — resolve that first' });
       return;
     }
 
@@ -178,6 +194,10 @@ export const approvePayment = async (req: AuthenticatedRequest, res: Response): 
     if (!payment) { res.status(404).json({ success: false, error: 'Payment not found' }); return; }
     if (orgId(req) && payment.booking.organizationId !== orgId(req)) { res.status(404).json({ success: false, error: 'Payment not found' }); return; }
     if (payment.status === 'VERIFIED') { res.status(400).json({ success: false, error: 'Payment already verified' }); return; }
+    if (await hasPendingCorrection(id)) {
+      res.status(409).json({ success: false, error: 'A correction is pending approval on this payment — resolve that first' });
+      return;
+    }
 
     const isRefund = payment.type === 'REFUND';
     const newAmountPaid = isRefund
@@ -256,6 +276,10 @@ export const rejectPayment = async (req: AuthenticatedRequest, res: Response): P
     if (!payment) { res.status(404).json({ success: false, error: 'Payment not found' }); return; }
     if (orgId(req) && payment.booking.organizationId !== orgId(req)) { res.status(404).json({ success: false, error: 'Payment not found' }); return; }
     if (payment.status === 'VERIFIED') { res.status(400).json({ success: false, error: 'Cannot reject an already-verified payment' }); return; }
+    if (await hasPendingCorrection(id)) {
+      res.status(409).json({ success: false, error: 'A correction is pending approval on this payment — resolve that first' });
+      return;
+    }
 
     const updated = await prisma.payment.update({
       where: { id },
@@ -296,6 +320,10 @@ export const requestCorrection = async (req: AuthenticatedRequest, res: Response
     if (!payment) { res.status(404).json({ success: false, error: 'Payment not found' }); return; }
     if (orgId(req) && payment.booking.organizationId !== orgId(req)) { res.status(404).json({ success: false, error: 'Payment not found' }); return; }
     if (payment.status === 'VERIFIED') { res.status(400).json({ success: false, error: 'Cannot request correction on an already-verified payment' }); return; }
+    if (await hasPendingCorrection(id)) {
+      res.status(409).json({ success: false, error: 'A correction is already pending approval on this payment' });
+      return;
+    }
 
     const updated = await prisma.payment.update({
       where: { id },
@@ -320,26 +348,51 @@ export const requestCorrection = async (req: AuthenticatedRequest, res: Response
 export const proposeCorrection = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    const { amount, method, reference, notes, note } = req.body;
+    const { amount, method, reference, notes, note, handoverToId } = req.body;
 
     const payment = await prisma.payment.findUnique({ where: { id }, include: { booking: { include: { lead: true } } } });
     if (!payment) { res.status(404).json({ success: false, error: 'Payment not found' }); return; }
     if (orgId(req) && payment.booking.organizationId !== orgId(req)) { res.status(404).json({ success: false, error: 'Payment not found' }); return; }
     if (payment.status === 'VERIFIED') { res.status(400).json({ success: false, error: 'Cannot propose a correction on an already-verified payment' }); return; }
 
-    const existingPending = await prisma.approvalRequest.findFirst({
-      where: { entityType: 'PAYMENT', entityId: id, type: 'PAYMENT_CORRECTION', status: 'PENDING' },
-    });
+    if (amount !== undefined) {
+      if (isNaN(Number(amount)) || Number(amount) <= 0) { res.status(400).json({ success: false, error: 'Valid amount is required' }); return; }
+      if (!isWholeAmount(amount)) { res.status(400).json({ success: false, error: WHOLE_AMOUNT_ERROR }); return; }
+    }
+    if (method !== undefined && !PAYMENT_METHODS.includes(method)) {
+      res.status(400).json({ success: false, error: 'A valid payment mode is required' }); return;
+    }
+    const resolvedMethod = method ?? payment.method;
+    const resolvedHandoverToId = handoverToId !== undefined ? handoverToId : payment.handoverToId;
+    if (resolvedMethod === 'CASH') {
+      if (!resolvedHandoverToId) { res.status(400).json({ success: false, error: 'Handover To is required for cash payments' }); return; }
+      const handoverTarget = await prisma.user.findUnique({ where: { id: resolvedHandoverToId } });
+      if (!handoverTarget || handoverTarget.organizationId !== orgId(req) || !handoverTarget.isActive) {
+        res.status(400).json({ success: false, error: 'Handover To must be an active employee' }); return;
+      }
+    }
+
+    const existingPending = await hasPendingCorrection(id);
     if (existingPending) { res.status(409).json({ success: false, error: 'A correction on this payment is already pending approval' }); return; }
 
     // Only include fields that actually differ, so the recipient sees a clean
-    // old→new diff instead of every field re-stated.
+    // old→new diff instead of every field re-stated. `previous` also captures
+    // status/financeNote (even though they're not user-editable) so a reject
+    // or cancel can restore exactly what was there before, instead of
+    // guessing it was always PENDING.
     const changes: Record<string, unknown> = {};
-    const previous: Record<string, unknown> = {};
+    const previous: Record<string, unknown> = { status: payment.status, financeNote: payment.financeNote };
     if (amount !== undefined && Number(amount) !== payment.amount) { changes.amount = Number(amount); previous.amount = payment.amount; }
     if (method !== undefined && method !== payment.method) { changes.method = method; previous.method = payment.method; }
     if (reference !== undefined && (reference?.trim() || null) !== payment.reference) { changes.reference = reference?.trim() || null; previous.reference = payment.reference; }
     if (notes !== undefined && (notes?.trim() || null) !== payment.notes) { changes.notes = notes?.trim() || null; previous.notes = payment.notes; }
+    if (handoverToId !== undefined && handoverToId !== payment.handoverToId) { changes.handoverToId = handoverToId || null; previous.handoverToId = payment.handoverToId; }
+    // If the mode is changing to/from CASH, the handover target must move
+    // with it even if the caller didn't explicitly touch handoverToId.
+    if (changes.method !== undefined && !('handoverToId' in changes)) {
+      if (changes.method === 'CASH' && resolvedHandoverToId !== payment.handoverToId) { changes.handoverToId = resolvedHandoverToId; previous.handoverToId = payment.handoverToId; }
+      else if (payment.method === 'CASH' && changes.method !== 'CASH') { changes.handoverToId = null; previous.handoverToId = payment.handoverToId; }
+    }
 
     if (Object.keys(changes).length === 0) {
       res.status(400).json({ success: false, error: 'Nothing to correct — the proposed values match the current payment' });
@@ -389,6 +442,10 @@ export const resubmitPayment = async (req: AuthenticatedRequest, res: Response):
     }
     if (payment.recordedById !== req.user?.id && req.user?.role !== 'ADMIN') {
       res.status(403).json({ success: false, error: 'Only the original recorder or an admin can resubmit this payment' });
+      return;
+    }
+    if (await hasPendingCorrection(id)) {
+      res.status(409).json({ success: false, error: 'Finance has proposed a correction on this payment — confirm or reject that instead of resubmitting' });
       return;
     }
 
