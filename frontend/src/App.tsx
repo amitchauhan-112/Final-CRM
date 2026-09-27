@@ -222,6 +222,7 @@ export default function App() {
         <Route index element={<Navigate to="/trip-captain/dashboard" replace />} />
         <Route path="dashboard" element={<TripCaptainDashboardPage />} />
         <Route path="trips/:id" element={<TripCaptainTripDetailPage />} />
+        <Route path="settings" element={<EmployeeSettingsPage />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />

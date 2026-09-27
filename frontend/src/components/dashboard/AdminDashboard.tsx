@@ -5,6 +5,7 @@ import {
   ArrowUp, ArrowDown, Minus, Trophy, Zap, Plus,
   ChevronRight, Flag, BarChart2,
   Sparkles, PhoneOff, Phone, CalendarCheck, XCircle,
+  Wallet, Map, ShieldCheck, IndianRupee, FolderKanban, MessageCircle,
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -354,6 +355,12 @@ function QuickActionsWidget() {
     { label: 'Confirmed',       icon: CheckCircle,color: 'text-green-600 bg-green-50 hover:bg-green-100 border-green-200',       action: () => navigate('/admin/leads?status=CONFIRMED') },
     { label: 'Campaigns',       icon: Megaphone,  color: 'text-violet-600 bg-violet-50 hover:bg-violet-100 border-violet-200',   action: () => navigate('/admin/campaigns') },
     { label: 'Reports',         icon: BarChart2,  color: 'text-sky-600 bg-sky-50 hover:bg-sky-100 border-sky-200',               action: () => navigate('/admin/reports') },
+    { label: 'Finance',         icon: Wallet,     color: 'text-emerald-600 bg-emerald-50 hover:bg-emerald-100 border-emerald-200', action: () => navigate('/admin/finance/dashboard') },
+    { label: 'Operations',      icon: Map,        color: 'text-cyan-600 bg-cyan-50 hover:bg-cyan-100 border-cyan-200',           action: () => navigate('/admin/operations/dashboard') },
+    { label: 'Approvals',       icon: ShieldCheck,color: 'text-amber-600 bg-amber-50 hover:bg-amber-100 border-amber-200',       action: () => navigate('/admin/approvals') },
+    { label: 'Payroll',         icon: IndianRupee,color: 'text-lime-600 bg-lime-50 hover:bg-lime-100 border-lime-200',           action: () => navigate('/admin/payroll') },
+    { label: 'Report Center',   icon: FolderKanban,color: 'text-indigo-600 bg-indigo-50 hover:bg-indigo-100 border-indigo-200',  action: () => navigate('/admin/report-center') },
+    { label: 'WhatsApp',        icon: MessageCircle,color: 'text-teal-600 bg-teal-50 hover:bg-teal-100 border-teal-200',        action: () => navigate('/admin/whatsapp') },
   ];
 
   return (

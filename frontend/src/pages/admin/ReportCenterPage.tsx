@@ -26,7 +26,7 @@ const CATEGORIES: ReportCategory[] = [
   { key: 'destination', label: 'Destination Reports', description: 'Revenue, growth, and refund % by destination', icon: MapPin, to: '/admin/business-intelligence?tab=destinations', color: 'bg-pink-100 text-pink-600' },
   { key: 'customer', label: 'Customer Reports', description: 'Lifetime value, retention, referrals', icon: Contact, to: '/admin/business-intelligence?tab=customers', color: 'bg-teal-100 text-teal-600' },
   { key: 'campaign', label: 'Campaign Reports', description: 'Leads, ROI, cost per lead/booking', icon: Megaphone, to: '/admin/business-intelligence?tab=campaigns', color: 'bg-orange-100 text-orange-600' },
-  { key: 'vendor', label: 'Vendor Reports', description: 'Vendor bills, payments, and running ledger', icon: Truck, to: '/admin/finance/vendor-ledger', color: 'bg-slate-200 text-slate-600' },
+  { key: 'vendor', label: 'Vendor Ledger', description: 'Every vendor\'s running balance — bills owed vs. payments made', icon: Truck, to: '/admin/finance/vendor-ledger', color: 'bg-slate-200 text-slate-600' },
   { key: 'department', label: 'Department Reports', description: 'Departments and designations', icon: Building2, to: '/admin/organization', color: 'bg-cyan-100 text-cyan-600' },
   { key: 'employee', label: 'Employee Reports', description: 'Revenue generated, task completion, response time', icon: UserCheck, to: '/admin/business-intelligence?tab=employees', color: 'bg-indigo-100 text-indigo-600' },
   { key: 'trip', label: 'Trip Reports', description: 'Per-trip profitability and margin', icon: PlaneTakeoff, to: '/admin/finance/reports', color: 'bg-red-100 text-red-600' },

@@ -940,12 +940,12 @@ function AuditTrail({ packageId }: { packageId: string }) {
 
 // ─── Package Detail Modal ─────────────────────────────────────────────────────
 
-function PackageDetailModal({ pkg, onClose, onEdit, canEdit }: {
-  pkg: Package; onClose: () => void; onEdit: () => void; canEdit: boolean;
+function PackageDetailModal({ pkg, onClose, onEdit, canEdit, initialTab }: {
+  pkg: Package; onClose: () => void; onEdit: () => void; canEdit: boolean; initialTab?: 'overview' | 'itinerary' | 'audit';
 }) {
   const currentUser = useAuthStore((s) => s.user);
   const isAdmin = currentUser?.role === 'ADMIN';
-  const [tab, setTab] = useState<'overview' | 'itinerary' | 'audit'>('overview');
+  const [tab, setTab] = useState<'overview' | 'itinerary' | 'audit'>(initialTab ?? 'overview');
   const highlights = parseList(pkg.highlights);
   const inclusions = parseList(pkg.inclusions);
   const exclusions = parseList(pkg.exclusions);
@@ -1105,8 +1105,8 @@ function PackageDetailModal({ pkg, onClose, onEdit, canEdit }: {
 
 // ─── Package Card ─────────────────────────────────────────────────────────────
 
-function PackageCard({ pkg, onView, onEdit, onDelete, canMutate }: {
-  pkg: Package; onView: () => void; onEdit: () => void; onDelete: () => void; canMutate: boolean;
+function PackageCard({ pkg, onView, onViewItinerary, onEdit, onDelete, canMutate }: {
+  pkg: Package; onView: () => void; onViewItinerary: () => void; onEdit: () => void; onDelete: () => void; canMutate: boolean;
 }) {
   const highlights = parseList(pkg.highlights);
 
@@ -1203,9 +1203,14 @@ function PackageCard({ pkg, onView, onEdit, onDelete, canMutate }: {
             <span className="flex items-center gap-1"><BookOpen className="w-3 h-3" />{pkg._count.bookings} bookings</span>
           )}
         </div>
-        <button onClick={onView} className="text-xs text-primary-600 hover:text-primary-700 font-medium flex items-center gap-0.5">
-          View <ChevronRight className="w-3 h-3" />
-        </button>
+        <div className="flex items-center gap-3">
+          <button onClick={onViewItinerary} className="text-xs text-slate-500 hover:text-primary-700 font-medium flex items-center gap-0.5">
+            <Calendar className="w-3 h-3" />Itinerary
+          </button>
+          <button onClick={onView} className="text-xs text-primary-600 hover:text-primary-700 font-medium flex items-center gap-0.5">
+            View <ChevronRight className="w-3 h-3" />
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -1222,6 +1227,7 @@ export default function PackagesPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<Package | null>(null);
   const [viewing, setViewing] = useState<Package | null>(null);
+  const [viewingTab, setViewingTab] = useState<'overview' | 'itinerary' | 'audit'>('overview');
   const [deleteTarget, setDeleteTarget] = useState<Package | null>(null);
   const currentUser = useAuthStore((s) => s.user);
   const isAdmin = currentUser?.role === 'ADMIN';
@@ -1337,7 +1343,8 @@ export default function PackagesPage() {
               key={pkg.id}
               pkg={pkg}
               canMutate={pkgCanMutate(pkg)}
-              onView={() => setViewing(pkg)}
+              onView={() => { setViewingTab('overview'); setViewing(pkg); }}
+              onViewItinerary={() => { setViewingTab('itinerary'); setViewing(pkg); }}
               onEdit={() => openEdit(pkg)}
               onDelete={() => setDeleteTarget(pkg)}
             />
@@ -1350,6 +1357,7 @@ export default function PackagesPage() {
         <PackageDetailModal
           pkg={viewing}
           canEdit={pkgCanMutate(viewing)}
+          initialTab={viewingTab}
           onClose={() => setViewing(null)}
           onEdit={() => openEdit(viewing)}
         />

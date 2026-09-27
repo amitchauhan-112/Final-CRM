@@ -73,6 +73,7 @@ export default function DeparturesPage() {
         <div className="flex items-center gap-1.5">
           <Map className="w-3.5 h-3.5 text-slate-400" />
           <span className="font-medium text-slate-700">{d.destination}</span>
+          {d.b2bVendorId && <span className="badge bg-violet-50 text-violet-700 text-[10px]" title="This trip was resold to another travel company">B2B</span>}
         </div>
       ),
     },

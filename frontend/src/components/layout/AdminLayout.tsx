@@ -6,7 +6,7 @@ import {
   MessageSquarePlus, Activity, BarChart2, Building2,
   UserCheck, Database, ChevronRight, Package, BookOpen,
   Contact, Wallet, Map, Home, Gauge, LineChart, FolderKanban, Settings2, Zap, HeartPulse, IndianRupee,
-  MessageCircle, Radar, ShieldCheck,
+  MessageCircle, Radar, ShieldCheck, Receipt,
 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import { useNotifications, useMarkAllAsRead, useMarkAsRead } from '../../hooks/useNotifications';
@@ -38,6 +38,7 @@ const NAV: NavEntry[] = [
     items: [
       { to: '/admin/leads',     label: 'Leads',     icon: UserCheck },
       { to: '/admin/campaigns', label: 'Campaigns', icon: Megaphone },
+      { to: '/admin/whatsapp',  label: 'WhatsApp Inbox', icon: MessageCircle },
       { to: '/admin/employee-monitoring', label: 'Employee Monitoring', icon: Radar },
     ],
   },
@@ -51,6 +52,7 @@ const NAV: NavEntry[] = [
       { to: '/admin/packages',   label: 'Packages',   icon: Package },
       { to: '/admin/bookings',   label: 'Bookings',   icon: BookOpen },
       { to: '/admin/customers',  label: 'Customers',  icon: Contact },
+      { to: '/admin/finance/ledger', label: 'Customer Ledger', icon: Receipt },
       { to: '/admin/finance',    label: 'Finance',    icon: Wallet },
       { to: '/admin/operations', label: 'Operations', icon: Map },
       { to: '/admin/masters',    label: 'Masters',    icon: Database },

@@ -5,10 +5,18 @@ import {
 import { useDeparture, useUpdateDeparture } from '../../hooks/useOperations';
 import { Skeleton } from '../../components/ui/Skeleton';
 import Tabs, { useUrlTab } from '../../components/ui/Tabs';
+import TripOverviewTab from '../../components/operations/TripOverviewTab';
+import PassengerTable from '../../components/operations/PassengerTable';
+import GroupSummaryGrid from '../../components/operations/GroupSummaryGrid';
+import TripProfitabilityCard from '../../components/operations/TripProfitabilityCard';
 import HotelsTab from '../../components/operations/HotelsTab';
 import VehiclesTab from '../../components/operations/VehiclesTab';
 import TripCaptainTab from '../../components/operations/TripCaptainTab';
 import OthersTab from '../../components/operations/OthersTab';
+import TimelineTab from '../../components/operations/TimelineTab';
+import ChecklistTab from '../../components/operations/ChecklistTab';
+import DocumentsTab from '../../components/operations/DocumentsTab';
+import NotesTab from '../../components/operations/NotesTab';
 import B2BSaleCard from '../../components/operations/B2BSaleCard';
 import { cn } from '../../utils/helpers';
 
@@ -19,16 +27,25 @@ const STATUS_BADGE: Record<string, string> = {
   CANCELLED: 'bg-red-50 text-red-600',
 };
 
-// Only these 4 tabs are rendered here — Overview/Passengers/Group Summary/
-// Timeline/Checklist/Documents/Notes were deliberately dropped from this page
-// per an explicit request to show only the operational requirements that need
-// action. Their components/routes/backend data are untouched — only unmounted
-// from here — so restoring any of them later is a small, low-risk change.
+// Full tab set restored — Overview/Passengers/Group Summary/Timeline/
+// Checklist/Documents/Notes had been dropped in an earlier pass to show only
+// the operational requirements that need action, which left several working
+// features (the Traveler Portal link + ID verification queue, chief among
+// them) with no way to reach them at all. Trip Captain/Hotel Required/
+// Vehicle Required/Others are the newer, richer tabs built after that pass —
+// kept as-is here, just reunited with the rest.
 const TABS = [
+  { key: 'overview', label: 'Overview' },
+  { key: 'passengers', label: 'Passengers' },
   { key: 'captain', label: 'Trip Captain' },
   { key: 'hotels', label: 'Hotel Required' },
   { key: 'vehicles', label: 'Vehicle Required' },
   { key: 'others', label: 'Others' },
+  { key: 'summary', label: 'Group Summary' },
+  { key: 'timeline', label: 'Timeline' },
+  { key: 'checklist', label: 'Checklist' },
+  { key: 'documents', label: 'Documents' },
+  { key: 'notes', label: 'Notes' },
 ] as const;
 type Tab = (typeof TABS)[number]['key'];
 
@@ -37,7 +54,7 @@ export default function DepartureDetailPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const base = location.pathname.startsWith('/admin') ? '/admin/operations' : '/operations';
-  const [tab, setTab] = useUrlTab<Tab>(TABS, 'captain');
+  const [tab, setTab] = useUrlTab<Tab>(TABS, 'overview');
   const searchParams = new URLSearchParams(location.search);
   const prefillCheckIn = searchParams.get('checkIn') ?? undefined;
   const prefillCheckOut = searchParams.get('checkOut') ?? undefined;
@@ -106,6 +123,8 @@ export default function DepartureDetailPage() {
 
       <Tabs tabs={TABS} active={tab} onChange={setTab} />
 
+      {tab === 'overview' && <TripOverviewTab departure={departure} onChangeTab={(t) => setTab(t as Tab)} />}
+      {tab === 'passengers' && <PassengerTable departure={departure} />}
       {tab === 'captain' && <TripCaptainTab departure={departure} />}
       {tab === 'hotels' && <HotelsTab
         departureId={departure.id}
@@ -122,6 +141,16 @@ export default function DepartureDetailPage() {
       />}
       {tab === 'vehicles' && <VehiclesTab departureId={departure.id} vehicles={departure.vehicles} totalTravelers={departure.groupSummary?.totalTravelers ?? 0} />}
       {tab === 'others' && <OthersTab departureId={departure.id} requirements={departure.requirements} />}
+      {tab === 'summary' && departure.groupSummary && (
+        <div className="space-y-4">
+          {departure.tripProfitability && <TripProfitabilityCard profitability={departure.tripProfitability} />}
+          <GroupSummaryGrid summary={departure.groupSummary} />
+        </div>
+      )}
+      {tab === 'timeline' && <TimelineTab departureId={departure.id} timeline={departure.timeline} departureDate={departure.departureDate} />}
+      {tab === 'checklist' && <ChecklistTab departureId={departure.id} checklist={departure.checklist} />}
+      {tab === 'documents' && <DocumentsTab departureId={departure.id} documents={departure.documents} />}
+      {tab === 'notes' && <NotesTab departureId={departure.id} notes={departure.notes} />}
     </div>
   );
 }

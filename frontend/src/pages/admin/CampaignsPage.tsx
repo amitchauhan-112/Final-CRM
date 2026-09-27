@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Plus, Target, CheckCircle, Megaphone, FileText, Users, MapPin, Calendar, TrendingUp, StickyNote, Paperclip, Archive, ChevronDown, ChevronUp, Download, Link2, FileSpreadsheet } from 'lucide-react';
+import { Plus, Target, CheckCircle, Megaphone, FileText, Users, MapPin, Calendar, TrendingUp, StickyNote, Paperclip, Archive, Download, Link2, FileSpreadsheet } from 'lucide-react';
 import { useCampaigns, useCampaign, useCampaignStats, useCreateCampaign, useUpdateCampaign, useDeleteCampaign } from '../../hooks/useCampaigns';
 import { useArchivedCampaigns, useArchiveDownload } from '../../hooks/useMetaConnection';
 import { Campaign, CampaignStatus, Lead } from '../../types/index';
@@ -239,7 +239,7 @@ export default function AdminCampaignsPage() {
   const [editCampaign, setEditCampaign] = useState<Campaign | null>(null);
   const [deleteCampaign, setDeleteCampaign] = useState<Campaign | null>(null);
   const [detailCampaignId, setDetailCampaignId] = useState<string | null>(null);
-  const [archivedOpen, setArchivedOpen] = useState(false);
+  const [viewingArchived, setViewingArchived] = useState(false);
 
   // Deep-linked from elsewhere (e.g. the "Active Campaigns" stat card on the
   // Admin Dashboard) — land straight on that status tab instead of "All".
@@ -310,10 +310,10 @@ export default function AdminCampaignsPage() {
         {STATUS_TABS.map((tab) => (
           <button
             key={tab.value}
-            onClick={() => setActiveTab(tab.value)}
+            onClick={() => { setActiveTab(tab.value); setViewingArchived(false); }}
             className={cn(
               'px-4 py-1.5 rounded-lg text-sm font-medium transition-all',
-              activeTab === tab.value
+              !viewingArchived && activeTab === tab.value
                 ? 'bg-white text-slate-900 shadow-sm'
                 : 'text-slate-500 hover:text-slate-700'
             )}
@@ -321,10 +321,69 @@ export default function AdminCampaignsPage() {
             {tab.label}
           </button>
         ))}
+        {archivedCampaigns.length > 0 && (
+          <button
+            onClick={() => setViewingArchived(true)}
+            className={cn(
+              'px-4 py-1.5 rounded-lg text-sm font-medium transition-all flex items-center gap-1.5',
+              viewingArchived
+                ? 'bg-white text-slate-900 shadow-sm'
+                : 'text-slate-500 hover:text-slate-700'
+            )}
+          >
+            <Archive className="w-3.5 h-3.5" />Archived ({archivedCampaigns.length})
+          </button>
+        )}
       </div>
 
-      {/* Campaign grid */}
-      {isLoading ? (
+      {viewingArchived ? (
+        <div className="card overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-slate-50 border-b border-slate-200">
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500">Campaign</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500">Destination</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500">Leads</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500">Archived On</th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500">Archive File</th>
+                </tr>
+              </thead>
+              <tbody>
+                {archivedCampaigns.map((ac) => (
+                  <tr key={ac.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
+                    <td className="px-4 py-3 font-medium text-slate-800">{ac.name}</td>
+                    <td className="px-4 py-3 text-slate-500">{ac.destination}</td>
+                    <td className="px-4 py-3 text-slate-600">{ac._count.leads}</td>
+                    <td className="px-4 py-3 text-xs text-slate-500">{formatDate(ac.archivedAt)}</td>
+                    <td className="px-4 py-3 text-right">
+                      {ac.archiveS3Key ? (
+                        <button
+                          onClick={async () => {
+                            try {
+                              const result = await archiveDownload.mutateAsync(ac.id);
+                              window.open(result.url, '_blank', 'noopener,noreferrer');
+                            } catch {
+                              toast.error('Failed to get download link');
+                            }
+                          }}
+                          disabled={archiveDownload.isPending}
+                          className="btn-secondary text-xs py-1 px-3 inline-flex items-center gap-1 ml-auto"
+                        >
+                          <Download className="w-3 h-3" />
+                          Download
+                        </button>
+                      ) : (
+                        <span className="text-xs text-slate-400">—</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : isLoading ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {[1, 2, 3, 4].map((i) => (
             <div key={i} className="card overflow-hidden">
@@ -360,68 +419,6 @@ export default function AdminCampaignsPage() {
               onDelete={setDeleteCampaign}
             />
           ))}
-        </div>
-      )}
-
-      {/* Archived campaigns */}
-      {archivedCampaigns.length > 0 && (
-        <div>
-          <button
-            onClick={() => setArchivedOpen(!archivedOpen)}
-            className="flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-slate-700 transition-colors py-1.5"
-          >
-            <Archive className="w-4 h-4" />
-            Archived ({archivedCampaigns.length})
-            {archivedOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-          </button>
-          {archivedOpen && (
-            <div className="card overflow-hidden mt-2">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="bg-slate-50 border-b border-slate-200">
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500">Campaign</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500">Destination</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500">Leads</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500">Archived On</th>
-                      <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500">Archive File</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {archivedCampaigns.map((ac) => (
-                      <tr key={ac.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
-                        <td className="px-4 py-3 font-medium text-slate-800">{ac.name}</td>
-                        <td className="px-4 py-3 text-slate-500">{ac.destination}</td>
-                        <td className="px-4 py-3 text-slate-600">{ac._count.leads}</td>
-                        <td className="px-4 py-3 text-xs text-slate-500">{formatDate(ac.archivedAt)}</td>
-                        <td className="px-4 py-3 text-right">
-                          {ac.archiveS3Key ? (
-                            <button
-                              onClick={async () => {
-                                try {
-                                  const result = await archiveDownload.mutateAsync(ac.id);
-                                  window.open(result.url, '_blank', 'noopener,noreferrer');
-                                } catch {
-                                  toast.error('Failed to get download link');
-                                }
-                              }}
-                              disabled={archiveDownload.isPending}
-                              className="btn-secondary text-xs py-1 px-3 inline-flex items-center gap-1 ml-auto"
-                            >
-                              <Download className="w-3 h-3" />
-                              Download
-                            </button>
-                          ) : (
-                            <span className="text-xs text-slate-400">No file</span>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
         </div>
       )}
 

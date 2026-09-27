@@ -39,7 +39,20 @@ export const listPendingApprovals = async (req: AuthenticatedRequest, res: Respo
       },
       orderBy: { createdAt: 'desc' },
     });
-    res.json({ success: true, data: requests.map((r) => ({ ...r, payload: JSON.parse(r.payload) })) });
+
+    // Resolve which lead each request belongs to, so the UI (dashboard cards,
+    // notifications) can deep-link straight to it instead of just a count.
+    const withLeadId = await Promise.all(requests.map(async (r) => {
+      let leadId: string | undefined;
+      if (r.type === 'BOOKING_CHANGE') {
+        leadId = (await prisma.booking.findUnique({ where: { id: r.entityId }, select: { leadId: true } }))?.leadId;
+      } else if (r.type === 'PAYMENT_CORRECTION') {
+        leadId = (await prisma.payment.findUnique({ where: { id: r.entityId }, select: { booking: { select: { leadId: true } } } }))?.booking.leadId;
+      }
+      return { ...r, leadId, payload: JSON.parse(r.payload) };
+    }));
+
+    res.json({ success: true, data: withLeadId });
   } catch {
     res.status(500).json({ success: false, error: 'Internal server error' });
   }

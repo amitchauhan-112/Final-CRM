@@ -5,6 +5,7 @@ import {
   Truck, FileBarChart, Bell, LogOut, ChevronDown, Menu, X, Settings, UserCircle, Receipt, ClipboardList, IndianRupee, Wallet,
 } from 'lucide-react';
 import LeadLookup from './LeadLookup';
+import GlobalSearch from './GlobalSearch';
 import { useAuthStore } from '../../store/authStore';
 import { useNotifications, useMarkAllAsRead, useMarkAsRead } from '../../hooks/useNotifications';
 import Avatar from '../ui/Avatar';
@@ -137,6 +138,7 @@ export default function FinanceLayout() {
 
           <div className="flex items-center gap-2">
             <LeadLookup />
+            <GlobalSearch />
             <div ref={notifRef} className="relative">
               <button
                 onClick={() => setNotifOpen(!notifOpen)}

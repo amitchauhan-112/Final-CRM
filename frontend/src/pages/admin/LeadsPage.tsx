@@ -486,6 +486,7 @@ export default function AdminLeadsPage() {
                 className="rounded border-slate-300 text-primary-600"
               />
               <span className="text-xs text-slate-500 font-medium">Select all</span>
+              <span className="text-xs text-slate-400">— tick a few to bulk-update their status</span>
             </div>
             <Table
               columns={columns}

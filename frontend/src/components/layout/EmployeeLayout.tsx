@@ -6,6 +6,7 @@ import {
   Package, UserCheck, CheckSquare, Target, MessageCircle, BookOpen, Wallet,
 } from 'lucide-react';
 import LeadLookup from './LeadLookup';
+import GlobalSearch from './GlobalSearch';
 import { useAuthStore } from '../../store/authStore';
 import { useNotifications, useMarkAllAsRead, useMarkAsRead } from '../../hooks/useNotifications';
 import FollowUpPopup from './FollowUpPopup';
@@ -17,6 +18,7 @@ import { SEVERITY_DOT, CATEGORIES } from '../../utils/notificationMeta';
 const navLinks = [
   { to: '/employee/dashboard',  label: 'Dashboard',    icon: LayoutDashboard },
   { to: '/employee/leads',      label: 'My Leads',     icon: Users },
+  { to: '/employee/whatsapp',   label: 'WhatsApp',     icon: MessageCircle },
   { to: '/employee/follow-ups', label: 'Follow-ups',   icon: Calendar },
   { to: '/employee/tasks',      label: 'My Tasks',     icon: CheckSquare },
   { to: '/employee/packages',   label: 'Packages',     icon: Package },
@@ -137,6 +139,7 @@ export default function EmployeeLayout() {
 
           <div className="flex items-center gap-2">
             <LeadLookup />
+            <GlobalSearch />
             <div ref={notifRef} className="relative">
               <button
                 onClick={() => setNotifOpen(!notifOpen)}

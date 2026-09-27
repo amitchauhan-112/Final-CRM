@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, X, UserCheck, BookOpen, IndianRupee, Package, Building2, Truck, Contact, Users2, LucideIcon } from 'lucide-react';
 import { useGlobalSearch } from '../../hooks/useGlobalSearch';
+import { useAuthStore } from '../../store/authStore';
 import { SearchResults } from '../../types/index';
 
 const SECTIONS: { key: keyof SearchResults; label: string; icon: LucideIcon }[] = [
@@ -16,7 +17,44 @@ const SECTIONS: { key: keyof SearchResults; label: string; icon: LucideIcon }[] 
   { key: 'travelers', label: 'Traveller Records', icon: UserCheck },
 ];
 
+// Each role only has some of these pages of its own — resolve to null when
+// there's genuinely nowhere for that role to go, rather than sending them to
+// an /admin/... route RequireAuth will just bounce them out of.
+function resolvePath(key: string, item: any, role: string): string | null {
+  const opsBase = role === 'ADMIN' ? '/admin/operations' : role === 'OPERATIONS' ? '/operations' : null;
+  switch (key) {
+    case 'leads':
+      if (role === 'ADMIN') return `/admin/leads?id=${item.id}`;
+      if (role === 'EMPLOYEE') return `/employee/leads?id=${item.id}`;
+      return null;
+    case 'bookings':
+      if (role === 'ADMIN') return `/admin/leads?id=${item.leadId}`;
+      if (role === 'EMPLOYEE') return `/employee/leads?id=${item.leadId}`;
+      return null;
+    case 'payments':
+      if (role === 'ADMIN') return '/admin/finance/verification';
+      if (role === 'FINANCE') return '/finance/verification';
+      return null;
+    case 'packages':
+      if (role === 'ADMIN') return '/admin/packages';
+      if (role === 'EMPLOYEE') return '/employee/packages';
+      return null;
+    case 'hotels':
+    case 'vehicles':
+    case 'travelers':
+      return opsBase && item.departureId ? `${opsBase}/departures/${item.departureId}` : null;
+    case 'vendors':
+      return opsBase ? `${opsBase}/vendors/${item.id}` : null;
+    case 'users':
+      return role === 'ADMIN' ? '/admin/organization' : null;
+    default:
+      return null;
+  }
+}
+
 export default function GlobalSearch() {
+  const { user } = useAuthStore();
+  const role = user?.role ?? 'EMPLOYEE';
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const navigate = useNavigate();
@@ -45,25 +83,28 @@ export default function GlobalSearch() {
   };
 
   const renderRow = (key: string, item: any) => {
+    const path = resolvePath(key, item, role);
+    const rowClass = `w-full text-left px-3 py-2 rounded-lg ${path ? 'hover:bg-slate-50 cursor-pointer' : 'cursor-default opacity-70'}`;
+    const onClick = path ? () => goTo(path) : undefined;
     switch (key) {
       case 'leads':
-        return <button key={item.id} onClick={() => goTo(`/admin/leads?id=${item.id}`)} className="w-full text-left px-3 py-2 hover:bg-slate-50 rounded-lg"><p className="text-sm font-medium text-slate-800">{item.name}</p><p className="text-xs text-slate-400">{item.phone} · {item.status}</p></button>;
+        return <button key={item.id} onClick={onClick} className={rowClass}><p className="text-sm font-medium text-slate-800">{item.name}</p><p className="text-xs text-slate-400">{item.phone} · {item.status}</p></button>;
       case 'bookings':
-        return <button key={item.id} onClick={() => goTo(`/admin/leads?id=${item.leadId}`)} className="w-full text-left px-3 py-2 hover:bg-slate-50 rounded-lg"><p className="text-sm font-medium text-slate-800">{item.travelerName}</p><p className="text-xs text-slate-400">{item.bookingNumber ?? item.id.slice(0, 8)}</p></button>;
+        return <button key={item.id} onClick={onClick} className={rowClass}><p className="text-sm font-medium text-slate-800">{item.travelerName}</p><p className="text-xs text-slate-400">{item.bookingNumber ?? item.id.slice(0, 8)}</p></button>;
       case 'payments':
-        return <button key={item.id} onClick={() => goTo('/admin/finance/verification')} className="w-full text-left px-3 py-2 hover:bg-slate-50 rounded-lg"><p className="text-sm font-medium text-slate-800">₹{item.amount.toLocaleString()}</p><p className="text-xs text-slate-400">{item.reference ?? item.receiptNo ?? 'No reference'}</p></button>;
+        return <button key={item.id} onClick={onClick} className={rowClass}><p className="text-sm font-medium text-slate-800">₹{item.amount.toLocaleString()}</p><p className="text-xs text-slate-400">{item.reference ?? item.receiptNo ?? 'No reference'}</p></button>;
       case 'packages':
-        return <button key={item.id} onClick={() => goTo('/admin/packages')} className="w-full text-left px-3 py-2 hover:bg-slate-50 rounded-lg"><p className="text-sm font-medium text-slate-800">{item.name}</p><p className="text-xs text-slate-400">Package</p></button>;
+        return <button key={item.id} onClick={onClick} className={rowClass}><p className="text-sm font-medium text-slate-800">{item.name}</p><p className="text-xs text-slate-400">Package</p></button>;
       case 'hotels':
-        return <button key={item.id} onClick={() => goTo(`/admin/operations/departures/${item.departureId}`)} className="w-full text-left px-3 py-2 hover:bg-slate-50 rounded-lg"><p className="text-sm font-medium text-slate-800">{item.name}</p><p className="text-xs text-slate-400">View trip</p></button>;
+        return <button key={item.id} onClick={onClick} className={rowClass}><p className="text-sm font-medium text-slate-800">{item.name}</p><p className="text-xs text-slate-400">View trip</p></button>;
       case 'vehicles':
-        return <button key={item.id} onClick={() => goTo(`/admin/operations/departures/${item.departureId}`)} className="w-full text-left px-3 py-2 hover:bg-slate-50 rounded-lg"><p className="text-sm font-medium text-slate-800">{item.vehicleNumber ?? item.driverName ?? 'Vehicle'}</p><p className="text-xs text-slate-400">View trip</p></button>;
+        return <button key={item.id} onClick={onClick} className={rowClass}><p className="text-sm font-medium text-slate-800">{item.vehicleNumber ?? item.driverName ?? 'Vehicle'}</p><p className="text-xs text-slate-400">View trip</p></button>;
       case 'vendors':
-        return <button key={item.id} onClick={() => goTo(`/admin/operations/vendors/${item.id}`)} className="w-full text-left px-3 py-2 hover:bg-slate-50 rounded-lg"><p className="text-sm font-medium text-slate-800">{item.name}</p><p className="text-xs text-slate-400">{item.type}</p></button>;
+        return <button key={item.id} onClick={onClick} className={rowClass}><p className="text-sm font-medium text-slate-800">{item.name}</p><p className="text-xs text-slate-400">{item.type}</p></button>;
       case 'users':
-        return <button key={item.id} onClick={() => goTo('/admin/organization')} className="w-full text-left px-3 py-2 hover:bg-slate-50 rounded-lg"><p className="text-sm font-medium text-slate-800">{item.name}</p><p className="text-xs text-slate-400">{item.email} · {item.role}</p></button>;
+        return <button key={item.id} onClick={onClick} className={rowClass}><p className="text-sm font-medium text-slate-800">{item.name}</p><p className="text-xs text-slate-400">{item.email} · {item.role}</p></button>;
       case 'travelers':
-        return <button key={item.id} onClick={() => item.departureId ? goTo(`/admin/operations/departures/${item.departureId}`) : undefined} className="w-full text-left px-3 py-2 hover:bg-slate-50 rounded-lg"><p className="text-sm font-medium text-slate-800">{item.name}</p><p className="text-xs text-slate-400">Traveller</p></button>;
+        return <button key={item.id} onClick={onClick} className={rowClass}><p className="text-sm font-medium text-slate-800">{item.name}</p><p className="text-xs text-slate-400">Traveller</p></button>;
       default:
         return null;
     }

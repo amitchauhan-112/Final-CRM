@@ -7,6 +7,7 @@ import {
 import { PieChart, Pie, Cell, Legend, Tooltip, ResponsiveContainer } from 'recharts';
 import { useNavigate } from 'react-router-dom';
 import { useLeads, useOverdueFollowUps, useUpdateLead } from '../../hooks/useLeads';
+import { usePendingApprovals } from '../../hooks/useApprovals';
 import { useAuthStore } from '../../store/authStore';
 import { useStarredLeads } from '../../hooks/useStarredLeads';
 import { useRecentViews } from '../../hooks/useRecentViews';
@@ -235,6 +236,8 @@ export default function EmployeeDashboard() {
   const { data: overdueData } = useOverdueFollowUps();
   const { starred, isStarred, toggle: toggleStar } = useStarredLeads();
   const { recentViewIds, trackView } = useRecentViews();
+  const { data: pendingApprovalsData } = usePendingApprovals();
+  const pendingApprovals = pendingApprovalsData?.data ?? [];
 
   const leads = myLeadsData?.data ?? [];
   const statsLeads = statsLeadsData?.data ?? [];
@@ -460,6 +463,27 @@ export default function EmployeeDashboard() {
       {/* Row 2 — Next Follow-up + Chart */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
         <div className="xl:col-span-1 space-y-4">
+          {/* Payment corrections Finance proposed on my recorded payments */}
+          {pendingApprovals.length > 0 && (
+            <div className="card p-4 border-amber-200 bg-amber-50/40 space-y-2">
+              <p className="text-xs font-bold text-amber-700 uppercase tracking-wide flex items-center gap-1.5">
+                <AlertCircle className="w-3.5 h-3.5" />Awaiting your confirmation
+              </p>
+              {pendingApprovals.slice(0, 3).map((a) => (
+                <button
+                  key={a.id}
+                  onClick={() => a.leadId && openLead(a.leadId)}
+                  className="w-full text-left px-3 py-2 rounded-lg bg-white border border-amber-100 hover:border-amber-300 transition-colors"
+                >
+                  <p className="text-sm font-medium text-slate-800">
+                    {a.type === 'PAYMENT_CORRECTION' ? 'Payment correction' : 'Booking change'} proposed by {a.requestedBy.name}
+                  </p>
+                  <p className="text-xs text-slate-400 mt-0.5">Tap to review and confirm</p>
+                </button>
+              ))}
+            </div>
+          )}
+
           {/* Next Follow-up */}
           {stats.nextFollowUp ? (
             <NextFollowUpCard lead={stats.nextFollowUp} onClick={() => openLead(stats.nextFollowUp!.id)} />

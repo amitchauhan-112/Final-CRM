@@ -577,6 +577,7 @@ export interface ApprovalRequest {
   type: ApprovalType;
   entityType: 'BOOKING' | 'PAYMENT';
   entityId: string;
+  leadId?: string;
   payload: { changes: Record<string, unknown>; previous: Record<string, unknown> };
   note?: string;
   requestedById: string;
@@ -1056,6 +1057,7 @@ export interface DepartureListItem {
   bookingCount: number;
   hotelsPending: number;
   vehiclesPending: number;
+  b2bVendorId?: string;
 }
 
 export interface OpsDashboardStats {

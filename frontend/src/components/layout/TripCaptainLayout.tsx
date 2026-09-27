@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
-import { Mountain, MapPinned, Bell, LogOut, ChevronDown, Menu, X } from 'lucide-react';
+import { Mountain, MapPinned, Bell, LogOut, ChevronDown, Menu, X, Settings } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import { useNotifications, useMarkAllAsRead, useMarkAsRead } from '../../hooks/useNotifications';
 import Avatar from '../ui/Avatar';
@@ -11,6 +11,7 @@ import { formatRelativeTime, cn } from '../../utils/helpers';
 // thing a captain needs: their assigned trips.
 const navLinks = [
   { to: '/trip-captain/dashboard', label: 'My Trips', icon: MapPinned },
+  { to: '/trip-captain/settings', label: 'Settings', icon: Settings },
 ];
 
 export default function TripCaptainLayout() {
@@ -180,6 +181,13 @@ export default function TripCaptainLayout() {
                       <p className="text-xs text-slate-400">{user.email}</p>
                       <p className="text-xs text-primary-600 font-medium mt-0.5">Trip Captain</p>
                     </div>
+                    <button
+                      onClick={() => { setUserMenuOpen(false); navigate('/trip-captain/settings'); }}
+                      className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+                    >
+                      <Settings className="w-4 h-4" />
+                      Settings
+                    </button>
                     <button
                       onClick={handleLogout}
                       className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors"
