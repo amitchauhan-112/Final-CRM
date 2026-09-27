@@ -1,9 +1,22 @@
 import { useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Search, X, User, Phone, MapPin, Calendar, IndianRupee, Users, Plane, Building2 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import api from '../../services/api';
 import { useAuthStore } from '../../store/authStore';
 import Badge from '../ui/Badge';
+
+// Where clicking a result should go — each role only has a Leads page of its
+// own for ADMIN/EMPLOYEE; Operations has no lead view but can jump straight
+// to the trip if this lead's already a booked departure; Finance has no
+// deep-linkable page for a bare lead today, so those results just aren't
+// clickable rather than dead-ending somewhere unhelpful.
+function getLeadOpenPath(lead: any, role: string): string | null {
+  if (role === 'ADMIN') return `/admin/leads?id=${lead.id}`;
+  if (role === 'EMPLOYEE') return `/employee/leads?id=${lead.id}`;
+  if (role === 'OPERATIONS' && lead.booking?.departure?.id) return `/operations/departures/${lead.booking.departure.id}`;
+  return null;
+}
 
 function useLeadLookup(query: string) {
   return useQuery({
@@ -42,10 +55,15 @@ function StatusBadge({ status }: { status?: string | null }) {
 
 // A lead that hasn't been booked yet — just contact info, status, and
 // whatever context (destination/assignee/campaign) is already on record.
-function LeadOnlyCard({ lead, role }: { lead: any; role: string }) {
+function LeadOnlyCard({ lead, role, onOpen }: { lead: any; role: string; onOpen?: () => void }) {
   const showSales = role === 'ADMIN' || role === 'EMPLOYEE';
   return (
-    <div className="border border-slate-200 rounded-xl p-4 space-y-2 bg-white">
+    <div
+      className={`border border-slate-200 rounded-xl p-4 space-y-2 bg-white ${onOpen ? 'cursor-pointer hover:border-primary-300 hover:shadow-sm transition-all' : ''}`}
+      onClick={onOpen}
+      role={onOpen ? 'button' : undefined}
+      tabIndex={onOpen ? 0 : undefined}
+    >
       <div className="flex items-start justify-between gap-2">
         <div>
           <div className="flex items-center gap-2">
@@ -77,14 +95,19 @@ function LeadOnlyCard({ lead, role }: { lead: any; role: string }) {
 }
 
 // A lead that has gone on to become a booking — full trip/finance/ops card.
-function BookedLeadCard({ lead, role }: { lead: any; role: string }) {
+function BookedLeadCard({ lead, role, onOpen }: { lead: any; role: string; onOpen?: () => void }) {
   const booking = lead.booking;
   const showFinance = role === 'ADMIN' || role === 'FINANCE';
   const showOps = role === 'ADMIN' || role === 'OPERATIONS';
   const showSales = role === 'ADMIN' || role === 'EMPLOYEE';
 
   return (
-    <div className="border border-slate-200 rounded-xl p-4 space-y-3 bg-white">
+    <div
+      className={`border border-slate-200 rounded-xl p-4 space-y-3 bg-white ${onOpen ? 'cursor-pointer hover:border-primary-300 hover:shadow-sm transition-all' : ''}`}
+      onClick={onOpen}
+      role={onOpen ? 'button' : undefined}
+      tabIndex={onOpen ? 0 : undefined}
+    >
       {/* Header */}
       <div className="flex items-start justify-between gap-2">
         <div>
@@ -196,6 +219,7 @@ function BookedLeadCard({ lead, role }: { lead: any; role: string }) {
 
 export default function LeadLookup() {
   const { user } = useAuthStore();
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const ref = useRef<HTMLDivElement>(null);
@@ -268,11 +292,13 @@ export default function LeadLookup() {
                   <p className="text-xs text-slate-400 mt-1">Try the full name, mobile number, or booking ID</p>
                 </div>
               ) : (
-                results.map((lead) => (
-                  lead.booking
-                    ? <BookedLeadCard key={lead.id} lead={lead} role={role} />
-                    : <LeadOnlyCard key={lead.id} lead={lead} role={role} />
-                ))
+                results.map((lead) => {
+                  const path = getLeadOpenPath(lead, role);
+                  const onOpen = path ? () => { setOpen(false); setQuery(''); navigate(path); } : undefined;
+                  return lead.booking
+                    ? <BookedLeadCard key={lead.id} lead={lead} role={role} onOpen={onOpen} />
+                    : <LeadOnlyCard key={lead.id} lead={lead} role={role} onOpen={onOpen} />;
+                })
               )}
             </div>
           </div>
