@@ -76,7 +76,7 @@ export default function VendorDetailPage() {
             </div>
             <div>
               <div className="flex items-center gap-2 flex-wrap">
-                <h2 className="text-xl font-bold text-slate-900">{vendor.name}</h2>
+                <h2 className="page-title">{vendor.name}</h2>
                 <span className={cn('badge', vendor.status === 'ACTIVE' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500')}>{vendor.status}</span>
               </div>
               <p className="text-sm text-slate-500 mt-1">{TYPE_LABELS[vendor.type] ?? vendor.type}</p>

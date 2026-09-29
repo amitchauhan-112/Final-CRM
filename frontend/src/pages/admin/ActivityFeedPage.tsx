@@ -111,7 +111,7 @@ export default function ActivityFeedPage() {
     <div className="space-y-5 max-w-4xl">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-bold text-slate-900">Audit Center</h2>
+          <h2 className="page-title">Audit Center</h2>
           <p className="text-sm text-slate-500 mt-0.5">Every important action, who did it, when, and what changed</p>
         </div>
       </div>

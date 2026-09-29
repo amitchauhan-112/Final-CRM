@@ -107,6 +107,14 @@
     @apply tab-item bg-white text-slate-900 shadow-sm;
   }
 
+  /* ── Card title ──────────────────────────────────────────────────────────── */
+  /* The ~25 near-identical <h3> recipes scattered across card headers all
+     converge here — new cards should reach for this instead of hand-rolling
+     another slight variant. */
+  .card-title {
+    @apply text-sm font-semibold text-slate-800;
+  }
+
   /* ── Page header ─────────────────────────────────────────────────────────── */
   .page-header {
     @apply flex items-center justify-between gap-4 flex-wrap;
@@ -119,14 +127,20 @@
   }
 
   /* ── Data table improvements ─────────────────────────────────────────────── */
+  /* Matches the recipe every hand-rolled table in the app had already
+     converged on (text-slate-500, no header background) — this class exists
+     to be the one shared target, not to introduce a new look. */
+  .data-table thead tr {
+    @apply border-b border-slate-200 bg-slate-50;
+  }
   .data-table th {
-    @apply px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wide whitespace-nowrap bg-slate-50/80;
+    @apply px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap;
   }
   .data-table td {
     @apply px-4 py-3 text-slate-700;
   }
   .data-table tbody tr {
-    @apply border-b border-slate-50 transition-colors duration-150 ease-enterprise;
+    @apply border-b border-slate-100 transition-colors duration-150 ease-enterprise;
   }
   .data-table tbody tr:hover {
     @apply bg-slate-50;

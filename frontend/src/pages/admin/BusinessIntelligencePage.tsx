@@ -74,7 +74,7 @@ export default function BusinessIntelligencePage() {
   return (
     <div className="space-y-5">
       <div>
-        <h2 className="text-xl font-bold text-slate-900">Business Intelligence</h2>
+        <h2 className="page-title">Business Intelligence</h2>
         <p className="text-sm text-slate-500 mt-0.5">Live analytics across packages, destinations, campaigns, customers, and employees</p>
       </div>
 

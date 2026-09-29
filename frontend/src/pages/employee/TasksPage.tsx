@@ -11,7 +11,7 @@ import { cn, formatDate, formatRelativeTime } from '../../utils/helpers';
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
   PENDING: { label: 'Pending', color: 'text-amber-700', bg: 'bg-amber-100' },
-  IN_PROGRESS: { label: 'In Progress', color: 'text-blue-700', bg: 'bg-blue-100' },
+  IN_PROGRESS: { label: 'In Progress', color: 'text-primary-700', bg: 'bg-primary-100' },
   DONE: { label: 'Done', color: 'text-emerald-700', bg: 'bg-emerald-100' },
   SKIPPED: { label: 'Skipped', color: 'text-slate-500', bg: 'bg-slate-100' },
 };
@@ -23,7 +23,7 @@ const PRIORITY_COLORS: Record<string, string> = {
 };
 
 const DEPT_COLORS: Record<string, string> = {
-  SALES: 'bg-blue-100 text-blue-700',
+  SALES: 'bg-primary-100 text-primary-700',
   OPERATIONS: 'bg-purple-100 text-purple-700',
   CUSTOMER_CARE: 'bg-emerald-100 text-emerald-700',
   ALL: 'bg-slate-100 text-slate-600',
@@ -170,7 +170,7 @@ export default function TasksPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold text-slate-900">My Tasks</h2>
+          <h2 className="page-title">My Tasks</h2>
           <p className="text-sm text-slate-500 mt-0.5">Booking workflow tasks assigned to you</p>
         </div>
         <div className="flex items-center gap-2">
@@ -206,7 +206,7 @@ export default function TasksPage() {
                 <t.icon className={cn('w-4 h-4',
                   t.key === 'overdue' ? 'text-red-500' :
                   t.key === 'today' ? 'text-amber-500' :
-                  t.key === 'upcoming' ? 'text-blue-500' : 'text-emerald-500'
+                  t.key === 'upcoming' ? 'text-primary-500' : 'text-emerald-500'
                 )} />
                 <span className={cn('text-xl font-bold',
                   t.key === 'overdue' && count > 0 ? 'text-red-600' :

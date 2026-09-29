@@ -70,7 +70,7 @@ export default function ExecutiveDashboardPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-bold text-slate-900">Executive Dashboard</h2>
+        <h2 className="page-title">Executive Dashboard</h2>
         <p className="text-sm text-slate-500 mt-0.5">The control center — revenue, operations, and business health at a glance</p>
       </div>
 

@@ -41,16 +41,13 @@ export default function Table<T extends { id?: string }>({
 }: TableProps<T>) {
   return (
     <div className={cn('overflow-x-auto', className)}>
-      <table className="w-full text-sm">
+      <table className="w-full text-sm data-table">
         <thead>
-          <tr className="border-b border-slate-200 bg-slate-50">
+          <tr>
             {columns.map((col) => (
               <th
                 key={col.key}
-                className={cn(
-                  'px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap',
-                  col.headerClassName
-                )}
+                className={cn('whitespace-nowrap', col.headerClassName)}
               >
                 {col.header}
               </th>
@@ -64,8 +61,8 @@ export default function Table<T extends { id?: string }>({
             ))
           ) : data.length === 0 ? (
             <tr>
-              <td colSpan={columns.length} className="px-4 py-12 text-center text-slate-400">
-                {emptyMessage}
+              <td colSpan={columns.length} className="empty-state">
+                <p className="empty-state-body">{emptyMessage}</p>
               </td>
             </tr>
           ) : (
@@ -74,15 +71,14 @@ export default function Table<T extends { id?: string }>({
                 key={(row as any).id ?? index}
                 onClick={() => onRowClick?.(row)}
                 className={cn(
-                  'border-b border-slate-100 transition-colors duration-150 ease-enterprise',
-                  onRowClick && 'cursor-pointer hover:bg-slate-50',
+                  onRowClick && 'cursor-pointer',
                   rowClassName?.(row)
                 )}
               >
                 {columns.map((col) => (
                   <td
                     key={col.key}
-                    className={cn('px-4 py-3 text-slate-700 align-top', col.className)}
+                    className={cn('align-top', col.className)}
                   >
                     {col.render
                       ? col.render(row, index)

@@ -117,7 +117,7 @@ export default function VendorsPage() {
     <div className="space-y-5">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h2 className="text-xl font-bold text-slate-900">Vendors</h2>
+          <h2 className="page-title">Vendors</h2>
           <p className="text-sm text-slate-500 mt-0.5">Hotel, vehicle, and local vendor directory</p>
         </div>
         <button onClick={() => setAddOpen(true)} className="btn-primary text-sm">

@@ -81,7 +81,7 @@ export default function RefundsPage() {
     <div className="space-y-5">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h2 className="text-xl font-bold text-slate-900">Refunds</h2>
+          <h2 className="page-title">Refunds</h2>
           <p className="text-sm text-slate-500 mt-0.5">Requested → Approved → Paid workflow</p>
         </div>
         <button onClick={() => setAddOpen(true)} className="btn-primary text-sm"><Plus className="w-4 h-4" />Request Refund</button>

@@ -52,14 +52,14 @@ function NextFollowUpCard({ lead, onClick }: { lead: Lead; onClick: () => void }
     <button
       onClick={onClick}
       className={cn(
-        'w-full card p-5 text-left transition-all hover:shadow-md',
-        isOverdueFlag ? 'border-red-200 bg-red-50/40' : 'border-orange-200 bg-orange-50/40'
+        'w-full card-interactive p-5 text-left',
+        isOverdueFlag ? 'border-red-200 bg-red-50/40' : 'border-amber-200 bg-amber-50/40'
       )}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
-            <Bell className={cn('w-4 h-4', isOverdueFlag ? 'text-red-500' : 'text-orange-500')} />
+            <Bell className={cn('w-4 h-4', isOverdueFlag ? 'text-red-500' : 'text-amber-500')} />
             <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Next Follow-up</span>
           </div>
           <p className="font-bold text-slate-900 truncate text-lg">{lead.name}</p>
@@ -69,7 +69,7 @@ function NextFollowUpCard({ lead, onClick }: { lead: Lead; onClick: () => void }
           )}
         </div>
         <div className="text-right shrink-0">
-          <p className={cn('text-xl font-bold', isOverdueFlag ? 'text-red-600' : 'text-orange-600')}>{timeLabel}</p>
+          <p className={cn('text-xl font-bold', isOverdueFlag ? 'text-red-600' : 'text-amber-600')}>{timeLabel}</p>
           <p className="text-xs text-slate-400 mt-1">{formatDate(lead.followUpDate)}</p>
           <Badge status={lead.status} className="mt-2" />
         </div>
@@ -337,7 +337,7 @@ export default function EmployeeDashboard() {
     <div className="space-y-5">
       {/* Header */}
       <div>
-        <h2 className="text-xl font-bold text-slate-900">
+        <h2 className="page-title">
           Good {new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 17 ? 'afternoon' : 'evening'},{' '}
           {user?.name?.split(' ')[0]} 👋
         </h2>
@@ -398,16 +398,16 @@ export default function EmployeeDashboard() {
           label="Interested"
           value={cardStats.interested.length}
           icon={TrendingUp}
-          iconBg="bg-violet-100"
-          iconColor="text-violet-600"
+          iconBg="bg-mountain-100"
+          iconColor="text-mountain-600"
           onClick={() => navigate(`/employee/leads?status=INTERESTED&${dateQuery}`)}
         />
         <StatsCard
           label="Follow-up Sched."
           value={cardStats.followUpScheduled.length}
           icon={CalendarCheck}
-          iconBg="bg-orange-100"
-          iconColor="text-orange-600"
+          iconBg="bg-amber-100"
+          iconColor="text-amber-600"
           trendLabel={cardStats.followUpScheduledDone > 0 ? `${cardStats.followUpScheduledDone} already completed` : undefined}
           onClick={() => navigate(`/employee/leads?status=FOLLOW_UP_SCHEDULED&${dateQuery}`)}
         />
@@ -415,8 +415,8 @@ export default function EmployeeDashboard() {
           label="Confirmed"
           value={cardStats.confirmed.length}
           icon={CheckCircle}
-          iconBg="bg-green-100"
-          iconColor="text-green-600"
+          iconBg="bg-emerald-100"
+          iconColor="text-emerald-600"
           onClick={() => navigate(`/employee/leads?status=CONFIRMED&${dateQuery}`)}
         />
         <StatsCard
@@ -438,8 +438,8 @@ export default function EmployeeDashboard() {
           label="Today's Follow-ups"
           value={cardStats.todayFollowUps.length}
           icon={Calendar}
-          iconBg="bg-orange-100"
-          iconColor="text-orange-600"
+          iconBg="bg-amber-100"
+          iconColor="text-amber-600"
           onClick={() => navigate('/employee/follow-ups')}
         />
         <StatsCard
@@ -454,8 +454,8 @@ export default function EmployeeDashboard() {
           label="Upcoming Follow-ups"
           value={cardStats.upcomingFollowUps.length}
           icon={CalendarCheck}
-          iconBg="bg-blue-100"
-          iconColor="text-blue-600"
+          iconBg="bg-primary-100"
+          iconColor="text-primary-600"
           onClick={() => navigate('/employee/follow-ups')}
         />
       </div>
@@ -499,7 +499,7 @@ export default function EmployeeDashboard() {
           {stats.todayFollowUps.length > 0 && (
             <div className="card p-5">
               <h3 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
-                <Calendar className="w-4 h-4 text-orange-500" />
+                <Calendar className="w-4 h-4 text-amber-500" />
                 Today's Follow-ups ({stats.todayFollowUps.length})
               </h3>
               <div className="space-y-2">
@@ -507,11 +507,11 @@ export default function EmployeeDashboard() {
                   <div
                     key={lead.id}
                     onClick={() => openLead(lead.id)}
-                    className="p-2.5 bg-orange-50 border border-orange-100 rounded-xl cursor-pointer hover:bg-orange-100 transition-colors"
+                    className="p-2.5 bg-amber-50 border border-amber-100 rounded-xl cursor-pointer hover:bg-amber-100 transition-colors"
                   >
                     <div className="flex items-center justify-between gap-2">
                       <p className="text-sm font-semibold text-slate-800 truncate">{lead.name}</p>
-                      <span className="text-xs text-orange-600 font-medium shrink-0">{formatDate(lead.followUpDate)}</span>
+                      <span className="text-xs text-amber-600 font-medium shrink-0">{formatDate(lead.followUpDate)}</span>
                     </div>
                     {lead.followUpNotes && (
                       <p className="text-xs text-slate-500 mt-0.5 truncate italic">"{lead.followUpNotes}"</p>
@@ -584,7 +584,7 @@ export default function EmployeeDashboard() {
           {stats.confirmed.length > 0 && (
             <div className="card p-5">
               <h3 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
-                <CheckCircle className="w-4 h-4 text-green-500" />
+                <CheckCircle className="w-4 h-4 text-emerald-500" />
                 Your Confirmed ({stats.confirmed.length})
               </h3>
               <div className="space-y-2">
@@ -592,9 +592,9 @@ export default function EmployeeDashboard() {
                   <div
                     key={lead.id}
                     onClick={() => openLead(lead.id)}
-                    className="flex items-center gap-2 p-2.5 rounded-xl bg-green-50 border border-green-100 cursor-pointer hover:bg-green-100 transition-colors"
+                    className="flex items-center gap-2 p-2.5 rounded-xl bg-emerald-50 border border-emerald-100 cursor-pointer hover:bg-emerald-100 transition-colors"
                   >
-                    <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0" />
+                    <CheckCircle className="w-4 h-4 text-emerald-600 flex-shrink-0" />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-slate-800 truncate">{lead.name}</p>
                       {lead.destination && <p className="text-xs text-slate-500">{lead.destination}</p>}

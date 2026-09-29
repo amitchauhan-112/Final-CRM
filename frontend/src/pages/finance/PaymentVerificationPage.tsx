@@ -38,7 +38,7 @@ export default function PaymentVerificationPage() {
   return (
     <div className="space-y-5">
       <div>
-        <h2 className="text-xl font-bold text-slate-900">Payment Verification</h2>
+        <h2 className="page-title">Payment Verification</h2>
         <p className="text-sm text-slate-500 mt-0.5">Payments recorded by Sales, awaiting your review</p>
       </div>
 

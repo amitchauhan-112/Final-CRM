@@ -113,7 +113,7 @@ function PkgItineraryTable({ rows, nights, onUpdateRow }: {
             ? 'bg-amber-100 text-amber-700'
             : isRet
             ? 'bg-emerald-100 text-emerald-700'
-            : row.rowType === 'day' ? 'bg-sky-100 text-sky-700' : 'bg-blue-100 text-blue-700';
+            : row.rowType === 'day' ? 'bg-sky-100 text-sky-700' : 'bg-primary-100 text-primary-700';
           const badgeText = row.rowType === 'day' ? `D${row.dayIndex}` : `N${row.dayIndex}`;
           return (
             <div key={row.key} className="grid grid-cols-1 sm:grid-cols-[8rem_7rem_1fr_8rem] gap-2 sm:gap-x-2 sm:items-center">
@@ -521,8 +521,8 @@ export default function BookingConfirmModal({ open, onClose, lead, existingBooki
                     'flex-1 flex items-center justify-center gap-2 p-2.5 border-2 rounded-xl cursor-pointer transition-colors text-sm font-medium',
                     watchedTourType === type
                       ? type === 'GIT'
-                        ? 'border-blue-500 bg-blue-50 text-blue-700'
-                        : 'border-violet-500 bg-violet-50 text-violet-700'
+                        ? 'border-primary-500 bg-primary-50 text-primary-700'
+                        : 'border-mountain-500 bg-mountain-50 text-mountain-700'
                       : 'border-slate-200 text-slate-500 hover:border-slate-300'
                   )}>
                     <input type="radio" value={type} {...register('tourType')} className="sr-only" />
@@ -638,7 +638,7 @@ export default function BookingConfirmModal({ open, onClose, lead, existingBooki
               <div className="sm:col-span-2 rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-2">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className={cn('text-[10px] font-bold px-2 py-0.5 rounded-full',
-                    selectedPkg.packageType === 'GIT' ? 'bg-blue-100 text-blue-700' : 'bg-violet-100 text-violet-700'
+                    selectedPkg.packageType === 'GIT' ? 'bg-primary-100 text-primary-700' : 'bg-mountain-100 text-mountain-700'
                   )}>{selectedPkg.packageType}</span>
                   <span className="text-xs font-semibold text-slate-800">{selectedPkg.name}</span>
                   <span className="text-xs text-slate-500 ml-auto">{selectedPkg.nights}N / {selectedPkg.days}D</span>
@@ -663,7 +663,7 @@ export default function BookingConfirmModal({ open, onClose, lead, existingBooki
                           <span className={cn('text-[9px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0 mt-0.5 tabular-nums',
                             isDepart ? 'bg-amber-100 text-amber-700'
                             : isReturn ? 'bg-emerald-100 text-emerald-700'
-                            : 'bg-blue-100 text-blue-700'
+                            : 'bg-primary-100 text-primary-700'
                           )}>D{item.dayOffset}</span>
                           <div className="min-w-0">
                             <p className="text-xs font-medium text-slate-700 leading-tight">{item.title}</p>

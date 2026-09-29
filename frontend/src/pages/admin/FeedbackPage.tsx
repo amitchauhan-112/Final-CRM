@@ -8,16 +8,16 @@ import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import Modal from '../../components/ui/Modal';
 
 const typeIcon = { BUG: Bug, SUGGESTION: Lightbulb, OTHER: MessageCircle };
-const typeColor = { BUG: 'text-red-600 bg-red-50', SUGGESTION: 'text-amber-600 bg-amber-50', OTHER: 'text-blue-600 bg-blue-50' };
+const typeColor = { BUG: 'text-red-600 bg-red-50', SUGGESTION: 'text-amber-600 bg-amber-50', OTHER: 'text-primary-600 bg-primary-50' };
 const priorityBadge = {
   LOW: 'bg-slate-100 text-slate-600',
-  MEDIUM: 'bg-blue-100 text-blue-700',
+  MEDIUM: 'bg-primary-100 text-primary-700',
   HIGH: 'bg-orange-100 text-orange-700',
   CRITICAL: 'bg-red-100 text-red-700',
 };
 const statusConfig: Record<FeedbackStatus, { label: string; color: string; icon: React.ComponentType<{ className?: string }> }> = {
   OPEN: { label: 'Open', color: 'bg-yellow-100 text-yellow-700', icon: AlertCircle },
-  IN_PROGRESS: { label: 'In Progress', color: 'bg-blue-100 text-blue-700', icon: Clock },
+  IN_PROGRESS: { label: 'In Progress', color: 'bg-primary-100 text-primary-700', icon: Clock },
   RESOLVED: { label: 'Resolved', color: 'bg-green-100 text-green-700', icon: CheckCircle2 },
   CLOSED: { label: 'Closed', color: 'bg-slate-100 text-slate-600', icon: Archive },
 };
@@ -137,14 +137,14 @@ export default function FeedbackPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-bold text-slate-900">Peer Feedback</h1>
+        <h1 className="page-title">Peer Feedback</h1>
         <p className="text-sm text-slate-500 mt-1">Bug reports and suggestions from your team during peer testing</p>
       </div>
 
       {/* Stats */}
       {stats && (
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-          <StatsCard label="Total" value={stats.total} icon={MessageCircle} iconBg="bg-blue-100" iconColor="text-blue-600" onClick={() => setFilters({})} />
+          <StatsCard label="Total" value={stats.total} icon={MessageCircle} iconBg="bg-primary-100" iconColor="text-primary-600" onClick={() => setFilters({})} />
           <StatsCard label="Open" value={stats.open} icon={AlertCircle} iconBg="bg-yellow-100" iconColor="text-yellow-600" onClick={() => handleFilter('status', 'OPEN')} />
           <StatsCard label="In Progress" value={stats.inProgress} icon={Clock} iconBg="bg-purple-100" iconColor="text-purple-600" onClick={() => handleFilter('status', 'IN_PROGRESS')} />
           <StatsCard label="Bug Reports" value={stats.bugs} icon={Bug} iconBg="bg-red-100" iconColor="text-red-600" onClick={() => handleFilter('type', 'BUG')} />

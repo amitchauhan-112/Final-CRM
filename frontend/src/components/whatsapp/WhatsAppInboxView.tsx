@@ -48,7 +48,7 @@ function ConversationRow({ conversation, active, onClick }: {
 
 function MessageStatusIcon({ status }: { status: WhatsAppMessage['status'] }) {
   if (status === 'FAILED') return <AlertTriangle className="w-3 h-3 text-red-300" />;
-  if (status === 'READ') return <CheckCheck className="w-3 h-3 text-blue-300" />;
+  if (status === 'READ') return <CheckCheck className="w-3 h-3 text-primary-300" />;
   if (status === 'DELIVERED') return <CheckCheck className="w-3 h-3 text-white/70" />;
   if (status === 'SENT') return <Check className="w-3 h-3 text-white/70" />;
   return <Clock className="w-3 h-3 text-white/50" />;

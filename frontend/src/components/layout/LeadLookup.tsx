@@ -39,7 +39,7 @@ function fmtDate(d?: string | Date | null) {
 function StatusBadge({ status }: { status?: string | null }) {
   const map: Record<string, string> = {
     ACTIVE: 'bg-emerald-100 text-emerald-800',
-    COMPLETED: 'bg-blue-100 text-blue-800',
+    COMPLETED: 'bg-primary-100 text-primary-800',
     CANCELLED: 'bg-red-100 text-red-800',
     VERIFIED: 'bg-emerald-100 text-emerald-700',
     PENDING: 'bg-amber-100 text-amber-800',
@@ -59,7 +59,7 @@ function LeadOnlyCard({ lead, role, onOpen }: { lead: any; role: string; onOpen?
   const showSales = role === 'ADMIN' || role === 'EMPLOYEE';
   return (
     <div
-      className={`border border-slate-200 rounded-xl p-4 space-y-2 bg-white ${onOpen ? 'cursor-pointer hover:border-primary-300 hover:shadow-sm transition-all' : ''}`}
+      className={onOpen ? 'card-interactive p-4 space-y-2' : 'card p-4 space-y-2'}
       onClick={onOpen}
       role={onOpen ? 'button' : undefined}
       tabIndex={onOpen ? 0 : undefined}
@@ -103,7 +103,7 @@ function BookedLeadCard({ lead, role, onOpen }: { lead: any; role: string; onOpe
 
   return (
     <div
-      className={`border border-slate-200 rounded-xl p-4 space-y-3 bg-white ${onOpen ? 'cursor-pointer hover:border-primary-300 hover:shadow-sm transition-all' : ''}`}
+      className={onOpen ? 'card-interactive p-4 space-y-3' : 'card p-4 space-y-3'}
       onClick={onOpen}
       role={onOpen ? 'button' : undefined}
       tabIndex={onOpen ? 0 : undefined}

@@ -47,7 +47,7 @@ export default function EmployeeSettingsPage() {
   return (
     <div className="space-y-5">
       <div>
-        <h2 className="text-xl font-bold text-slate-900">Settings</h2>
+        <h2 className="page-title">Settings</h2>
         <p className="text-sm text-slate-500 mt-0.5">Manage your account settings</p>
       </div>
 

@@ -22,7 +22,7 @@ export default function VendorCreditsPage() {
   return (
     <div className="space-y-5">
       <div>
-        <h2 className="text-xl font-bold text-slate-900">Vendor Credits</h2>
+        <h2 className="page-title">Vendor Credits</h2>
         <p className="text-sm text-slate-500 mt-0.5">Net balance with every vendor, in one place</p>
       </div>
 
@@ -32,8 +32,8 @@ export default function VendorCreditsPage() {
           <p className="text-2xl font-bold text-orange-500 mt-1">{formatCurrency(totalPayable)}</p>
         </div>
         <div className="card p-5">
-          <p className="text-xs text-slate-400 font-semibold uppercase tracking-wider flex items-center gap-1"><ArrowDownLeft className="w-3.5 h-3.5 text-violet-600" />Owed To Us</p>
-          <p className="text-2xl font-bold text-violet-600 mt-1">{formatCurrency(totalReceivable)}</p>
+          <p className="text-xs text-slate-400 font-semibold uppercase tracking-wider flex items-center gap-1"><ArrowDownLeft className="w-3.5 h-3.5 text-mountain-600" />Owed To Us</p>
+          <p className="text-2xl font-bold text-mountain-600 mt-1">{formatCurrency(totalReceivable)}</p>
         </div>
       </div>
 
@@ -72,7 +72,7 @@ export default function VendorCreditsPage() {
                       <p className="font-medium text-slate-800 text-sm">{c.vendorName}</p>
                       <p className="text-xs text-slate-400">{c.vendorType.replace('_', ' ')} · {c.billCount} bill{c.billCount !== 1 ? 's' : ''}</p>
                     </div>
-                    <p className="font-bold text-violet-600">{formatCurrency(Math.abs(c.netBalance))}</p>
+                    <p className="font-bold text-mountain-600">{formatCurrency(Math.abs(c.netBalance))}</p>
                   </button>
                 ))}
               </div>

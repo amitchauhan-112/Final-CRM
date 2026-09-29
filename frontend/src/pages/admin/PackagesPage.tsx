@@ -128,8 +128,8 @@ const ACTIVITY_OPTIONS: { value: ActivityType; label: string }[] = [
 
 const ACTIVITY_BADGE: Record<ActivityType, string> = {
   JOURNEY: 'bg-amber-100 text-amber-700',
-  STAY: 'bg-blue-100 text-blue-700',
-  SIGHTSEEING: 'bg-violet-100 text-violet-700',
+  STAY: 'bg-primary-100 text-primary-700',
+  SIGHTSEEING: 'bg-mountain-100 text-mountain-700',
 };
 
 // ─── Package Create Modal (minimal) ──────────────────────────────────────────
@@ -227,7 +227,7 @@ function PackageCreateModal({ open, onClose }: { open: boolean; onClose: () => v
                     className={cn(
                       'flex-1 flex items-center justify-center gap-2 p-2.5 border-2 rounded-xl text-sm font-medium transition-colors',
                       pkgType === type
-                        ? type === 'GIT' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-violet-500 bg-violet-50 text-violet-700'
+                        ? type === 'GIT' ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-mountain-500 bg-mountain-50 text-mountain-700'
                         : 'border-slate-200 text-slate-500 hover:border-slate-300',
                       disabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer',
                     )}
@@ -284,7 +284,7 @@ function PackageCreateModal({ open, onClose }: { open: boolean; onClose: () => v
                 ? 'bg-amber-100 text-amber-700'
                 : isRet
                 ? 'bg-emerald-100 text-emerald-700'
-                : row.rowType === 'day' ? 'bg-sky-100 text-sky-700' : 'bg-blue-100 text-blue-700';
+                : row.rowType === 'day' ? 'bg-sky-100 text-sky-700' : 'bg-primary-100 text-primary-700';
               const badgeText = row.rowType === 'day' ? `D${row.dayIndex}` : `N${row.dayIndex}`;
               return (
                 <div key={row.key} className="grid grid-cols-1 sm:grid-cols-[9rem_8rem_1fr_10rem] gap-2 sm:gap-x-3 sm:items-center">
@@ -518,7 +518,7 @@ function PackageFormModal({ open, onClose, existing }: { open: boolean; onClose:
                 {isEdit ? (
                   <div className={cn(
                     'input flex items-center gap-2 cursor-not-allowed select-none',
-                    existing?.packageType === 'GIT' ? 'bg-blue-50 text-blue-700' : 'bg-violet-50 text-violet-700',
+                    existing?.packageType === 'GIT' ? 'bg-primary-50 text-primary-700' : 'bg-mountain-50 text-mountain-700',
                   )}>
                     <Lock className="w-3.5 h-3.5 flex-shrink-0" />
                     <span className="font-semibold">{existing?.packageType}</span>
@@ -534,7 +534,7 @@ function PackageFormModal({ open, onClose, existing }: { open: boolean; onClose:
                           className={cn(
                             'flex-1 flex items-center gap-2 p-2.5 border-2 rounded-xl cursor-pointer transition-colors text-sm font-medium',
                             watch('packageType') === type
-                              ? type === 'GIT' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-violet-500 bg-violet-50 text-violet-700'
+                              ? type === 'GIT' ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-mountain-500 bg-mountain-50 text-mountain-700'
                               : 'border-slate-200 text-slate-500 hover:border-slate-300',
                             disabled ? 'opacity-40 cursor-not-allowed' : '',
                           )}
@@ -751,13 +751,13 @@ function TravelDayEditor({ packageId, totalNights }: { packageId: string; totalN
   const dayBorderBg = (offset: number) => {
     if (isDeparture(offset)) return 'border-l-amber-400 bg-amber-50/60';
     if (isReturn(offset)) return 'border-l-emerald-400 bg-emerald-50/60';
-    return isNightRow(offset) ? 'border-l-blue-300 bg-white' : 'border-l-sky-300 bg-sky-50/30';
+    return isNightRow(offset) ? 'border-l-primary-300 bg-white' : 'border-l-sky-300 bg-sky-50/30';
   };
 
   const dayBadge = (offset: number) => {
     if (isDeparture(offset)) return 'bg-amber-100 text-amber-700';
     if (isReturn(offset)) return 'bg-emerald-100 text-emerald-700';
-    return isNightRow(offset) ? 'bg-blue-100 text-blue-700' : 'bg-sky-100 text-sky-700';
+    return isNightRow(offset) ? 'bg-primary-100 text-primary-700' : 'bg-sky-100 text-sky-700';
   };
 
   if (isLoading) return <div className="py-8 text-center text-slate-400 text-sm">Loading day plan…</div>;
@@ -885,7 +885,7 @@ function AuditTrail({ packageId }: { packageId: string }) {
 
   const ACTION_STYLES: Record<string, string> = {
     CREATE: 'bg-emerald-100 text-emerald-700',
-    UPDATE: 'bg-blue-100 text-blue-700',
+    UPDATE: 'bg-primary-100 text-primary-700',
     DELETE: 'bg-red-100 text-red-700',
   };
 
@@ -969,7 +969,7 @@ function PackageDetailModal({ pkg, onClose, onEdit, canEdit, initialTab }: {
           <div className="flex items-center gap-2 flex-wrap">
             <span className={cn('badge text-[10px]', STATUS_COLORS[pkg.status])}>{pkg.status}</span>
             <span className={cn('text-[10px] font-bold px-2 py-0.5 rounded-full',
-              pkg.packageType === 'GIT' ? 'bg-blue-100 text-blue-700' : 'bg-violet-100 text-violet-700'
+              pkg.packageType === 'GIT' ? 'bg-primary-100 text-primary-700' : 'bg-mountain-100 text-mountain-700'
             )}>{pkg.packageType}</span>
             {pkg.difficultyLevel && (
               <span className={cn('text-[10px] px-2 py-0.5 rounded-full font-medium', DIFFICULTY_COLORS[pkg.difficultyLevel])}>
@@ -1121,7 +1121,7 @@ function PackageCard({ pkg, onView, onViewItinerary, onEdit, onDelete, canMutate
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             <span className={cn('text-[10px] font-bold px-1.5 py-0.5 rounded',
-              pkg.packageType === 'GIT' ? 'bg-blue-100 text-blue-700' : 'bg-violet-100 text-violet-700'
+              pkg.packageType === 'GIT' ? 'bg-primary-100 text-primary-700' : 'bg-mountain-100 text-mountain-700'
             )}>{pkg.packageType ?? 'GIT'}</span>
             <span className={cn('badge text-[10px]', STATUS_COLORS[pkg.status] ?? 'badge-muted')}>{pkg.status}</span>
             {pkg.difficultyLevel && (
@@ -1272,7 +1272,7 @@ export default function PackagesPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold text-slate-900">Packages</h2>
+          <h2 className="page-title">Packages</h2>
           <p className="text-sm text-slate-500 mt-0.5">Manage tour packages with itinerary workflows</p>
         </div>
         <button onClick={openCreate} className="btn-primary gap-2 self-start sm:self-auto">

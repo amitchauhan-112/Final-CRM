@@ -51,7 +51,7 @@ export default function MyTargetsPage() {
   return (
     <div className="space-y-5">
       <div>
-        <h2 className="text-xl font-bold text-slate-900">My Target & Incentives</h2>
+        <h2 className="page-title">My Target & Incentives</h2>
         <p className="text-sm text-slate-500 mt-0.5">{MONTH_NAMES[month - 1]} {year} — updates in real time as bookings are confirmed</p>
       </div>
 

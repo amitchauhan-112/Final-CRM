@@ -79,8 +79,8 @@ function DesignationCard({ desig, onEdit, onDelete, onToggle }: {
       {/* Header */}
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2.5 min-w-0">
-          <div className="w-8 h-8 rounded-lg bg-violet-50 border border-violet-100 flex items-center justify-center flex-shrink-0">
-            <Award className="w-4 h-4 text-violet-600" />
+          <div className="w-8 h-8 rounded-lg bg-mountain-50 border border-mountain-100 flex items-center justify-center flex-shrink-0">
+            <Award className="w-4 h-4 text-mountain-600" />
           </div>
           <div className="min-w-0">
             <p className="font-semibold text-slate-900 text-sm truncate">{desig.name}</p>

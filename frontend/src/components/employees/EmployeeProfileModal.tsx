@@ -142,7 +142,7 @@ export default function EmployeeProfileModal({ employeeId, onClose }: Props) {
                   <StatBox icon={Target} label="Total Leads" value={profile.stats.total} color="bg-slate-50 border-slate-200 text-slate-700" />
                   <StatBox icon={CheckCircle} label="Confirmed" value={profile.stats.confirmed} color="bg-green-50 border-green-200 text-green-700" />
                   <StatBox icon={XCircle} label="Lost" value={profile.stats.lost} color="bg-red-50 border-red-200 text-red-700" />
-                  <StatBox icon={Clock} label="Pending" value={profile.stats.pending} color="bg-blue-50 border-blue-200 text-blue-700" />
+                  <StatBox icon={Clock} label="Pending" value={profile.stats.pending} color="bg-primary-50 border-primary-200 text-primary-700" />
                   <StatBox icon={AlertCircle} label="Overdue" value={profile.stats.overdue} color="bg-orange-50 border-orange-200 text-orange-700" />
                   <StatBox icon={TrendingUp} label="Conv. Rate" value={`${profile.stats.conversionRate}%`} color="bg-primary-50 border-primary-200 text-primary-700" />
                 </div>

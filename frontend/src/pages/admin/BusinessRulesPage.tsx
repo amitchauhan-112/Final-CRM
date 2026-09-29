@@ -7,7 +7,7 @@ import { formatDate, cn } from '../../utils/helpers';
 
 const CATEGORY_BADGE: Record<string, string> = {
   SALES: 'bg-primary-50 text-primary-700',
-  OPERATIONS: 'bg-blue-50 text-blue-700',
+  OPERATIONS: 'bg-primary-50 text-primary-700',
   FINANCE: 'bg-emerald-50 text-emerald-700',
   CUSTOMER: 'bg-pink-50 text-pink-700',
   SYSTEM: 'bg-slate-100 text-slate-600',
@@ -50,7 +50,7 @@ export default function BusinessRulesPage() {
   return (
     <div className="space-y-5">
       <div>
-        <h2 className="text-xl font-bold text-slate-900">Business Rules</h2>
+        <h2 className="page-title">Business Rules</h2>
         <p className="text-sm text-slate-500 mt-0.5">Every threshold that drives automatic reminders and payment schedules — edit without touching code</p>
       </div>
 

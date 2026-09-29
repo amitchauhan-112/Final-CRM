@@ -120,7 +120,7 @@ export default function CampaignForm({
   return (
     <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-4">
       {isMetaCampaign && (
-        <div className="flex items-center gap-2 p-3 bg-blue-50 border border-blue-200 rounded-xl text-xs text-blue-700">
+        <div className="flex items-center gap-2 p-3 bg-primary-50 border border-primary-200 rounded-xl text-xs text-primary-700">
           <Link2 className="w-3.5 h-3.5 flex-shrink-0" />
           <span>This campaign is synced from Meta Ads. Name, status, dates, and budget are managed by Meta and cannot be edited here.</span>
         </div>

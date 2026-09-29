@@ -361,13 +361,13 @@ function BookingSummary({ booking, onEdit }: { booking: Booking; onEdit: () => v
 
 const TASK_STATUS_CFG: Record<string, { label: string; color: string; bg: string }> = {
   PENDING:     { label: 'Pending',     color: 'text-amber-700',  bg: 'bg-amber-100' },
-  IN_PROGRESS: { label: 'In Progress', color: 'text-blue-700',   bg: 'bg-blue-100' },
+  IN_PROGRESS: { label: 'In Progress', color: 'text-primary-700',   bg: 'bg-primary-100' },
   DONE:        { label: 'Done',        color: 'text-emerald-700', bg: 'bg-emerald-100' },
   SKIPPED:     { label: 'Skipped',    color: 'text-slate-500',  bg: 'bg-slate-100' },
 };
 const PRIORITY_DOT: Record<string, string> = { HIGH: 'bg-red-500', MEDIUM: 'bg-amber-400', LOW: 'bg-slate-300' };
 const DEPT_BADGE: Record<string, string> = {
-  SALES: 'bg-blue-50 text-blue-700', OPERATIONS: 'bg-purple-50 text-purple-700',
+  SALES: 'bg-primary-50 text-primary-700', OPERATIONS: 'bg-purple-50 text-purple-700',
   CUSTOMER_CARE: 'bg-emerald-50 text-emerald-700', ALL: 'bg-slate-100 text-slate-600',
 };
 
@@ -576,7 +576,7 @@ function PaymentsTab({ booking }: { booking: Booking }) {
     CASH: 'Cash', UPI: 'UPI', BANK_TRANSFER: 'Bank Transfer', CHEQUE: 'Cheque', ONLINE: 'Online',
   };
   const typeColors: Record<string, string> = {
-    ADVANCE: 'bg-blue-100 text-blue-700',
+    ADVANCE: 'bg-primary-100 text-primary-700',
     PARTIAL: 'bg-amber-100 text-amber-700',
     FINAL: 'bg-emerald-100 text-emerald-700',
     REFUND: 'bg-red-100 text-red-700',
@@ -1124,7 +1124,7 @@ export default function LeadDetail({ leadId, open, onClose, isStarred, onToggleS
                     <Badge source={lead.source} />
                     <PriorityBadge priority={(lead as any).priority ?? 'MEDIUM'} />
                     {!lead.isRead && (
-                      <span className="text-[10px] px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full font-semibold">New</span>
+                      <span className="text-[10px] px-2 py-0.5 bg-primary-100 text-primary-700 rounded-full font-semibold">New</span>
                     )}
                   </div>
                   {/* Tags */}

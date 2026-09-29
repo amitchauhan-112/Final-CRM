@@ -611,8 +611,8 @@ function MetaIntegrationsSection() {
       {/* Header card */}
       <div className="card p-5">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 bg-blue-50 rounded-xl flex items-center justify-center flex-shrink-0">
-            <Link2 className="w-5 h-5 text-blue-600" />
+          <div className="w-9 h-9 bg-primary-50 rounded-xl flex items-center justify-center flex-shrink-0">
+            <Link2 className="w-5 h-5 text-primary-600" />
           </div>
           <div className="flex-1">
             <h4 className="font-semibold text-slate-800 text-sm">Meta (Facebook / Instagram) Ads</h4>
@@ -1027,7 +1027,7 @@ export default function AdminSettingsPage() {
   return (
     <div className="space-y-5">
       <div>
-        <h2 className="text-xl font-bold text-slate-900">Settings</h2>
+        <h2 className="page-title">Settings</h2>
         <p className="text-sm text-slate-500 mt-0.5">Manage account, organization, and integration settings</p>
       </div>
 

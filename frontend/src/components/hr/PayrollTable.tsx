@@ -7,7 +7,7 @@ import Modal from '../ui/Modal';
 
 const STATUS_BADGE: Record<string, string> = {
   PENDING: 'bg-amber-50 text-amber-700',
-  PARTIAL: 'bg-blue-50 text-blue-700',
+  PARTIAL: 'bg-primary-50 text-primary-700',
   PAID: 'bg-emerald-50 text-emerald-700',
 };
 const STATUS_ICON: Record<string, typeof Clock> = { PENDING: Clock, PARTIAL: AlertCircle, PAID: CheckCircle2 };

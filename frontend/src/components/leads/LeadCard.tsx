@@ -17,7 +17,7 @@ export default function LeadCard({ lead, onClick }: LeadCardProps) {
     <div
       onClick={() => onClick?.(lead)}
       className={cn(
-        'card p-4 hover:shadow-md transition-all cursor-pointer',
+        'card-interactive p-4',
         overdue && 'border-red-200 bg-red-50/30',
         !lead.isRead && 'border-l-4 border-l-primary-500'
       )}

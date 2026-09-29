@@ -45,10 +45,10 @@ const SOURCE_COLORS: Record<string, string> = {
 };
 
 const AGE_CONFIG = [
-  { key: 'fresh',  label: 'Fresh',    desc: '< 1 day',   color: 'bg-green-500',  text: 'text-green-700',  badge: 'bg-green-100' },
-  { key: 'recent', label: 'Recent',   desc: '1–3 days',  color: 'bg-blue-500',   text: 'text-blue-700',   badge: 'bg-blue-100' },
+  { key: 'fresh',  label: 'Fresh',    desc: '< 1 day',   color: 'bg-emerald-500',  text: 'text-emerald-700',  badge: 'bg-emerald-100' },
+  { key: 'recent', label: 'Recent',   desc: '1–3 days',  color: 'bg-primary-500',   text: 'text-primary-700',   badge: 'bg-primary-100' },
   { key: 'aging',  label: 'Aging',    desc: '3–7 days',  color: 'bg-yellow-500', text: 'text-yellow-700', badge: 'bg-yellow-100' },
-  { key: 'old',    label: 'Old',      desc: '7–14 days', color: 'bg-orange-500', text: 'text-orange-700', badge: 'bg-orange-100' },
+  { key: 'old',    label: 'Old',      desc: '7–14 days', color: 'bg-amber-500', text: 'text-amber-700', badge: 'bg-amber-100' },
   { key: 'stale',  label: 'Stale',    desc: '14+ days',  color: 'bg-red-500',    text: 'text-red-700',    badge: 'bg-red-100' },
 ];
 
@@ -56,10 +56,10 @@ const AGE_CONFIG = [
 
 function DailyActivityCard({ daily }: { daily: { created: number; updated: number; transferred: number; confirmed: number; lost: number } }) {
   const items = [
-    { label: 'Created',     value: daily.created,     color: 'text-blue-600',   bg: 'bg-blue-50',   icon: '➕' },
+    { label: 'Created',     value: daily.created,     color: 'text-primary-600',   bg: 'bg-primary-50',   icon: '➕' },
     { label: 'Updated',     value: daily.updated,     color: 'text-purple-600', bg: 'bg-purple-50', icon: '✏️' },
-    { label: 'Transferred', value: daily.transferred, color: 'text-orange-600', bg: 'bg-orange-50', icon: '🔄' },
-    { label: 'Confirmed',   value: daily.confirmed,   color: 'text-green-600',  bg: 'bg-green-50',  icon: '✅' },
+    { label: 'Transferred', value: daily.transferred, color: 'text-amber-600', bg: 'bg-amber-50', icon: '🔄' },
+    { label: 'Confirmed',   value: daily.confirmed,   color: 'text-emerald-600',  bg: 'bg-emerald-50',  icon: '✅' },
     { label: 'Lost',        value: daily.lost,        color: 'text-red-600',    bg: 'bg-red-50',    icon: '❌' },
   ];
   return (
@@ -84,9 +84,9 @@ function DailyActivityCard({ daily }: { daily: { created: number; updated: numbe
 function FollowUpHealthCard({ health }: { health: { today: number; done: number; pending: number; overdue: number } }) {
   const navigate = useNavigate();
   const items = [
-    { label: 'Today',    value: health.today,   color: 'text-blue-700',   bg: 'bg-blue-50',   border: 'border-blue-200',  icon: Calendar },
-    { label: 'Done',     value: health.done,    color: 'text-green-700',  bg: 'bg-green-50',  border: 'border-green-200', icon: CheckCircle },
-    { label: 'Pending',  value: health.pending, color: 'text-orange-700', bg: 'bg-orange-50', border: 'border-orange-200',icon: Clock },
+    { label: 'Today',    value: health.today,   color: 'text-primary-700',   bg: 'bg-primary-50',   border: 'border-primary-200',  icon: Calendar },
+    { label: 'Done',     value: health.done,    color: 'text-emerald-700',  bg: 'bg-emerald-50',  border: 'border-emerald-200', icon: CheckCircle },
+    { label: 'Pending',  value: health.pending, color: 'text-amber-700', bg: 'bg-amber-50', border: 'border-amber-200',icon: Clock },
     { label: 'Overdue',  value: health.overdue, color: 'text-red-700',    bg: 'bg-red-50',    border: 'border-red-200',   icon: AlertCircle },
   ];
   return (
@@ -174,7 +174,7 @@ function WorkloadWidget({ workload }: { workload: { id: string; name: string; ac
         <div className="space-y-2.5">
           {workload.map((emp) => {
             const pct = (emp.activeLeads / max) * 100;
-            const color = emp.activeLeads > max * 0.8 ? 'bg-red-500' : emp.activeLeads > max * 0.5 ? 'bg-orange-500' : 'bg-green-500';
+            const color = emp.activeLeads > max * 0.8 ? 'bg-red-500' : emp.activeLeads > max * 0.5 ? 'bg-amber-500' : 'bg-emerald-500';
             return (
               <div key={emp.id} className="flex items-center gap-3">
                 <Avatar name={emp.name} size="xs" className="flex-shrink-0" />
@@ -218,15 +218,15 @@ function RecentConfirmedWidget({ bookings }: { bookings: { id: string; name: str
         <div className="divide-y divide-slate-100">
           {bookings.map((b) => (
             <div key={b.id} className="flex items-center gap-3 px-5 py-3 hover:bg-slate-50 transition-colors">
-              <div className="w-8 h-8 bg-green-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                <CheckCircle className="w-4 h-4 text-green-600" />
+              <div className="w-8 h-8 bg-emerald-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                <CheckCircle className="w-4 h-4 text-emerald-600" />
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-slate-800 truncate">{b.name}</p>
                 <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                   {b.destination && <span className="text-xs text-slate-500">{b.destination}</span>}
                   {b.groupSize && <span className="text-xs text-slate-400">· {b.groupSize} pax</span>}
-                  {b.budget && <span className="text-xs text-green-600 font-medium">· {formatCurrency(b.budget)}</span>}
+                  {b.budget && <span className="text-xs text-emerald-600 font-medium">· {formatCurrency(b.budget)}</span>}
                 </div>
               </div>
               <div className="text-right shrink-0">
@@ -273,7 +273,7 @@ function LeaderboardWidget() {
         <div className="divide-y divide-slate-100">
           {sorted.map((emp, idx) => {
             const rate = parseFloat(emp.conversionRate);
-            const rateColor = rate >= 50 ? 'text-green-600' : rate >= 25 ? 'text-yellow-600' : 'text-red-600';
+            const rateColor = rate >= 50 ? 'text-emerald-600' : rate >= 25 ? 'text-yellow-600' : 'text-red-600';
             return (
               <div
                 key={emp.id}
@@ -288,7 +288,7 @@ function LeaderboardWidget() {
                 </div>
                 <div className="flex items-center gap-4 text-right shrink-0">
                   <div>
-                    <p className="text-sm font-bold text-green-700">{emp.confirmed}</p>
+                    <p className="text-sm font-bold text-emerald-700">{emp.confirmed}</p>
                     <p className="text-xs text-slate-400">Confirmed</p>
                   </div>
                   <div>
@@ -351,9 +351,9 @@ function QuickActionsWidget() {
   const actions = [
     { label: 'New Lead',        icon: Plus,      color: 'text-primary-600 bg-primary-50 hover:bg-primary-100 border-primary-200', action: () => navigate('/admin/leads') },
     { label: 'High Priority',   icon: Flag,       color: 'text-red-600 bg-red-50 hover:bg-red-100 border-red-200',               action: () => navigate('/admin/leads') },
-    { label: 'Overdue',         icon: AlertCircle,color: 'text-orange-600 bg-orange-50 hover:bg-orange-100 border-orange-200',   action: () => navigate('/admin/leads?status=FOLLOW_UP_SCHEDULED') },
-    { label: 'Confirmed',       icon: CheckCircle,color: 'text-green-600 bg-green-50 hover:bg-green-100 border-green-200',       action: () => navigate('/admin/leads?status=CONFIRMED') },
-    { label: 'Campaigns',       icon: Megaphone,  color: 'text-violet-600 bg-violet-50 hover:bg-violet-100 border-violet-200',   action: () => navigate('/admin/campaigns') },
+    { label: 'Overdue',         icon: AlertCircle,color: 'text-amber-600 bg-amber-50 hover:bg-amber-100 border-amber-200',   action: () => navigate('/admin/leads?status=FOLLOW_UP_SCHEDULED') },
+    { label: 'Confirmed',       icon: CheckCircle,color: 'text-emerald-600 bg-emerald-50 hover:bg-emerald-100 border-emerald-200',       action: () => navigate('/admin/leads?status=CONFIRMED') },
+    { label: 'Campaigns',       icon: Megaphone,  color: 'text-mountain-600 bg-mountain-50 hover:bg-mountain-100 border-mountain-200',   action: () => navigate('/admin/campaigns') },
     { label: 'Reports',         icon: BarChart2,  color: 'text-sky-600 bg-sky-50 hover:bg-sky-100 border-sky-200',               action: () => navigate('/admin/reports') },
     { label: 'Finance',         icon: Wallet,     color: 'text-emerald-600 bg-emerald-50 hover:bg-emerald-100 border-emerald-200', action: () => navigate('/admin/finance/dashboard') },
     { label: 'Operations',      icon: Map,        color: 'text-cyan-600 bg-cyan-50 hover:bg-cyan-100 border-cyan-200',           action: () => navigate('/admin/operations/dashboard') },
@@ -422,8 +422,8 @@ function HighPriorityWidget({ organizationId }: { organizationId?: string }) {
                 'text-xs px-1.5 py-0.5 rounded-full font-medium',
                 l.status === 'NEW' ? 'bg-sky-100 text-sky-700' :
                 l.status === 'CONTACTED' ? 'bg-yellow-100 text-yellow-700' :
-                l.status === 'INTERESTED' ? 'bg-violet-100 text-violet-700' :
-                'bg-orange-100 text-orange-700'
+                l.status === 'INTERESTED' ? 'bg-mountain-100 text-mountain-700' :
+                'bg-amber-100 text-amber-700'
               )}>{l.status.replace('_', ' ')}</span>
               {l.followUpDate && !l.followUpDone && (
                 <p className={cn('text-xs mt-0.5', new Date(l.followUpDate) < new Date() ? 'text-red-500 font-medium' : 'text-slate-400')}>
@@ -502,8 +502,8 @@ export default function AdminDashboard() {
           label="Pending Leads"
           value={pendingLeads}
           icon={Clock}
-          iconBg="bg-orange-100"
-          iconColor="text-orange-600"
+          iconBg="bg-amber-100"
+          iconColor="text-amber-600"
           onClick={() => navigate('/admin/leads')}
         />
         <StatsCard
@@ -518,8 +518,8 @@ export default function AdminDashboard() {
           label="Confirmed Bookings"
           value={stats?.byStatus?.CONFIRMED ?? 0}
           icon={CheckCircle}
-          iconBg="bg-green-100"
-          iconColor="text-green-600"
+          iconBg="bg-emerald-100"
+          iconColor="text-emerald-600"
           onClick={() => navigate('/admin/leads?status=CONFIRMED')}
         />
         <StatsCard
@@ -564,24 +564,24 @@ export default function AdminDashboard() {
             label="Interested"
             value={stats?.byStatus?.INTERESTED ?? 0}
             icon={TrendingUp}
-            iconBg="bg-violet-100"
-            iconColor="text-violet-600"
+            iconBg="bg-mountain-100"
+            iconColor="text-mountain-600"
             onClick={() => navigate('/admin/leads?status=INTERESTED')}
           />
           <StatsCard
             label="Follow-up Sched."
             value={stats?.byStatus?.FOLLOW_UP_SCHEDULED ?? 0}
             icon={CalendarCheck}
-            iconBg="bg-orange-100"
-            iconColor="text-orange-600"
+            iconBg="bg-amber-100"
+            iconColor="text-amber-600"
             onClick={() => navigate('/admin/leads?status=FOLLOW_UP_SCHEDULED')}
           />
           <StatsCard
             label="Confirmed"
             value={stats?.byStatus?.CONFIRMED ?? 0}
             icon={CheckCircle}
-            iconBg="bg-green-100"
-            iconColor="text-green-600"
+            iconBg="bg-emerald-100"
+            iconColor="text-emerald-600"
             onClick={() => navigate('/admin/leads?status=CONFIRMED')}
           />
           <StatsCard
@@ -699,7 +699,7 @@ export default function AdminDashboard() {
                           </div>
                         </td>
                         <td className="text-right font-semibold text-slate-700 tabular">{c.total}</td>
-                        <td className="text-right font-semibold text-orange-600 tabular">{c.pending ?? c.active}</td>
+                        <td className="text-right font-semibold text-amber-600 tabular">{c.pending ?? c.active}</td>
                         <td className="text-right font-semibold text-emerald-700 tabular">{c.confirmed}</td>
                         <td className="text-right font-semibold text-red-600 tabular">{c.lost}</td>
                         <td className="text-right">

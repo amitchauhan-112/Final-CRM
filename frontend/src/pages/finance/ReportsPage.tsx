@@ -86,7 +86,7 @@ export default function FinanceReportsPage() {
     <div className="space-y-5">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h2 className="text-xl font-bold text-slate-900">Reports</h2>
+          <h2 className="page-title">Reports</h2>
           <p className="text-sm text-slate-500 mt-0.5">Collections, revenue, outstanding, vendor, and refund reporting</p>
         </div>
         <div className="flex items-center gap-2">

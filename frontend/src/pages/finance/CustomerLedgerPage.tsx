@@ -31,7 +31,7 @@ export default function CustomerLedgerPage() {
   return (
     <div className="space-y-5">
       <div>
-        <h2 className="text-xl font-bold text-slate-900">Customer Ledger</h2>
+        <h2 className="page-title">Customer Ledger</h2>
         <p className="text-sm text-slate-500 mt-0.5">Complete financial history per booking</p>
       </div>
 

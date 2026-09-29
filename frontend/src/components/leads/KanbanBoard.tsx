@@ -17,7 +17,7 @@ const COLUMNS: {
 }[] = [
   { status: 'NEW',                 label: 'New',             color: 'text-sky-700',    bg: 'bg-sky-50',     headerBg: 'bg-sky-100 border-sky-200',     dot: 'bg-sky-500' },
   { status: 'CONTACTED',           label: 'Contacted',       color: 'text-yellow-700', bg: 'bg-yellow-50',  headerBg: 'bg-yellow-100 border-yellow-200',dot: 'bg-yellow-500' },
-  { status: 'INTERESTED',          label: 'Interested',      color: 'text-violet-700', bg: 'bg-violet-50',  headerBg: 'bg-violet-100 border-violet-200',dot: 'bg-violet-500' },
+  { status: 'INTERESTED',          label: 'Interested',      color: 'text-mountain-700', bg: 'bg-mountain-50',  headerBg: 'bg-mountain-100 border-mountain-200',dot: 'bg-mountain-500' },
   { status: 'FOLLOW_UP_SCHEDULED', label: 'Follow-up',       color: 'text-orange-700', bg: 'bg-orange-50',  headerBg: 'bg-orange-100 border-orange-200',dot: 'bg-orange-500' },
   { status: 'CONFIRMED',           label: 'Confirmed',       color: 'text-emerald-700',bg: 'bg-emerald-50', headerBg: 'bg-emerald-100 border-emerald-200',dot: 'bg-emerald-500' },
   { status: 'LOST',                label: 'Lost',            color: 'text-red-700',    bg: 'bg-red-50',     headerBg: 'bg-red-100 border-red-200',     dot: 'bg-red-500' },
@@ -59,7 +59,7 @@ function KanbanCard({
       onClick={() => onOpenDetail(lead.id)}
       title={isLocked ? 'A confirmed lead\'s status can never be changed again' : undefined}
       className={cn(
-        'bg-white rounded-xl border border-slate-200 p-3.5 shadow-sm hover:shadow-md cursor-pointer transition-all select-none',
+        'card-interactive p-3.5 select-none',
         isDragging && 'opacity-40 scale-95'
       )}
     >
@@ -90,7 +90,7 @@ function KanbanCard({
         <div
           className={cn(
             'flex items-center gap-1 text-xs font-medium mb-2',
-            hasOverdueFollowup ? 'text-red-600' : hasTodayFollowup ? 'text-orange-600' : 'text-blue-600'
+            hasOverdueFollowup ? 'text-red-600' : hasTodayFollowup ? 'text-orange-600' : 'text-primary-600'
           )}
         >
           {hasOverdueFollowup ? (

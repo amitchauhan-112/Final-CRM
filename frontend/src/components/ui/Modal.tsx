@@ -67,6 +67,8 @@ export default function Modal({
             <h2 className="text-base font-semibold text-slate-900">{title}</h2>
             <button
               onClick={onClose}
+              title="Close"
+              aria-label="Close"
               className="p-1.5 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
             >
               <X className="w-4 h-4" />

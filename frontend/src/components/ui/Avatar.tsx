@@ -16,7 +16,7 @@ const sizeClasses = {
 };
 
 const colors = [
-  'bg-blue-500',
+  'bg-primary-500',
   'bg-mountain-500',
   'bg-green-500',
   'bg-orange-500',

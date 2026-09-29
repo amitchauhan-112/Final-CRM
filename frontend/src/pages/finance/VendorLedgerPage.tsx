@@ -11,7 +11,7 @@ const STATUS_BADGE: Record<string, string> = {
   PARTIAL: 'bg-primary-50 text-primary-700',
   PAID: 'bg-emerald-50 text-emerald-700',
   OVERDUE: 'bg-red-50 text-red-600',
-  RECEIVABLE: 'bg-violet-50 text-violet-700',
+  RECEIVABLE: 'bg-mountain-50 text-mountain-700',
 };
 
 const METHOD_LABEL: Record<string, string> = {
@@ -34,7 +34,7 @@ export default function VendorLedgerPage() {
   return (
     <div className="space-y-5">
       <div>
-        <h2 className="text-xl font-bold text-slate-900">Vendor Ledger</h2>
+        <h2 className="page-title">Vendor Ledger</h2>
         <p className="text-sm text-slate-500 mt-0.5">Running statement per vendor across every bill</p>
       </div>
 
@@ -94,7 +94,7 @@ export default function VendorLedgerPage() {
                   </div>
                   <div>
                     <p className="text-xs text-slate-400">{ledger.ledger.totalOutstanding < 0 ? 'They Owe Us' : 'Outstanding'}</p>
-                    <p className={cn('text-lg font-bold', ledger.ledger.totalOutstanding < 0 ? 'text-violet-600' : 'text-orange-500')}>{formatCurrency(Math.abs(ledger.ledger.totalOutstanding))}</p>
+                    <p className={cn('text-lg font-bold', ledger.ledger.totalOutstanding < 0 ? 'text-mountain-600' : 'text-orange-500')}>{formatCurrency(Math.abs(ledger.ledger.totalOutstanding))}</p>
                   </div>
                   <div>
                     <p className="text-xs text-slate-400">Bills</p>
@@ -133,7 +133,7 @@ export default function VendorLedgerPage() {
                               <td className="px-4 py-2.5">{p.serviceType.replace('_', ' ')}</td>
                               <td className="px-4 py-2.5 text-right">{formatCurrency(p.totalAmount)}</td>
                               <td className="px-4 py-2.5 text-right">{formatCurrency(p.advancePaid)}</td>
-                              <td className={cn('px-4 py-2.5 text-right font-medium', p.balanceAmount < 0 && 'text-violet-600')}>{formatCurrency(Math.abs(p.balanceAmount))}</td>
+                              <td className={cn('px-4 py-2.5 text-right font-medium', p.balanceAmount < 0 && 'text-mountain-600')}>{formatCurrency(Math.abs(p.balanceAmount))}</td>
                               <td className="px-4 py-2.5"><span className={cn('badge', STATUS_BADGE[p.status])}>{p.status === 'RECEIVABLE' ? 'THEY OWE US' : p.status}</span></td>
                               <td className="px-4 py-2.5 text-right whitespace-nowrap">
                                 <button onClick={() => setAddEntryFor(p.id)} className="text-xs font-medium text-emerald-600 hover:text-emerald-700 mr-2">Add</button>

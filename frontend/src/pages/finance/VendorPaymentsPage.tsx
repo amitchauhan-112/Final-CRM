@@ -16,7 +16,7 @@ const STATUS_BADGE: Record<string, string> = {
   PARTIAL: 'bg-primary-50 text-primary-700',
   PAID: 'bg-emerald-50 text-emerald-700',
   OVERDUE: 'bg-red-50 text-red-600',
-  RECEIVABLE: 'bg-violet-50 text-violet-700',
+  RECEIVABLE: 'bg-mountain-50 text-mountain-700',
 };
 
 const METHOD_LABEL: Record<string, string> = {
@@ -51,7 +51,7 @@ function VendorPaymentCard({ vp }: { vp: VendorPayment }) {
         <div><p className="text-slate-400">Advance Paid</p><p className="font-semibold text-slate-700">{formatCurrency(vp.advancePaid)}</p></div>
         <div>
           <p className="text-slate-400">{vp.balanceAmount < 0 ? 'They Owe Us' : 'Balance'}</p>
-          <p className={cn('font-semibold', vp.balanceAmount < 0 ? 'text-violet-600' : 'text-orange-500')}>{formatCurrency(Math.abs(vp.balanceAmount))}</p>
+          <p className={cn('font-semibold', vp.balanceAmount < 0 ? 'text-mountain-600' : 'text-orange-500')}>{formatCurrency(Math.abs(vp.balanceAmount))}</p>
         </div>
         <div><p className="text-slate-400">Due Date</p><p className="font-semibold text-slate-700">{vp.dueDate ? formatDate(vp.dueDate) : '—'}</p></div>
       </div>
@@ -130,7 +130,7 @@ export default function VendorPaymentsPage() {
     <div className="space-y-5">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h2 className="text-xl font-bold text-slate-900">Vendor Payments</h2>
+          <h2 className="page-title">Vendor Payments</h2>
           <p className="text-sm text-slate-500 mt-0.5">Hotels, vehicles, trip captains, guides & local vendors</p>
         </div>
         <button onClick={() => setAddOpen(true)} className="btn-primary text-sm"><Plus className="w-4 h-4" />Add Vendor Bill</button>

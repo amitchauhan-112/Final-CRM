@@ -106,7 +106,7 @@ export default function ApprovalsPage() {
   return (
     <div className="space-y-5">
       <div>
-        <h2 className="text-xl font-bold text-slate-900">Approvals</h2>
+        <h2 className="page-title">Approvals</h2>
         <p className="text-sm text-slate-500 mt-0.5">Everything waiting on your sign-off, in one queue</p>
       </div>
 

@@ -88,7 +88,7 @@ function ItineraryTable({ rows, nights, readOnly, onUpdateRow }: {
             ? 'bg-amber-100 text-amber-700'
             : isRet
             ? 'bg-emerald-100 text-emerald-700'
-            : row.rowType === 'day' ? 'bg-sky-100 text-sky-700' : 'bg-blue-100 text-blue-700';
+            : row.rowType === 'day' ? 'bg-sky-100 text-sky-700' : 'bg-primary-100 text-primary-700';
           const badgeText = row.rowType === 'day' ? `D${row.dayIndex}` : `N${row.dayIndex}`;
           return (
             <div key={row.key} className="grid grid-cols-1 sm:grid-cols-[9rem_8rem_1fr] gap-2 sm:gap-x-3 sm:items-center">
@@ -150,7 +150,7 @@ function FITViewModal({ pkg, onClose }: { pkg: PkgType; onClose: () => void }) {
     >
       <div className="space-y-5">
         <div className="flex flex-wrap gap-2 text-xs">
-          <span className={cn('font-bold px-1.5 py-0.5 rounded', pkg.packageType === 'GIT' ? 'bg-blue-100 text-blue-700' : 'bg-violet-100 text-violet-700')}>{pkg.packageType ?? 'GIT'}</span>
+          <span className={cn('font-bold px-1.5 py-0.5 rounded', pkg.packageType === 'GIT' ? 'bg-primary-100 text-primary-700' : 'bg-mountain-100 text-mountain-700')}>{pkg.packageType ?? 'GIT'}</span>
           {pkg.destination && <span className="flex items-center gap-1 text-slate-600"><MapPin className="w-3 h-3" />{pkg.destination.name}, {pkg.destination.country}</span>}
           {pkg.tourCategory && <span className="flex items-center gap-1 text-slate-600"><Tag className="w-3 h-3" />{pkg.tourCategory.name}</span>}
           <span className="flex items-center gap-1 text-slate-600"><Clock className="w-3 h-3" />{pkg.nights}N / {pkg.days}D</span>
@@ -302,11 +302,11 @@ function EditFITModal({ pkg, onClose }: { pkg: PkgType; onClose: () => void }) {
               <input {...register('name', { required: 'Name is required' })} className="input" />
               {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name.message}</p>}
             </div>
-            <div className="flex items-center gap-3 px-4 py-2 bg-violet-50 border border-violet-200 rounded-xl self-end sm:col-span-2">
-              <UserCircle className="w-4 h-4 text-violet-500 flex-shrink-0" />
+            <div className="flex items-center gap-3 px-4 py-2 bg-mountain-50 border border-mountain-200 rounded-xl self-end sm:col-span-2">
+              <UserCircle className="w-4 h-4 text-mountain-500 flex-shrink-0" />
               <div>
-                <p className="text-xs font-semibold text-violet-700">FIT Package</p>
-                <p className="text-[10px] text-violet-500">Individual / independent tour</p>
+                <p className="text-xs font-semibold text-mountain-700">FIT Package</p>
+                <p className="text-[10px] text-mountain-500">Individual / independent tour</p>
               </div>
             </div>
           </div>
@@ -409,7 +409,7 @@ function NewFITModal({ open, onClose }: { open: boolean; onClose: () => void }) 
         </>
       }
     >
-      <div className="mb-4 flex items-start gap-2 px-3 py-2.5 bg-violet-50 border border-violet-200 rounded-xl text-xs text-violet-700">
+      <div className="mb-4 flex items-start gap-2 px-3 py-2.5 bg-mountain-50 border border-mountain-200 rounded-xl text-xs text-mountain-700">
         <Info className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
         <span>FIT packages are Individual / Independent tours you create for specific customers. Add pricing and full details after creation.</span>
       </div>
@@ -421,11 +421,11 @@ function NewFITModal({ open, onClose }: { open: boolean; onClose: () => void }) 
             <input {...register('name', { required: 'Name is required' })} className="input" placeholder="e.g. Manali Private Trip — Sharma Family" />
             {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name.message}</p>}
           </div>
-          <div className="flex items-center gap-3 px-4 py-2 bg-violet-50 border border-violet-200 rounded-xl self-end sm:col-span-2">
-            <UserCircle className="w-4 h-4 text-violet-500 flex-shrink-0" />
+          <div className="flex items-center gap-3 px-4 py-2 bg-mountain-50 border border-mountain-200 rounded-xl self-end sm:col-span-2">
+            <UserCircle className="w-4 h-4 text-mountain-500 flex-shrink-0" />
             <div>
-              <p className="text-xs font-semibold text-violet-700">FIT Package</p>
-              <p className="text-[10px] text-violet-500">Individual / independent tour</p>
+              <p className="text-xs font-semibold text-mountain-700">FIT Package</p>
+              <p className="text-[10px] text-mountain-500">Individual / independent tour</p>
             </div>
           </div>
         </div>
@@ -521,7 +521,7 @@ function PackageCard({
           <div className="flex items-center gap-1.5 flex-wrap">
             <span className={cn(
               'text-[10px] font-bold px-1.5 py-0.5 rounded',
-              pkg.packageType === 'GIT' ? 'bg-blue-100 text-blue-700' : 'bg-violet-100 text-violet-700'
+              pkg.packageType === 'GIT' ? 'bg-primary-100 text-primary-700' : 'bg-mountain-100 text-mountain-700'
             )}>{pkg.packageType ?? 'GIT'}</span>
             {isMyFIT && (
               <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-medium">My Package</span>
@@ -672,7 +672,7 @@ export default function PackageCatalogPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold text-slate-900">Package Catalog</h2>
+          <h2 className="page-title">Package Catalog</h2>
           <p className="text-sm text-slate-500 mt-0.5">Browse GIT group packages or create your own FIT packages</p>
         </div>
         <button onClick={() => setShowNewFIT(true)} className="btn-primary gap-2 self-start sm:self-auto">

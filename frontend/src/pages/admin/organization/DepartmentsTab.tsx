@@ -128,7 +128,7 @@ function DepartmentCard({ dept, onEdit, onDelete, onToggle }: {
         </div>
         <div className="bg-slate-50 rounded-xl p-3 text-center border border-slate-100">
           <div className="flex items-center justify-center gap-1 mb-0.5">
-            <ChevronRight className="w-3.5 h-3.5 text-violet-500" />
+            <ChevronRight className="w-3.5 h-3.5 text-mountain-500" />
             <p className="text-base font-bold text-slate-800 tabular">{desigCount}</p>
           </div>
           <p className="text-[10px] text-slate-400">Designations</p>

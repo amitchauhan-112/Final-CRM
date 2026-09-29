@@ -73,7 +73,7 @@ export default function DeparturesPage() {
         <div className="flex items-center gap-1.5">
           <Map className="w-3.5 h-3.5 text-slate-400" />
           <span className="font-medium text-slate-700">{d.destination}</span>
-          {d.b2bVendorId && <span className="badge bg-violet-50 text-violet-700 text-[10px]" title="This trip was resold to another travel company">B2B</span>}
+          {d.b2bVendorId && <span className="badge bg-mountain-50 text-mountain-700 text-[10px]" title="This trip was resold to another travel company">B2B</span>}
         </div>
       ),
     },
@@ -147,7 +147,7 @@ export default function DeparturesPage() {
   return (
     <div className="space-y-5">
       <div>
-        <h2 className="text-xl font-bold text-slate-900">Departures</h2>
+        <h2 className="page-title">Departures</h2>
         <p className="text-sm text-slate-500 mt-0.5">Every trip, grouped by departure date</p>
       </div>
 

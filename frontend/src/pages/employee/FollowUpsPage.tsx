@@ -121,14 +121,14 @@ function FollowUpCard({
   const colorMap = {
     overdue: 'bg-red-50 border-red-200',
     today: 'bg-orange-50 border-orange-200',
-    upcoming: 'bg-blue-50 border-blue-100',
+    upcoming: 'bg-primary-50 border-primary-100',
     later: 'bg-slate-50 border-slate-200',
   };
 
   const textMap = {
     overdue: 'text-red-700',
     today: 'text-orange-700',
-    upcoming: 'text-blue-700',
+    upcoming: 'text-primary-700',
     later: 'text-slate-600',
   };
 
@@ -352,7 +352,7 @@ export default function EmployeeFollowUpsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-bold text-slate-900">Follow-ups</h2>
+          <h2 className="page-title">Follow-ups</h2>
           <p className="text-sm text-slate-500 mt-0.5">
             {overdue.length > 0 && <span className="text-red-600 font-medium">{overdue.length} overdue · </span>}
             {today.length} today · {upcoming.length} upcoming · {later.length} later · {completedLeads.length} completed

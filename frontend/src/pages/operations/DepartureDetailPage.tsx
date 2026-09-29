@@ -90,7 +90,7 @@ export default function DepartureDetailPage() {
             </div>
             <div>
               <div className="flex items-center gap-2 flex-wrap">
-                <h2 className="text-xl font-bold text-slate-900">{departure.destination}</h2>
+                <h2 className="page-title">{departure.destination}</h2>
                 <select
                   value={departure.status}
                   disabled={updateStatus.isPending}

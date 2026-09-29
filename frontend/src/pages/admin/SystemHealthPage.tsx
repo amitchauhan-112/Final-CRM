@@ -17,7 +17,7 @@ export default function SystemHealthPage() {
   return (
     <div className="space-y-5">
       <div>
-        <h2 className="text-xl font-bold text-slate-900">System Health</h2>
+        <h2 className="page-title">System Health</h2>
         <p className="text-sm text-slate-500 mt-0.5">Background jobs, notifications, database, storage, and recent errors</p>
       </div>
 

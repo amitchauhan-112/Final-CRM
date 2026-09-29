@@ -112,7 +112,7 @@ export default function EmployeeCashPage() {
   return (
     <div className="space-y-5">
       <div>
-        <h2 className="text-xl font-bold text-slate-900">Employee Cash</h2>
+        <h2 className="page-title">Employee Cash</h2>
         <p className="text-sm text-slate-500 mt-0.5">Cash currently held by each employee, and what's been collected from them</p>
       </div>
 

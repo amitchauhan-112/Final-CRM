@@ -284,7 +284,7 @@ function DestinationsTab() {
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1.5">
                         {dest.type === 'INTERNATIONAL' ? (
-                          <Globe className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
+                          <Globe className="w-3.5 h-3.5 text-primary-500 flex-shrink-0" />
                         ) : (
                           <Map className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" />
                         )}
@@ -297,7 +297,7 @@ function DestinationsTab() {
                     <td className="px-4 py-3">
                       <span className={cn(
                         'badge text-[11px]',
-                        dest.type === 'INTERNATIONAL' ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                        dest.type === 'INTERNATIONAL' ? 'bg-primary-50 text-primary-700 border-primary-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'
                       )}>
                         {dest.type === 'INTERNATIONAL' ? 'International' : 'Domestic'}
                       </span>
@@ -449,8 +449,8 @@ function CategoryCard({ cat, onEdit, onDelete, onToggle }: {
       {/* Header */}
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
-          <div className="w-10 h-10 rounded-xl bg-violet-50 border border-violet-100 flex items-center justify-center flex-shrink-0 text-lg">
-            {cat.icon || <Tag className="w-5 h-5 text-violet-500" />}
+          <div className="w-10 h-10 rounded-xl bg-mountain-50 border border-mountain-100 flex items-center justify-center flex-shrink-0 text-lg">
+            {cat.icon || <Tag className="w-5 h-5 text-mountain-500" />}
           </div>
           <div className="min-w-0">
             <p className="font-bold text-slate-900 text-sm truncate">{cat.name}</p>

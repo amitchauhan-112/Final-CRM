@@ -24,7 +24,7 @@ function RoomSummary({ rooms }: { rooms: StayPlanEntry['rooms'] }) {
     { label: 'Single', value: rooms.SINGLE, color: 'text-primary-600' },
     { label: 'Double', value: rooms.DOUBLE, color: 'text-emerald-600' },
     { label: 'Triple', value: rooms.TRIPLE, color: 'text-amber-600' },
-    { label: 'Quad', value: rooms.QUAD, color: 'text-violet-600' },
+    { label: 'Quad', value: rooms.QUAD, color: 'text-mountain-600' },
   ].filter((r) => r.value > 0);
 
   if (items.length === 0) return null;
@@ -271,7 +271,7 @@ export default function StayPlanningPage() {
             <ArrowLeft className="w-4 h-4" />
           </button>
           <div>
-            <h2 className="text-xl font-bold text-slate-900">Stay Planning</h2>
+            <h2 className="page-title">Stay Planning</h2>
             <p className="text-sm text-slate-500 mt-0.5">
               Auto-calculated from confirmed bookings — dates, rooms, and vehicles
             </p>

@@ -73,7 +73,7 @@ export default function BookingsPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold text-slate-900">Bookings</h2>
+          <h2 className="page-title">Bookings</h2>
           <p className="text-sm text-slate-500 mt-0.5">All confirmed bookings with payment status</p>
         </div>
         {meta && (

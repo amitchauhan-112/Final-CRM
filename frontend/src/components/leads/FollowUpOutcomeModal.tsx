@@ -104,9 +104,9 @@ export default function FollowUpOutcomeModal({
             <button
               type="button"
               onClick={onInterested}
-              className="flex items-center gap-3 text-left px-4 py-3 rounded-xl border border-slate-200 hover:border-violet-300 hover:bg-violet-50 transition-all"
+              className="flex items-center gap-3 text-left px-4 py-3 rounded-xl border border-slate-200 hover:border-mountain-300 hover:bg-mountain-50 transition-all"
             >
-              <TrendingUp className="w-4.5 h-4.5 text-violet-500 flex-shrink-0" />
+              <TrendingUp className="w-4.5 h-4.5 text-mountain-500 flex-shrink-0" />
               <div>
                 <p className="text-sm font-semibold text-slate-800">Interested</p>
                 <p className="text-xs text-slate-500">Still interested, no concrete date yet</p>

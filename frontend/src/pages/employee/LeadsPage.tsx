@@ -237,7 +237,7 @@ export default function EmployeeLeadsPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold text-slate-900">My Leads</h2>
+          <h2 className="page-title">My Leads</h2>
           <p className="text-sm text-slate-500 mt-0.5">{meta?.total ?? 0} leads assigned to you</p>
         </div>
         <div className="flex items-center gap-2">

@@ -30,7 +30,7 @@ export default function CampaignCard({ campaign, onEdit, onDelete, onView }: Cam
   const statusCfg = campaignStatusConfig[campaign.status];
 
   return (
-    <div className="card overflow-hidden hover:shadow-elevate-lg hover:-translate-y-1 hover:scale-[1.01] hover:border-primary-100 transition-all duration-200 ease-enterprise group">
+    <div className="card-interactive overflow-hidden group">
 
       {/* ── Gradient banner ──────────────────────────────────────────── */}
       <div

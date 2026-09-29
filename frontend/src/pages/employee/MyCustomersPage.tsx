@@ -49,7 +49,7 @@ export default function MyCustomersPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-bold text-slate-900">My Customers</h2>
+        <h2 className="page-title">My Customers</h2>
         <p className="text-sm text-slate-500 mt-0.5">Confirmed leads assigned to you</p>
       </div>
 

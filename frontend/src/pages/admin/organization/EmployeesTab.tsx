@@ -327,7 +327,7 @@ function EmployeeCard({
                 {user.role}
               </span>
               {user.designation && (
-                <span className="badge text-[10px] px-2 py-0.5 bg-violet-100 text-violet-700">
+                <span className="badge text-[10px] px-2 py-0.5 bg-mountain-100 text-mountain-700">
                   {user.designation.name}
                 </span>
               )}

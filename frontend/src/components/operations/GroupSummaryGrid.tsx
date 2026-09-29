@@ -8,7 +8,7 @@ import { formatCurrency } from '../../utils/helpers';
 export default function GroupSummaryGrid({ summary }: { summary: GroupSummary }) {
   const tiles = [
     { label: 'Total Travelers', value: summary.totalTravelers, icon: Users, color: 'text-primary-600 bg-primary-50', alwaysShow: true },
-    { label: 'Male', value: summary.maleCount, icon: User, color: 'text-blue-600 bg-blue-50' },
+    { label: 'Male', value: summary.maleCount, icon: User, color: 'text-primary-600 bg-primary-50' },
     { label: 'Female', value: summary.femaleCount, icon: User, color: 'text-pink-600 bg-pink-50' },
     { label: 'Double Rooms Required', value: summary.doubleSharingRoomsRequired, icon: BedDouble, color: 'text-slate-600 bg-slate-100' },
     { label: 'Triple Rooms Required', value: summary.tripleSharingRoomsRequired, icon: Layers, color: 'text-slate-600 bg-slate-100' },

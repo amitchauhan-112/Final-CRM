@@ -21,7 +21,7 @@ const STATUS_CFG: Record<RoomRequirementStatus, { label: string; dot: string; bg
   PENDING:          { label: 'Pending',          dot: 'bg-red-500',     bg: 'bg-red-50',     text: 'text-red-700',     icon: AlertTriangle },
   PARTIALLY_BOOKED: { label: 'Partially Booked',  dot: 'bg-amber-500',   bg: 'bg-amber-50',   text: 'text-amber-700',   icon: Clock },
   FULLY_BOOKED:     { label: 'Fully Booked',      dot: 'bg-emerald-500', bg: 'bg-emerald-50', text: 'text-emerald-700', icon: CheckCircle2 },
-  OVERBOOKED:       { label: 'Overbooked',        dot: 'bg-violet-500',  bg: 'bg-violet-50',  text: 'text-violet-700',  icon: AlertTriangle },
+  OVERBOOKED:       { label: 'Overbooked',        dot: 'bg-mountain-500',  bg: 'bg-mountain-50',  text: 'text-mountain-700',  icon: AlertTriangle },
 };
 
 function StatusBadge({ status }: { status: RoomRequirementStatus }) {
@@ -158,7 +158,7 @@ export default function RoomsRequiredPage() {
             <ArrowLeft className="w-4 h-4" />
           </button>
           <div>
-            <h2 className="text-xl font-bold text-slate-900">Rooms Required</h2>
+            <h2 className="page-title">Rooms Required</h2>
             <p className="text-sm text-slate-500 mt-0.5">Date → location → required, booked, pending — at a glance</p>
           </div>
         </div>

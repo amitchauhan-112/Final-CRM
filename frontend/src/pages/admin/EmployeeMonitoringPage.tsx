@@ -151,7 +151,7 @@ export default function EmployeeMonitoringPage() {
                         </button>
                       </td>
                       <Cell value={emp.total} className="font-semibold text-slate-800" />
-                      <Cell value={emp.fresh} status="NEW" className="text-blue-600" />
+                      <Cell value={emp.fresh} status="NEW" className="text-primary-600" />
                       <Cell value={emp.notContacted} status="NOT_CONTACTED" className="text-slate-500" />
                       <Cell value={emp.contacted} status="CONTACTED" className="text-slate-600" />
                       <Cell value={emp.interested} status="INTERESTED" className="text-purple-600" />

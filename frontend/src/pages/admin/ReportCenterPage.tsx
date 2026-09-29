@@ -19,7 +19,7 @@ interface ReportCategory {
 // of their logic.
 const CATEGORIES: ReportCategory[] = [
   { key: 'sales', label: 'Sales Reports', description: 'Lead analytics, conversion, and daily trend', icon: Users2, to: '/admin/reports', color: 'bg-primary-100 text-primary-600' },
-  { key: 'operations', label: 'Operations Reports', description: 'Departure revenue and trip readiness', icon: Map, to: '/admin/finance/reports', color: 'bg-blue-100 text-blue-600' },
+  { key: 'operations', label: 'Operations Reports', description: 'Departure revenue and trip readiness', icon: Map, to: '/admin/finance/reports', color: 'bg-primary-100 text-primary-600' },
   { key: 'finance', label: 'Finance Reports', description: 'Collections, outstanding, refunds, P&L', icon: Wallet, to: '/admin/finance/reports', color: 'bg-emerald-100 text-emerald-600' },
   { key: 'booking', label: 'Booking Reports', description: 'All bookings, status, and balances', icon: BookOpen, to: '/admin/bookings', color: 'bg-amber-100 text-amber-600' },
   { key: 'package', label: 'Package Reports', description: 'Bookings, revenue, profit, cancellation % per package', icon: Package, to: '/admin/business-intelligence?tab=packages', color: 'bg-purple-100 text-purple-600' },
@@ -38,7 +38,7 @@ export default function ReportCenterPage() {
   return (
     <div className="space-y-5">
       <div>
-        <h2 className="text-xl font-bold text-slate-900">Report Center</h2>
+        <h2 className="page-title">Report Center</h2>
         <p className="text-sm text-slate-500 mt-0.5">One place to find every report across Sales, Operations, Finance, and Business Intelligence</p>
       </div>
 
@@ -49,7 +49,7 @@ export default function ReportCenterPage() {
             <button
               key={c.key}
               onClick={() => navigate(c.to)}
-              className="card p-5 text-left hover:shadow-md hover:-translate-y-px transition-all duration-200"
+              className="card-interactive p-5 text-left"
             >
               <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${c.color}`}>
                 <Icon className="w-5 h-5" />
@@ -63,7 +63,7 @@ export default function ReportCenterPage() {
 
       <button
         onClick={() => navigate('/admin/business-intelligence')}
-        className="card p-5 w-full flex items-center gap-3 hover:shadow-md transition-all duration-200"
+        className="card-interactive p-5 w-full flex items-center gap-3"
       >
         <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-primary-100 text-primary-600 flex-shrink-0">
           <LineChart className="w-5 h-5" />

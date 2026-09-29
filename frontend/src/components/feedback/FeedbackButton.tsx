@@ -15,7 +15,7 @@ type FormValues = {
 const typeOptions = [
   { value: 'BUG', label: 'Bug Report', icon: Bug, color: 'text-red-600' },
   { value: 'SUGGESTION', label: 'Suggestion', icon: Lightbulb, color: 'text-amber-600' },
-  { value: 'OTHER', label: 'Other', icon: MessageCircle, color: 'text-blue-600' },
+  { value: 'OTHER', label: 'Other', icon: MessageCircle, color: 'text-primary-600' },
 ];
 
 const priorityOptions = [

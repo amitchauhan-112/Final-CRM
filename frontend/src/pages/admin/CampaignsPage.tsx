@@ -86,13 +86,13 @@ function CampaignDetailModal({
               <div className="flex items-center gap-2 mb-1 flex-wrap">
                 <Badge campaignStatus={campaign.status} />
                 {campaign.isFromMeta && (
-                  <span className="inline-flex items-center gap-1 bg-blue-50 text-blue-600 text-[10px] font-bold px-2 py-0.5 rounded-full border border-blue-100 tracking-wide">
+                  <span className="inline-flex items-center gap-1 bg-primary-50 text-primary-600 text-[10px] font-bold px-2 py-0.5 rounded-full border border-primary-100 tracking-wide">
                     <Link2 className="w-2.5 h-2.5" />
                     META
                   </span>
                 )}
               </div>
-              <h2 className="text-xl font-bold text-slate-900">{campaign.name}</h2>
+              <h2 className="page-title">{campaign.name}</h2>
               <div className="flex items-center gap-1.5 text-slate-500 text-sm mt-1">
                 <MapPin className="w-3.5 h-3.5" />
                 <span>{campaign.destination}</span>

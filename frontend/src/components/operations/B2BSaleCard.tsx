@@ -70,14 +70,14 @@ export default function B2BSaleCard({ departure }: { departure: Departure }) {
     return (
       <div className="card p-4 flex items-start justify-between gap-3">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-violet-100 flex items-center justify-center flex-shrink-0">
-            <Building2 className="w-5 h-5 text-violet-600" />
+          <div className="w-10 h-10 rounded-xl bg-mountain-100 flex items-center justify-center flex-shrink-0">
+            <Building2 className="w-5 h-5 text-mountain-600" />
           </div>
           <div>
             <p className="text-xs text-slate-400">Resold (B2B) to</p>
             <p className="font-semibold text-slate-800 text-sm">{departure.b2bVendor.name}</p>
             <div className="flex items-center gap-3 text-xs text-slate-500 mt-0.5 flex-wrap">
-              {departure.b2bRate != null && <span className="flex items-center gap-1 font-semibold text-violet-700"><IndianRupee className="w-3 h-3" />{departure.b2bRate.toLocaleString('en-IN')}</span>}
+              {departure.b2bRate != null && <span className="flex items-center gap-1 font-semibold text-mountain-700"><IndianRupee className="w-3 h-3" />{departure.b2bRate.toLocaleString('en-IN')}</span>}
               {departure.b2bVendor.contactPerson && <span className="flex items-center gap-1"><User className="w-3 h-3" />{departure.b2bVendor.contactPerson}</span>}
               {departure.b2bVendor.contact && <span className="flex items-center gap-1"><Phone className="w-3 h-3" />{departure.b2bVendor.contact}</span>}
             </div>

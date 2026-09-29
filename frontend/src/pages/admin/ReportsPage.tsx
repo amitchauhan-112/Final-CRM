@@ -168,7 +168,7 @@ export default function ReportsPage() {
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-xl font-bold text-slate-900">Reports</h2>
+          <h2 className="page-title">Reports</h2>
           <p className="text-sm text-slate-500 mt-0.5">Performance insights and analytics</p>
         </div>
         <div className="flex items-center gap-2">

@@ -28,7 +28,7 @@ export default function AdminPayrollPage() {
     <div className="space-y-5">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h2 className="text-xl font-bold text-slate-900">Payroll & Incentives</h2>
+          <h2 className="page-title">Payroll & Incentives</h2>
           <p className="text-sm text-slate-500 mt-0.5">Sales targets, achievement, incentives, salary, and payment release</p>
         </div>
         {showMonthPicker && <MonthPicker month={month} year={year} onChange={(m, y) => { setMonth(m); setYear(y); }} />}

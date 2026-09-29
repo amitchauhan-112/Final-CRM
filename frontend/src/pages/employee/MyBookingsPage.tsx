@@ -72,7 +72,7 @@ export default function MyBookingsPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold text-slate-900">My Bookings</h2>
+          <h2 className="page-title">My Bookings</h2>
           <p className="text-sm text-slate-500 mt-0.5">Bookings from your confirmed leads, with booking & travel dates</p>
         </div>
         {meta && (

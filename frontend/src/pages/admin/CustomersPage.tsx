@@ -36,7 +36,7 @@ function CustomerCard({ lead, onView }: { lead: any; onView: (id: string) => voi
 
   return (
     <div
-      className="card p-5 hover:shadow-lg transition-all cursor-pointer hover:border-primary-300"
+      className="card-interactive p-5"
       onClick={() => onView(lead.id)}
     >
       {/* Header */}
@@ -152,7 +152,7 @@ export default function CustomersPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold text-slate-900">Customers</h2>
+          <h2 className="page-title">Customers</h2>
           <p className="text-sm text-slate-500 mt-0.5">Confirmed leads with booking details</p>
         </div>
         {meta && <p className="text-sm text-slate-500">{meta.total} customer{meta.total !== 1 ? 's' : ''}</p>}

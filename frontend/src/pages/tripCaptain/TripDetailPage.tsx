@@ -14,8 +14,8 @@ import { MealType, PackageItinerary } from '../../types/index';
 
 const ACTIVITY_BADGE: Record<string, string> = {
   JOURNEY: 'bg-amber-100 text-amber-700',
-  STAY: 'bg-blue-100 text-blue-700',
-  SIGHTSEEING: 'bg-violet-100 text-violet-700',
+  STAY: 'bg-primary-100 text-primary-700',
+  SIGHTSEEING: 'bg-mountain-100 text-mountain-700',
 };
 
 const MEAL_OPTIONS: { value: MealType; label: string }[] = [
@@ -92,7 +92,7 @@ export default function TripCaptainTripDetailPage() {
       </button>
 
       <div className="card p-5">
-        <h2 className="text-xl font-bold text-slate-900">{departure.destination}</h2>
+        <h2 className="page-title">{departure.destination}</h2>
         <p className="text-sm text-slate-500 flex items-center gap-1.5 mt-1">
           <Calendar className="w-3.5 h-3.5" />
           {new Date(departure.departureDate).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}
@@ -122,8 +122,8 @@ export default function TripCaptainTripDetailPage() {
               <div key={h.id} className="card p-4 space-y-2">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center flex-shrink-0">
-                      <Building2 className="w-5 h-5 text-blue-600" />
+                    <div className="w-10 h-10 rounded-xl bg-primary-100 flex items-center justify-center flex-shrink-0">
+                      <Building2 className="w-5 h-5 text-primary-600" />
                     </div>
                     <div>
                       <p className="font-semibold text-slate-800 text-sm">{h.name}</p>
