@@ -6,7 +6,7 @@ import { blockDecimalKey, wholeNumberRule } from '../../utils/helpers';
 
 interface VendorPaymentForm {
   vendorId: string; departureId?: string; serviceType: VendorServiceType;
-  totalAmount: number; advancePaid?: number; dueDate?: string; notes?: string;
+  totalAmount: number; advancePaid?: number; advanceMethod?: string; dueDate?: string; notes?: string;
 }
 
 export default function VendorPaymentFormModal({ open, onClose, defaultValues, onSubmit, isLoading }: {
@@ -58,10 +58,28 @@ export default function VendorPaymentFormModal({ open, onClose, defaultValues, o
           <label className="label">Total Amount *</label>
           <input type="number" step="1" onKeyDown={blockDecimalKey} {...register('totalAmount', { required: true, min: 0, ...wholeNumberRule })} className="input" />
         </div>
-        <div>
-          <label className="label">Advance Paid</label>
-          <input type="number" step="1" onKeyDown={blockDecimalKey} {...register('advancePaid', wholeNumberRule)} className="input" />
-        </div>
+        {!defaultValues && (
+          <>
+            <div>
+              <label className="label">Advance Paid</label>
+              <input type="number" step="1" onKeyDown={blockDecimalKey} {...register('advancePaid', wholeNumberRule)} className="input" />
+            </div>
+            <div>
+              <label className="label">Paid Via</label>
+              <select {...register('advanceMethod')} className="input">
+                <option value="CASH">Cash</option>
+                <option value="UPI">UPI</option>
+                <option value="BANK_TRANSFER">Bank Transfer</option>
+                <option value="CHEQUE">Cheque</option>
+              </select>
+            </div>
+          </>
+        )}
+        {defaultValues && (
+          <div className="sm:col-span-2 text-xs text-slate-400 bg-slate-50 rounded-lg px-3 py-2">
+            Advance paid is now tracked as itemized entries — use "Add Payment" on the bill to record further payments, credits, or refunds.
+          </div>
+        )}
         <div>
           <label className="label">Due Date</label>
           <input type="date" {...register('dueDate')} className="input" />

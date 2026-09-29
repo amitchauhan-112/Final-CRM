@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../services/api';
 import {
   ApiResponse, PaginatedResponse, FinanceDashboardStats, Payment, PendingTrackerRow,
-  CustomerLedger, Refund, VendorPayment, PaymentScheduleItem, FinanceDocument, VendorLedger,
+  CustomerLedger, Refund, VendorPayment, PaymentScheduleItem, FinanceDocument, VendorLedger, VendorCredit,
 } from '../types/index';
 import toast from 'react-hot-toast';
 
@@ -308,6 +308,48 @@ export function useUploadVendorPaymentFile() {
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['finance', 'vendor-payments'] }); toast.success('File uploaded'); },
     onError: (e: any) => toast.error(e?.response?.data?.error || 'Upload failed'),
+  });
+}
+
+// Itemized entries — every real payment/credit-note/refund against a bill,
+// replacing the old blind "edit the advance paid number" flow.
+export function useAddVendorPaymentEntry() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, ...payload }: { id: string; amount: number; method: string; note?: string }) =>
+      (await api.post(`/finance/vendor-payments/${id}/entries`, payload)).data.data,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['finance', 'vendor-payments'] });
+      qc.invalidateQueries({ queryKey: ['finance', 'vendor-ledger'] });
+      qc.invalidateQueries({ queryKey: ['finance', 'vendor-credits'] });
+      qc.invalidateQueries({ queryKey: ['finance', 'dashboard'] });
+      toast.success('Entry recorded');
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.error || 'Failed to record entry'),
+  });
+}
+
+export function useDeleteVendorPaymentEntry() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, entryId }: { id: string; entryId: string }) =>
+      (await api.delete(`/finance/vendor-payments/${id}/entries/${entryId}`)).data.data,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['finance', 'vendor-payments'] });
+      qc.invalidateQueries({ queryKey: ['finance', 'vendor-ledger'] });
+      qc.invalidateQueries({ queryKey: ['finance', 'vendor-credits'] });
+      toast.success('Entry removed');
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.error || 'Failed to remove entry'),
+  });
+}
+
+// ─── Vendor Credits — cross-vendor "who do I owe, who owes me" ─────────────
+
+export function useVendorCredits() {
+  return useQuery<ApiResponse<{ credits: VendorCredit[]; totalPayable: number; totalReceivable: number }>>({
+    queryKey: ['finance', 'vendor-credits'],
+    queryFn: async () => (await api.get('/finance/vendor-credits')).data,
   });
 }
 

@@ -109,6 +109,7 @@ model User {
   requestedRefunds     Refund[]         @relation("RefundRequester")
   approvedRefunds      Refund[]         @relation("RefundApprover")
   createdVendorPayments VendorPayment[] @relation("VendorPaymentCreator")
+  createdVendorPaymentEntries VendorPaymentEntry[] @relation("VendorPaymentEntryCreator")
   verifiedTravelers     Traveler[]      @relation("TravelerVerifier")
   uploadedVendorDocuments VendorDocument[] @relation("VendorDocumentUploader")
   createdExpenses       Expense[]       @relation("ExpenseCreator")
@@ -1738,15 +1739,24 @@ model VendorPayment {
 
   serviceType String                          // HOTEL | VEHICLE | TRIP_CAPTAIN | LOCAL_GUIDE | LOCAL_VENDOR | B2B | ACTIVITY
   totalAmount Float
+  // advancePaid/balanceAmount are derived — recalculated from `entries`
+  // every time one is added/removed (see recalcVendorPayment in
+  // vendorPayment.controller.ts) — kept as real columns rather than computed
+  // on every read since they're checked constantly (auto-confirm threshold,
+  // dashboards, ledger totals). balanceAmount can go NEGATIVE: that means
+  // this vendor has been paid more than they were owed (e.g. a customer's
+  // pending balance was paid straight to a B2B agent, overshooting what we
+  // actually owed them) — the vendor owes US the difference until a
+  // VENDOR_REFUND entry settles it back to zero.
   advancePaid Float    @default(0)
   balanceAmount Float  @default(0)
   // Set only when synced from Ops's Hotel/Vehicle.advanceRequired — the
-  // threshold updateVendorPayment checks against to auto-confirm the linked
+  // threshold recalcVendorPayment checks against to auto-confirm the linked
   // Hotel/Vehicle once Finance's advancePaid reaches it. Null for bills
   // Finance enters directly (no linked Hotel/Vehicle to auto-confirm).
   advanceRequired Float?
   dueDate     DateTime?
-  status      String   @default("PENDING")    // PENDING | PARTIAL | PAID | OVERDUE
+  status      String   @default("PENDING")    // PENDING | PARTIAL | PAID | OVERDUE | RECEIVABLE
   invoiceUrl  String?
   paymentProofUrl String?
   notes       String?
@@ -1756,6 +1766,8 @@ model VendorPayment {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  entries VendorPaymentEntry[]
 
   // Back-relations for the Operations→Finance auto-sync — the Hotel/Vehicle/
   // Departure row that this payment was generated from, if any
@@ -1769,6 +1781,37 @@ model VendorPayment {
   @@index([organizationId])
   @@index([status])
   @@map("vendor_payments")
+}
+
+// Itemized history behind VendorPayment.advancePaid — every real transaction
+// (or explicit credit/refund note) against a bill, instead of one blind
+// number Finance silently overwrites. Also the mechanism for reconciling a
+// B2B resale: when a customer pays their pending balance straight to the
+// agent we resold the trip to (bypassing us entirely), that gets logged here
+// as CUSTOMER_DIRECT so it still counts toward what we owed that agent.
+model VendorPaymentEntry {
+  id              String        @id @default(uuid())
+  vendorPaymentId String
+  vendorPayment   VendorPayment @relation(fields: [vendorPaymentId], references: [id], onDelete: Cascade)
+
+  amount Float
+  // CASH | UPI | BANK_TRANSFER | CHEQUE — we actually paid the vendor.
+  // CUSTOMER_DIRECT — the customer paid the vendor directly on our behalf
+  // (reduces what we owe them, same as a normal payment).
+  // CREDIT — an explicit "vendor agreed to wait" acknowledgment; recorded
+  // for the history/note, but does NOT reduce the balance (we still owe it).
+  // VENDOR_REFUND — the vendor returned money to us, e.g. after a
+  // CUSTOMER_DIRECT overshoot left them owing us; brings balance back
+  // toward zero from negative.
+  method String
+  note   String?
+
+  createdById String
+  createdBy   User   @relation("VendorPaymentEntryCreator", fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+
+  @@index([vendorPaymentId])
+  @@map("vendor_payment_entries")
 }
 
 // ─── Expense Management ────────────────────────────────────────────────────

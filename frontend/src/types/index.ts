@@ -1156,9 +1156,35 @@ export interface StayPlan {
 // ─── Finance Panel ───────────────────────────────────────────────────────────
 
 export type RefundStatus = 'REQUESTED' | 'APPROVED' | 'PAID' | 'REJECTED';
-export type VendorPaymentStatus = 'PENDING' | 'PARTIAL' | 'PAID' | 'OVERDUE';
-export type VendorServiceType = 'HOTEL' | 'VEHICLE' | 'TRIP_CAPTAIN' | 'LOCAL_GUIDE' | 'LOCAL_VENDOR' | 'ACTIVITY';
+// RECEIVABLE — this vendor has been paid more than they were owed (balance
+// went negative), so they owe US the difference instead.
+export type VendorPaymentStatus = 'PENDING' | 'PARTIAL' | 'PAID' | 'OVERDUE' | 'RECEIVABLE';
+export type VendorServiceType = 'HOTEL' | 'VEHICLE' | 'TRIP_CAPTAIN' | 'LOCAL_GUIDE' | 'LOCAL_VENDOR' | 'B2B' | 'ACTIVITY';
 export type PendingIndicator = 'PAID' | 'DUE_SOON' | 'OVERDUE';
+
+// CASH/UPI/BANK_TRANSFER/CHEQUE/CUSTOMER_DIRECT reduce what's owed.
+// CREDIT is an acknowledgment note only (doesn't move the balance).
+// VENDOR_REFUND is money the vendor sent back to us.
+export type VendorPaymentEntryMethod = 'CASH' | 'UPI' | 'BANK_TRANSFER' | 'CHEQUE' | 'CUSTOMER_DIRECT' | 'CREDIT' | 'VENDOR_REFUND';
+
+export interface VendorPaymentEntry {
+  id: string;
+  vendorPaymentId: string;
+  amount: number;
+  method: VendorPaymentEntryMethod;
+  note?: string;
+  createdById: string;
+  createdBy: Pick<User, 'id' | 'name'>;
+  createdAt: string;
+}
+
+export interface VendorCredit {
+  vendorId: string;
+  vendorName: string;
+  vendorType: VendorType;
+  netBalance: number; // positive = we owe them, negative = they owe us
+  billCount: number;
+}
 
 export interface Refund {
   id: string;
@@ -1207,6 +1233,7 @@ export interface VendorPayment {
   invoiceUrl?: string;
   paymentProofUrl?: string;
   notes?: string;
+  entries?: VendorPaymentEntry[];
   createdAt: string;
   updatedAt: string;
 }

@@ -54,6 +54,7 @@ import PendingTrackerPage from './pages/finance/PendingTrackerPage';
 import RefundsPage from './pages/finance/RefundsPage';
 import VendorPaymentsPage from './pages/finance/VendorPaymentsPage';
 import VendorLedgerPage from './pages/finance/VendorLedgerPage';
+import VendorCreditsPage from './pages/finance/VendorCreditsPage';
 import ExpensesPage from './pages/finance/ExpensesPage';
 import FinanceReportsPage from './pages/finance/ReportsPage';
 import EmployeeCashPage from './pages/finance/EmployeeCashPage';
@@ -141,6 +142,7 @@ export default function App() {
         <Route path="finance/refunds" element={<RefundsPage />} />
         <Route path="finance/vendor-payments" element={<VendorPaymentsPage />} />
         <Route path="finance/vendor-ledger" element={<VendorLedgerPage />} />
+        <Route path="finance/vendor-credits" element={<VendorCreditsPage />} />
         <Route path="finance/expenses" element={<ExpensesPage />} />
         <Route path="finance/employee-cash" element={<EmployeeCashPage />} />
         <Route path="finance/reports" element={<FinanceReportsPage />} />
@@ -182,6 +184,7 @@ export default function App() {
         <Route path="refunds" element={<RefundsPage />} />
         <Route path="vendor-payments" element={<VendorPaymentsPage />} />
         <Route path="vendor-ledger" element={<VendorLedgerPage />} />
+        <Route path="vendor-credits" element={<VendorCreditsPage />} />
         <Route path="expenses" element={<ExpensesPage />} />
         <Route path="employee-cash" element={<EmployeeCashPage />} />
         <Route path="reports" element={<FinanceReportsPage />} />

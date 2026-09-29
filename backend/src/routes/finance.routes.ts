@@ -9,6 +9,7 @@ import { getCustomerLedger, getPendingTracker } from '../controllers/ledger.cont
 import { listRefunds, createRefund, approveRefund, markRefundPaid, rejectRefund } from '../controllers/refund.controller.js';
 import {
   listVendorPayments, createVendorPayment, updateVendorPayment, deleteVendorPayment, uploadVendorPaymentFile, getVendorLedger,
+  addVendorPaymentEntry, deleteVendorPaymentEntry, getVendorCredits,
 } from '../controllers/vendorPayment.controller.js';
 import { listVendors } from '../controllers/vendor.controller.js';
 import { listDepartures } from '../controllers/departure.controller.js';
@@ -63,11 +64,14 @@ router.get('/vendors', listVendors);
 
 // Vendor payments
 router.get('/vendors/:id/ledger', getVendorLedger);
+router.get('/vendor-credits', getVendorCredits);
 router.get('/vendor-payments', listVendorPayments);
 router.post('/vendor-payments', createVendorPayment);
 router.put('/vendor-payments/:id', updateVendorPayment);
 router.delete('/vendor-payments/:id', deleteVendorPayment);
 router.post('/vendor-payments/:id/upload', uploadVendorPaymentProof.single('file'), uploadVendorPaymentFile);
+router.post('/vendor-payments/:id/entries', addVendorPaymentEntry);
+router.delete('/vendor-payments/:id/entries/:entryId', deleteVendorPaymentEntry);
 
 // Read-only access to Departures/Packages (owned by Operations/Sales) — Finance
 // needs them to tag an expense to a trip/package.

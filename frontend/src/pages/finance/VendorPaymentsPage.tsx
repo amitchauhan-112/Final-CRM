@@ -1,29 +1,41 @@
 import { useRef, useState } from 'react';
-import { Plus, Pencil, Trash2, Truck, FileUp, Receipt, ExternalLink } from 'lucide-react';
+import { Plus, Pencil, Trash2, Truck, FileUp, Receipt, ExternalLink, IndianRupee, ChevronDown, ChevronUp, X } from 'lucide-react';
 import {
   useVendorPayments, useCreateVendorPayment, useUpdateVendorPayment, useDeleteVendorPayment, useUploadVendorPaymentFile,
+  useDeleteVendorPaymentEntry,
 } from '../../hooks/useFinance';
 import VendorPaymentFormModal from '../../components/finance/VendorPaymentFormModal';
+import AddVendorPaymentEntryModal from '../../components/finance/AddVendorPaymentEntryModal';
 import Modal from '../../components/ui/Modal';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { VendorPayment } from '../../types/index';
-import { formatCurrency, formatDate, cn } from '../../utils/helpers';
+import { formatCurrency, formatDate, formatRelativeTime, cn } from '../../utils/helpers';
 
 const STATUS_BADGE: Record<string, string> = {
   PENDING: 'bg-amber-50 text-amber-700',
   PARTIAL: 'bg-primary-50 text-primary-700',
   PAID: 'bg-emerald-50 text-emerald-700',
   OVERDUE: 'bg-red-50 text-red-600',
+  RECEIVABLE: 'bg-violet-50 text-violet-700',
+};
+
+const METHOD_LABEL: Record<string, string> = {
+  CASH: 'Cash', UPI: 'UPI', BANK_TRANSFER: 'Bank Transfer', CHEQUE: 'Cheque',
+  CUSTOMER_DIRECT: 'Customer paid directly', CREDIT: 'On credit', VENDOR_REFUND: 'Vendor refund',
 };
 
 function VendorPaymentCard({ vp }: { vp: VendorPayment }) {
   const updateVp = useUpdateVendorPayment();
   const deleteVp = useDeleteVendorPayment();
   const uploadFile = useUploadVendorPaymentFile();
+  const deleteEntry = useDeleteVendorPaymentEntry();
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [addEntryOpen, setAddEntryOpen] = useState(false);
+  const [entriesOpen, setEntriesOpen] = useState(false);
   const invoiceRef = useRef<HTMLInputElement>(null);
   const proofRef = useRef<HTMLInputElement>(null);
+  const entries = vp.entries ?? [];
 
   return (
     <div className="card p-4 space-y-2">
@@ -32,17 +44,47 @@ function VendorPaymentCard({ vp }: { vp: VendorPayment }) {
           <p className="font-semibold text-slate-800 text-sm">{vp.vendor.name}</p>
           <p className="text-xs text-slate-400">{vp.serviceType.replace('_', ' ')}{vp.departure ? ` · ${vp.departure.destination}` : ''}</p>
         </div>
-        <span className={cn('badge', STATUS_BADGE[vp.status])}>{vp.status}</span>
+        <span className={cn('badge', STATUS_BADGE[vp.status])}>{vp.status === 'RECEIVABLE' ? 'THEY OWE US' : vp.status}</span>
       </div>
       <div className="grid grid-cols-2 gap-2 text-xs">
         <div><p className="text-slate-400">Total</p><p className="font-semibold text-slate-700">{formatCurrency(vp.totalAmount)}</p></div>
         <div><p className="text-slate-400">Advance Paid</p><p className="font-semibold text-slate-700">{formatCurrency(vp.advancePaid)}</p></div>
-        <div><p className="text-slate-400">Balance</p><p className="font-semibold text-orange-500">{formatCurrency(vp.balanceAmount)}</p></div>
+        <div>
+          <p className="text-slate-400">{vp.balanceAmount < 0 ? 'They Owe Us' : 'Balance'}</p>
+          <p className={cn('font-semibold', vp.balanceAmount < 0 ? 'text-violet-600' : 'text-orange-500')}>{formatCurrency(Math.abs(vp.balanceAmount))}</p>
+        </div>
         <div><p className="text-slate-400">Due Date</p><p className="font-semibold text-slate-700">{vp.dueDate ? formatDate(vp.dueDate) : '—'}</p></div>
       </div>
       {vp.notes && <p className="text-xs text-slate-500">{vp.notes}</p>}
 
+      {entries.length > 0 && (
+        <div>
+          <button onClick={() => setEntriesOpen((o) => !o)} className="text-xs font-medium text-slate-500 hover:text-slate-700 flex items-center gap-1">
+            {entriesOpen ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+            {entries.length} entr{entries.length === 1 ? 'y' : 'ies'}
+          </button>
+          {entriesOpen && (
+            <div className="mt-1.5 space-y-1">
+              {entries.map((e) => (
+                <div key={e.id} className="flex items-center justify-between gap-2 text-xs bg-slate-50 rounded-lg px-2.5 py-1.5">
+                  <div className="min-w-0">
+                    <p className="font-medium text-slate-700">
+                      {formatCurrency(e.amount)} <span className="text-slate-400 font-normal">· {METHOD_LABEL[e.method] ?? e.method}</span>
+                    </p>
+                    <p className="text-[10px] text-slate-400 truncate">{e.createdBy.name} · {formatRelativeTime(e.createdAt)}{e.note ? ` · ${e.note}` : ''}</p>
+                  </div>
+                  <button onClick={() => deleteEntry.mutate({ id: vp.id, entryId: e.id })} className="p-1 rounded hover:bg-red-50 text-slate-300 hover:text-red-500 flex-shrink-0">
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="flex items-center gap-1 flex-wrap pt-1">
+        <button onClick={() => setAddEntryOpen(true)} className="text-xs font-medium text-emerald-600 hover:text-emerald-700 flex items-center gap-1"><IndianRupee className="w-3 h-3" />Add Payment</button>
         <button onClick={() => setEditOpen(true)} className="text-xs font-medium text-primary-600 hover:text-primary-700 flex items-center gap-1"><Pencil className="w-3 h-3" />Edit</button>
         <button onClick={() => setDeleteOpen(true)} className="text-xs font-medium text-red-500 hover:text-red-600 flex items-center gap-1"><Trash2 className="w-3 h-3" />Remove</button>
         <input ref={invoiceRef} type="file" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadFile.mutate({ id: vp.id, file: f, fileType: 'invoice' }); }} />
@@ -59,6 +101,7 @@ function VendorPaymentCard({ vp }: { vp: VendorPayment }) {
         )}
       </div>
 
+      <AddVendorPaymentEntryModal open={addEntryOpen} onClose={() => setAddEntryOpen(false)} vendorPaymentId={vp.id} />
       <VendorPaymentFormModal
         open={editOpen} onClose={() => setEditOpen(false)} defaultValues={vp} isLoading={updateVp.isPending}
         onSubmit={(data) => updateVp.mutate({ id: vp.id, ...data } as any, { onSuccess: () => setEditOpen(false) })}
@@ -99,6 +142,7 @@ export default function VendorPaymentsPage() {
         <option value="PARTIAL">Partial</option>
         <option value="PAID">Paid</option>
         <option value="OVERDUE">Overdue</option>
+        <option value="RECEIVABLE">They Owe Us</option>
       </select>
 
       {isLoading ? (

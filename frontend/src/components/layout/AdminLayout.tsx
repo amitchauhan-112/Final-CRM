@@ -6,7 +6,7 @@ import {
   MessageSquarePlus, Activity, BarChart2, Building2,
   UserCheck, Database, ChevronRight, Package, BookOpen,
   Contact, Wallet, Map, Home, Gauge, LineChart, FolderKanban, Settings2, Zap, HeartPulse, IndianRupee,
-  MessageCircle, Radar, ShieldCheck, Receipt,
+  MessageCircle, Radar, ShieldCheck, Receipt, Scale,
 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import { useNotifications, useMarkAllAsRead, useMarkAsRead } from '../../hooks/useNotifications';
@@ -53,6 +53,7 @@ const NAV: NavEntry[] = [
       { to: '/admin/bookings',   label: 'Bookings',   icon: BookOpen },
       { to: '/admin/customers',  label: 'Customers',  icon: Contact },
       { to: '/admin/finance/ledger', label: 'Customer Ledger', icon: Receipt },
+      { to: '/admin/finance/vendor-credits', label: 'Vendor Credits', icon: Scale },
       { to: '/admin/finance',    label: 'Finance',    icon: Wallet },
       { to: '/admin/operations', label: 'Operations', icon: Map },
       { to: '/admin/masters',    label: 'Masters',    icon: Database },
