@@ -4,6 +4,7 @@ import { AuthenticatedRequest } from '../types/index.js';
 import { emitFinanceUpdated, emitOperationsUpdated, notifyOperationsTeam } from '../services/notification.service.js';
 import { buildUploadUrl } from '../middleware/upload.js';
 import { isWholeAmount, WHOLE_AMOUNT_ERROR } from '../utils/amountValidation.js';
+import { roomsRequiredForDeparture } from '../services/roomRequirement.service.js';
 
 const orgId = (req: AuthenticatedRequest) => req.user?.organizationId ?? null;
 const orgFilter = (req: AuthenticatedRequest) => (orgId(req) ? { organizationId: orgId(req) } : {});
@@ -13,10 +14,9 @@ const orgFilter = (req: AuthenticatedRequest) => (orgId(req) ? { organizationId:
 // only — logged for the history but doesn't reduce what's owed. VENDOR_REFUND
 // is money coming back FROM the vendor (they'd been overpaid), so it
 // subtracts instead of adding.
-const ENTRY_METHODS = ['CASH', 'UPI', 'BANK_TRANSFER', 'CHEQUE', 'CUSTOMER_DIRECT', 'CREDIT', 'VENDOR_REFUND'];
-const PAYING_METHODS = ['CASH', 'UPI', 'BANK_TRANSFER', 'CHEQUE', 'CUSTOMER_DIRECT'];
+export const ENTRY_METHODS = ['CASH', 'UPI', 'BANK_TRANSFER', 'CHEQUE', 'CUSTOMER_DIRECT', 'CREDIT', 'VENDOR_REFUND'];
 
-function computeStatus(totalAmount: number, advancePaid: number, dueDate: Date | null): string {
+export function computeStatus(totalAmount: number, advancePaid: number, dueDate: Date | null): string {
   const balance = totalAmount - advancePaid;
   if (balance < 0) return 'RECEIVABLE'; // vendor has been paid more than they were owed — they owe us
   if (balance === 0) return 'PAID';
@@ -26,47 +26,102 @@ function computeStatus(totalAmount: number, advancePaid: number, dueDate: Date |
 }
 
 // Re-derives advancePaid/balanceAmount/status from the entry log, then runs
-// the same advance-required auto-confirm check updateVendorPayment always
-// has — shared so both the direct-edit path and the new entry-based path
-// keep that behavior identical.
-async function recalcVendorPayment(vendorPaymentId: string) {
-  const existing = await prisma.vendorPayment.findUnique({
-    where: { id: vendorPaymentId },
-    include: { entries: true, hotel: true, vehicle: true },
-  });
-  if (!existing) return null;
+// the advance-required auto-confirm (and auto-revert) check — shared by the
+// entry-based path, the direct-edit path, and Operations' Hotel/Vehicle/B2B
+// auto-sync, so all three keep this behavior identical instead of each
+// reimplementing (and subtly disagreeing on) the math.
+//
+// The sum itself runs as a single atomic UPDATE...FROM, not a JS read-sum-
+// write — two concurrent entries (or an entry racing a sync call) would
+// otherwise let the second write silently clobber the first's effect, since
+// both would start from the same pre-change snapshot.
+export async function recalcVendorPayment(vendorPaymentId: string) {
+  const exists = await prisma.vendorPayment.findUnique({ where: { id: vendorPaymentId }, select: { id: true } });
+  if (!exists) return null;
 
-  const advancePaid = existing.entries.reduce((sum, e) => {
-    if (e.method === 'VENDOR_REFUND') return sum - e.amount;
-    if (PAYING_METHODS.includes(e.method)) return sum + e.amount;
-    return sum; // CREDIT — acknowledgment only, no balance effect
-  }, 0);
-  const balanceAmount = existing.totalAmount - advancePaid;
-  const status = computeStatus(existing.totalAmount, advancePaid, existing.dueDate);
+  await prisma.$executeRaw`
+    UPDATE vendor_payments vp
+    SET "advancePaid" = sub.total,
+        "balanceAmount" = vp."totalAmount" - sub.total,
+        status = CASE
+          WHEN vp."totalAmount" - sub.total < 0 THEN 'RECEIVABLE'
+          WHEN vp."totalAmount" - sub.total = 0 THEN 'PAID'
+          WHEN vp."dueDate" IS NOT NULL AND vp."dueDate" < NOW() THEN 'OVERDUE'
+          WHEN sub.total > 0 THEN 'PARTIAL'
+          ELSE 'PENDING'
+        END
+    FROM (
+      SELECT COALESCE(SUM(
+        CASE
+          WHEN method = 'VENDOR_REFUND' THEN -amount
+          WHEN method IN ('CASH', 'UPI', 'BANK_TRANSFER', 'CHEQUE', 'CUSTOMER_DIRECT') THEN amount
+          ELSE 0
+        END
+      ), 0) AS total
+      FROM vendor_payment_entries
+      WHERE "vendorPaymentId" = ${vendorPaymentId}
+    ) sub
+    WHERE vp.id = ${vendorPaymentId}
+  `;
 
-  const updated = await prisma.vendorPayment.update({
+  const updated = await prisma.vendorPayment.findUnique({
     where: { id: vendorPaymentId },
-    data: { advancePaid, balanceAmount, status },
     include: {
       entries: { orderBy: { createdAt: 'desc' }, include: { createdBy: { select: { id: true, name: true } } } },
       vendor: { select: { id: true, name: true, type: true } },
       departure: { select: { id: true, destination: true, departureDate: true } },
+      hotel: true,
+      vehicle: true,
     },
   });
+  if (!updated) return null;
 
-  // Advance-required auto-confirm: this bill was auto-synced from a
-  // Hotel/Vehicle that set advanceRequired — once the recorded advancePaid
-  // reaches it, that Hotel/Vehicle flips to CONFIRMED without Ops having to
-  // come back and do it by hand. Only ever moves PENDING -> CONFIRMED.
-  if (existing.advanceRequired != null && advancePaid >= existing.advanceRequired) {
-    if (existing.hotel && existing.hotel.status === 'PENDING') {
-      await prisma.hotel.update({ where: { id: existing.hotel.id }, data: { status: 'CONFIRMED' } });
-      await notifyOperationsTeam(existing.organizationId, 'HOTEL_CONFIRMED', 'Hotel Confirmed', `Hotel "${existing.hotel.name}" auto-confirmed — advance paid`, existing.hotel.departureId);
-      emitOperationsUpdated(existing.hotel.departureId);
+  // Advance-required auto-confirm/auto-revert: this bill was auto-synced
+  // from a Hotel/Vehicle that set advanceRequired. `updateMany` with a
+  // status filter makes the flip itself atomic too — if two recalcs race,
+  // only the one that actually finds PENDING (or CONFIRMED, for a revert)
+  // applies it and sends the notification, not both.
+  const meetsThreshold = updated.advanceRequired != null && updated.advancePaid >= updated.advanceRequired;
+  const belowThreshold = updated.advanceRequired != null && updated.advancePaid < updated.advanceRequired;
+
+  if (updated.hotel) {
+    if (meetsThreshold && updated.hotel.status === 'PENDING') {
+      // Never auto-confirm past the same confirmed-room cap updateHotel
+      // enforces by hand — a paid advance doesn't excuse overbooking rooms.
+      let roomCapOk = true;
+      if (updated.hotel.numberOfRooms) {
+        const [required, confirmedElsewhere] = await Promise.all([
+          roomsRequiredForDeparture(updated.hotel.departureId),
+          prisma.hotel.aggregate({
+            where: { departureId: updated.hotel.departureId, status: 'CONFIRMED', id: { not: updated.hotel.id } },
+            _sum: { numberOfRooms: true },
+          }),
+        ]);
+        roomCapOk = (confirmedElsewhere._sum.numberOfRooms ?? 0) + updated.hotel.numberOfRooms <= required;
+      }
+      if (roomCapOk) {
+        const claimed = await prisma.hotel.updateMany({ where: { id: updated.hotel.id, status: 'PENDING' }, data: { status: 'CONFIRMED' } });
+        if (claimed.count > 0) {
+          await notifyOperationsTeam(updated.organizationId, 'HOTEL_CONFIRMED', 'Hotel Confirmed', `Hotel "${updated.hotel.name}" auto-confirmed — advance paid`, updated.hotel.departureId);
+          emitOperationsUpdated(updated.hotel.departureId);
+        }
+      }
+    } else if (belowThreshold && updated.hotel.status === 'CONFIRMED') {
+      // A refund or a removed entry can drop the advance back under the
+      // threshold — follow it back to PENDING rather than leaving a hotel
+      // marked CONFIRMED on an advance that's no longer actually there.
+      const reverted = await prisma.hotel.updateMany({ where: { id: updated.hotel.id, status: 'CONFIRMED' }, data: { status: 'PENDING' } });
+      if (reverted.count > 0) emitOperationsUpdated(updated.hotel.departureId);
     }
-    if (existing.vehicle && existing.vehicle.status === 'PENDING') {
-      await prisma.vehicle.update({ where: { id: existing.vehicle.id }, data: { status: 'CONFIRMED' } });
-      emitOperationsUpdated(existing.vehicle.departureId);
+  }
+
+  if (updated.vehicle) {
+    if (meetsThreshold && updated.vehicle.status === 'PENDING') {
+      const claimed = await prisma.vehicle.updateMany({ where: { id: updated.vehicle.id, status: 'PENDING' }, data: { status: 'CONFIRMED' } });
+      if (claimed.count > 0) emitOperationsUpdated(updated.vehicle.departureId);
+    } else if (belowThreshold && updated.vehicle.status === 'CONFIRMED') {
+      const reverted = await prisma.vehicle.updateMany({ where: { id: updated.vehicle.id, status: 'CONFIRMED' }, data: { status: 'PENDING' } });
+      if (reverted.count > 0) emitOperationsUpdated(updated.vehicle.departureId);
     }
   }
 
@@ -102,7 +157,11 @@ export const createVendorPayment = async (req: AuthenticatedRequest, res: Respon
     const { vendorId, departureId, serviceType, totalAmount, advancePaid, advanceMethod, dueDate, notes, invoiceUrl, paymentProofUrl } = req.body;
     const vendor = await prisma.vendor.findFirst({ where: { id: vendorId, ...orgFilter(req) } });
     if (!vendor) { res.status(404).json({ success: false, error: 'Vendor not found' }); return; }
-    if (!totalAmount || isNaN(Number(totalAmount))) { res.status(400).json({ success: false, error: 'Valid total amount is required' }); return; }
+    if (departureId) {
+      const departure = await prisma.departure.findFirst({ where: { id: departureId, ...orgFilter(req) } });
+      if (!departure) { res.status(404).json({ success: false, error: 'Departure not found' }); return; }
+    }
+    if (!totalAmount || isNaN(Number(totalAmount)) || Number(totalAmount) <= 0) { res.status(400).json({ success: false, error: 'Valid total amount is required' }); return; }
     if (!isWholeAmount(totalAmount) || !isWholeAmount(advancePaid)) { res.status(400).json({ success: false, error: WHOLE_AMOUNT_ERROR }); return; }
 
     const total = Number(totalAmount);
@@ -161,6 +220,7 @@ export const updateVendorPayment = async (req: AuthenticatedRequest, res: Respon
 
     const b = req.body;
     if (!isWholeAmount(b.totalAmount)) { res.status(400).json({ success: false, error: WHOLE_AMOUNT_ERROR }); return; }
+    if (b.totalAmount !== undefined && Number(b.totalAmount) <= 0) { res.status(400).json({ success: false, error: 'Valid total amount is required' }); return; }
     const total = b.totalAmount !== undefined ? Number(b.totalAmount) : existing.totalAmount;
     const due = b.dueDate !== undefined ? (b.dueDate ? new Date(b.dueDate) : null) : existing.dueDate;
 
@@ -234,6 +294,14 @@ export const deleteVendorPaymentEntry = async (req: AuthenticatedRequest, res: R
 
     await prisma.vendorPaymentEntry.delete({ where: { id: entryId } });
     const updated = await recalcVendorPayment(id);
+
+    await prisma.activityLog.create({
+      data: {
+        action: 'Vendor Payment Entry Removed',
+        details: `₹${entry.amount.toLocaleString()} (${entry.method}) entry removed by ${req.user?.name}`,
+        entityType: 'VENDOR_PAYMENT', entityId: id, userId: req.user!.id,
+      },
+    });
     emitFinanceUpdated();
 
     res.json({ success: true, data: updated });
@@ -272,7 +340,11 @@ export const getVendorLedger = async (req: AuthenticatedRequest, res: Response):
     const vendor = await prisma.vendor.findFirst({
       where: { id, ...orgFilter(req) },
       include: {
+        // Defense in depth: a vendor's bills should already all share its
+        // org (nothing should be able to create a cross-org one), but filter
+        // explicitly rather than trust that invariant silently holds forever.
         payments: {
+          where: orgFilter(req),
           include: {
             departure: { select: { id: true, destination: true, departureDate: true } },
             createdBy: { select: { id: true, name: true } },
@@ -314,7 +386,7 @@ export const getVendorCredits = async (req: AuthenticatedRequest, res: Response)
       where: orgFilter(req),
       include: {
         payments: {
-          where: { balanceAmount: { not: 0 } },
+          where: { balanceAmount: { not: 0 }, ...orgFilter(req) },
           select: { id: true, balanceAmount: true, totalAmount: true, serviceType: true, departure: { select: { id: true, destination: true, departureDate: true } } },
         },
       },

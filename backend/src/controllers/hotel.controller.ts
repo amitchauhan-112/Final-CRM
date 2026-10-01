@@ -2,7 +2,7 @@ import { Response } from 'express';
 import prisma from '../lib/prisma.js';
 import { AuthenticatedRequest } from '../types/index.js';
 import { emitOperationsUpdated, notifyOperationsTeam } from '../services/notification.service.js';
-import { roomsForBookingList } from '../services/roomRequirement.service.js';
+import { roomsRequiredForDeparture } from '../services/roomRequirement.service.js';
 import { syncVendorPayment } from '../services/vendorPaymentSync.service.js';
 
 const orgId = (req: AuthenticatedRequest) => req.user?.organizationId ?? null;
@@ -14,16 +14,6 @@ async function assertDepartureAccess(req: AuthenticatedRequest, departureId: str
   return departure;
 }
 
-// Confirmed hotel rooms must never exceed what the departure's bookings
-// actually require — PENDING entries (still shopping around for a rate) are
-// exempt, since they're not a commitment yet.
-async function roomsRequiredForDeparture(departureId: string): Promise<number> {
-  const bookings = await prisma.booking.findMany({
-    where: { departureId, status: { not: 'CANCELLED' } },
-    select: { numberOfTravelers: true, roomSharing: true, travelers: { select: { roomSharing: true } } },
-  });
-  return roomsForBookingList(bookings).total;
-}
 
 export const createHotel = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {

@@ -5,6 +5,7 @@
 // Shared by hotel.controller.ts and vehicle.controller.ts.
 
 import prisma from '../lib/prisma.js';
+import { recalcVendorPayment } from '../controllers/vendorPayment.controller.js';
 
 export type SyncVendorPaymentInput = {
   organizationId: string | null;
@@ -32,15 +33,35 @@ export async function syncVendorPayment(input: SyncVendorPaymentInput): Promise<
     return existingVendorPaymentId ?? null;
   }
 
+  // Guard against linking a vendor from a different tenant — the picker UIs
+  // only ever list same-org vendors, but a crafted vendorId here would mix
+  // one org's bill/history onto another org's vendor record.
+  const vendor = await prisma.vendor.findFirst({ where: { id: vendorId, ...(organizationId ? { organizationId } : {}) } });
+  if (!vendor) return existingVendorPaymentId ?? null;
+
   if (existingVendorPaymentId) {
-    const existing = await prisma.vendorPayment.findUnique({ where: { id: existingVendorPaymentId } });
+    const existing = await prisma.vendorPayment.findUnique({
+      where: { id: existingVendorPaymentId },
+      select: { id: true, entries: { select: { id: true }, take: 1 } },
+    });
     if (existing) {
-      const balanceAmount = Math.max(0, totalAmount - existing.advancePaid);
-      const status = balanceAmount <= 0 ? 'PAID' : existing.advancePaid > 0 ? 'PARTIAL' : (existing.status === 'OVERDUE' ? 'OVERDUE' : 'PENDING');
+      // Once Finance has started recording payments against this bill,
+      // treat the rate/vendor as settled from their side — a later,
+      // unrelated Operations save (editing room plan, trip captain, etc.)
+      // shouldn't silently overwrite a rate Finance has already paid
+      // against, or move already-paid history onto a different vendor.
+      const hasPayments = existing.entries.length > 0;
       await prisma.vendorPayment.update({
         where: { id: existingVendorPaymentId },
-        data: { vendorId, totalAmount, balanceAmount, status, advanceRequired: advanceRequired ?? null },
+        data: {
+          advanceRequired: advanceRequired ?? null,
+          ...(hasPayments ? {} : { vendorId, totalAmount }),
+        },
       });
+      // Delegate status/balance to the same recalc every other path uses —
+      // keeps RECEIVABLE, auto-confirm, and auto-revert all correct here too,
+      // instead of this duplicating (and under-handling) that logic itself.
+      await recalcVendorPayment(existingVendorPaymentId);
       return existingVendorPaymentId;
     }
   }

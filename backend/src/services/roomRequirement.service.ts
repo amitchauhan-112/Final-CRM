@@ -1,3 +1,5 @@
+import prisma from '../lib/prisma.js';
+
 // ─── Room Requirement Engine ──────────────────────────────────────────────
 // Single, centralized, FIT/GIT-aware source of truth for "how many rooms of
 // each type does a set of bookings need". Before this file existed the same
@@ -72,6 +74,19 @@ export function roomsForBooking(b: RoomBookingInput): RoomCounts {
 // against what a single departure requires in total).
 export function roomsForBookingList(bookings: RoomBookingInput[]): RoomCounts {
   return bookings.reduce((sum, b) => addRoomCounts(sum, roomsForBooking(b)), emptyRoomCounts());
+}
+
+// Confirmed hotel rooms must never exceed what the departure's bookings
+// actually require — PENDING entries (still shopping around for a rate) are
+// exempt, since they're not a commitment yet. Lives here (not in
+// hotel.controller.ts) so vendorPayment.controller.ts's auto-confirm check
+// can reuse it too without a circular import between the two controllers.
+export async function roomsRequiredForDeparture(departureId: string): Promise<number> {
+  const bookings = await prisma.booking.findMany({
+    where: { departureId, status: { not: 'CANCELLED' } },
+    select: { numberOfTravelers: true, roomSharing: true, travelers: { select: { roomSharing: true } } },
+  });
+  return roomsForBookingList(bookings).total;
 }
 
 export type GitSourceBreakdown = {

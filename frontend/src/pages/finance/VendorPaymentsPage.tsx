@@ -73,7 +73,10 @@ function VendorPaymentCard({ vp }: { vp: VendorPayment }) {
                     </p>
                     <p className="text-[10px] text-slate-400 truncate">{e.createdBy.name} · {formatRelativeTime(e.createdAt)}{e.note ? ` · ${e.note}` : ''}</p>
                   </div>
-                  <button onClick={() => deleteEntry.mutate({ id: vp.id, entryId: e.id })} className="p-1 rounded hover:bg-red-50 text-slate-300 hover:text-red-500 flex-shrink-0">
+                  <button
+                    onClick={() => { if (window.confirm('Remove this entry? The balance will be recalculated.')) deleteEntry.mutate({ id: vp.id, entryId: e.id }); }}
+                    className="p-1 rounded hover:bg-red-50 text-slate-300 hover:text-red-500 flex-shrink-0"
+                  >
                     <X className="w-3 h-3" />
                   </button>
                 </div>

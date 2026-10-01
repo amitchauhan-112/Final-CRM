@@ -38,10 +38,11 @@ export default function VendorPaymentFormModal({ open, onClose, defaultValues, o
       <form id="vendor-payment-form" onSubmit={handleSubmit(onSubmit)} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <label className="label">Vendor *</label>
-          <select {...register('vendorId', { required: true })} className="input">
+          <select {...register('vendorId', { required: true })} className="input" disabled={!!defaultValues}>
             <option value="">Select vendor…</option>
             {vendors.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
           </select>
+          {defaultValues && <p className="text-xs text-slate-400 mt-1">Vendor can't be changed on an existing bill.</p>}
         </div>
         <div>
           <label className="label">Service Type</label>
@@ -56,7 +57,7 @@ export default function VendorPaymentFormModal({ open, onClose, defaultValues, o
         </div>
         <div>
           <label className="label">Total Amount *</label>
-          <input type="number" step="1" onKeyDown={blockDecimalKey} {...register('totalAmount', { required: true, min: 0, ...wholeNumberRule })} className="input" />
+          <input type="number" step="1" onKeyDown={blockDecimalKey} {...register('totalAmount', { required: true, min: 1, ...wholeNumberRule })} className="input" />
         </div>
         {!defaultValues && (
           <>
