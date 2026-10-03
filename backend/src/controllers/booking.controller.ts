@@ -175,6 +175,12 @@ export const createBooking = async (req: AuthenticatedRequest, res: Response): P
     const rand = Math.floor(1000 + Math.random() * 9000);
     const bookingNumber = `BKG-${datePart}-${rand}`;
 
+    // Credit goes to whoever was assigned the lead (the person who actually
+    // worked it), not whoever happens to click Confirm — an Admin often
+    // confirms on an employee's behalf, and Sales Targets achievement is
+    // computed from this field.
+    const leadForCredit = await prisma.lead.findUnique({ where: { id: leadId }, select: { assignedToId: true } });
+
     const [booking] = await prisma.$transaction([
       prisma.booking.upsert({
         where: { leadId },
@@ -182,6 +188,7 @@ export const createBooking = async (req: AuthenticatedRequest, res: Response): P
           leadId,
           organizationId: orgId(req),
           bookingNumber,
+          salesExecutiveId: leadForCredit?.assignedToId ?? null,
           packageId: packageId || null,
           travelerName: travelerName.trim(),
           numberOfTravelers: Number(numberOfTravelers),
@@ -203,6 +210,7 @@ export const createBooking = async (req: AuthenticatedRequest, res: Response): P
         },
         update: {
           packageId: packageId !== undefined ? packageId || null : undefined,
+          salesExecutiveId: leadForCredit?.assignedToId ?? null,
           travelerName: travelerName.trim(),
           numberOfTravelers: Number(numberOfTravelers),
           aadharNumber: aadharNumber?.trim() || null,
@@ -400,9 +408,20 @@ export async function applyBookingChanges(
   const paid = existing.amountPaid;
   const balance = Math.max(0, price - paid);
 
+  // Self-heals bookings created before salesExecutiveId was wired up
+  // (it was silently never set) — only fills a currently-null value, never
+  // reassigns credit on an already-attributed booking just because it's
+  // being edited.
+  let salesExecutiveId: string | null | undefined;
+  if (!existing.salesExecutiveId) {
+    const leadForCredit = await prisma.lead.findUnique({ where: { id: existing.leadId }, select: { assignedToId: true } });
+    salesExecutiveId = leadForCredit?.assignedToId ?? undefined;
+  }
+
   const booking = await prisma.booking.update({
     where: { id },
     data: {
+      ...(salesExecutiveId !== undefined ? { salesExecutiveId } : {}),
       travelerName: travelerName?.trim() ?? existing.travelerName,
       numberOfTravelers: numberOfTravelers !== undefined ? Number(numberOfTravelers) : existing.numberOfTravelers,
       aadharNumber: aadharNumber !== undefined ? aadharNumber?.trim() || null : existing.aadharNumber,
