@@ -13,6 +13,7 @@ import { useBookingPayments, useRecordPayment, useDeletePayment } from '../../ho
 import JourneyTracker from './JourneyTracker';
 import { useBookingTasks, useUpdateTask, useCreateTask } from '../../hooks/useTasks';
 import { useUsers } from '../../hooks/useUsers';
+import { useSettings } from '../../hooks/useSettings';
 import BookingConfirmModal from './BookingConfirmModal';
 import Badge from '../ui/Badge';
 import Avatar from '../ui/Avatar';
@@ -960,6 +961,7 @@ export default function LeadDetail({ leadId, open, onClose, isStarred, onToggleS
   const [outcomeModalOpen, setOutcomeModalOpen] = useState(false);
   const [renameOpen, setRenameOpen] = useState(false);
   const [renameValue, setRenameValue] = useState('');
+  const [renameSource, setRenameSource] = useState('');
 
   const { data, isLoading, isError } = useLead(leadId);
   const updateLead = useUpdateLead();
@@ -967,6 +969,8 @@ export default function LeadDetail({ leadId, open, onClose, isStarred, onToggleS
   const { data: usersData } = useUsers({ limit: 100 });
   const { data: bookingData } = useBookingByLead(leadId);
   const { data: whatsappConversations } = useWhatsAppConversations();
+  const { data: settings } = useSettings();
+  const sourceOptions = settings?.sources ?? ['MANUAL', 'WHATSAPP', 'INSTAGRAM', 'WEBSITE', 'META_ADS'];
 
   const lead = data?.data;
   const booking = bookingData?.data ?? null;
@@ -1128,9 +1132,9 @@ export default function LeadDetail({ leadId, open, onClose, isStarred, onToggleS
                     <h2 className="text-base font-bold text-slate-900 truncate">{lead.name}</h2>
                     {user?.role === 'ADMIN' && lead.status === 'CONFIRMED' && (
                       <button
-                        onClick={() => { setRenameValue(lead.name); setRenameOpen(true); }}
+                        onClick={() => { setRenameValue(lead.name); setRenameSource(lead.source); setRenameOpen(true); }}
                         className="p-1 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 flex-shrink-0"
-                        title="Fix name"
+                        title="Fix name / source"
                       >
                         <Edit className="w-3.5 h-3.5" />
                       </button>
@@ -1346,18 +1350,18 @@ export default function LeadDetail({ leadId, open, onClose, isStarred, onToggleS
         )}
       </Modal>
 
-      {/* ── Rename Modal (Admin-only, available even once CONFIRMED — a typo'd
-           name shouldn't be stuck forever, but the full Edit Lead form stays
-           locked post-confirmation since its other fields can drift out of
-           sync with the booking) ───────────────────────────────────────── */}
+      {/* ── Fix Details Modal (Admin-only, available even once CONFIRMED — a
+           typo'd name or wrong source shouldn't be stuck forever, but the
+           full Edit Lead form stays locked post-confirmation since its
+           other fields can drift out of sync with the booking) ─────────── */}
       <Modal
-        open={renameOpen} onClose={() => setRenameOpen(false)} title="Fix Lead Name" size="sm"
+        open={renameOpen} onClose={() => setRenameOpen(false)} title="Fix Lead Details" size="sm"
         footer={<>
           <button onClick={() => setRenameOpen(false)} className="btn-secondary">Cancel</button>
           <button
             onClick={() => {
               if (!lead || !renameValue.trim()) return;
-              updateLead.mutate({ id: lead.id, name: renameValue.trim() }, { onSuccess: () => setRenameOpen(false) });
+              updateLead.mutate({ id: lead.id, name: renameValue.trim(), source: renameSource as Lead['source'] }, { onSuccess: () => setRenameOpen(false) });
             }}
             disabled={updateLead.isPending || !renameValue.trim()}
             className="btn-primary"
@@ -1366,13 +1370,23 @@ export default function LeadDetail({ leadId, open, onClose, isStarred, onToggleS
           </button>
         </>}
       >
-        <label className="label">Name</label>
-        <input
-          value={renameValue}
-          onChange={(e) => setRenameValue(e.target.value)}
-          className="input"
-          autoFocus
-        />
+        <div className="space-y-3">
+          <div>
+            <label className="label">Name</label>
+            <input
+              value={renameValue}
+              onChange={(e) => setRenameValue(e.target.value)}
+              className="input"
+              autoFocus
+            />
+          </div>
+          <div>
+            <label className="label">Source</label>
+            <select value={renameSource} onChange={(e) => setRenameSource(e.target.value)} className="input">
+              {sourceOptions.map((s) => <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>)}
+            </select>
+          </div>
+        </div>
       </Modal>
 
       {/* ── Follow-up Date/Time Modal ────────────────────────────────────── */}
