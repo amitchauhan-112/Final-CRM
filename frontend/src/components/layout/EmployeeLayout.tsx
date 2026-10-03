@@ -3,8 +3,9 @@ import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
   Mountain, LayoutDashboard, Users, Calendar, Bell,
   LogOut, ChevronDown, Menu, X, Settings, UserCircle,
-  Package, UserCheck, CheckSquare, Target, MessageCircle, BookOpen, Wallet,
+  Package, UserCheck, CheckSquare, Target, MessageCircle, BookOpen, Wallet, ShieldCheck,
 } from 'lucide-react';
+import { usePendingApprovals } from '../../hooks/useApprovals';
 import LeadLookup from './LeadLookup';
 import GlobalSearch from './GlobalSearch';
 import { useAuthStore } from '../../store/authStore';
@@ -26,6 +27,7 @@ const navLinks = [
   { to: '/employee/bookings',   label: 'My Bookings',  icon: BookOpen },
   { to: '/employee/cash',       label: 'My Cash',      icon: Wallet },
   { to: '/employee/targets',    label: 'My Targets',   icon: Target },
+  { to: '/employee/approvals',  label: 'Approvals',    icon: ShieldCheck },
   { to: '/employee/settings',   label: 'Settings',     icon: Settings },
 ];
 
@@ -41,6 +43,8 @@ export default function EmployeeLayout() {
   const userMenuRef = useRef<HTMLDivElement>(null);
 
   const { data: notifData } = useNotifications(1, 10);
+  const { data: pendingApprovalsData } = usePendingApprovals();
+  const pendingApprovalsCount = pendingApprovalsData?.data?.length ?? 0;
   const markAllRead = useMarkAllAsRead();
   const markOneRead = useMarkAsRead();
 
@@ -107,6 +111,11 @@ export default function EmployeeLayout() {
             >
               <Icon className="w-5 h-5 flex-shrink-0" />
               {label}
+              {to === '/employee/approvals' && pendingApprovalsCount > 0 && (
+                <span className="ml-auto w-5 h-5 bg-red-500 text-white text-[10px] rounded-full flex items-center justify-center font-bold">
+                  {pendingApprovalsCount > 9 ? '9+' : pendingApprovalsCount}
+                </span>
+              )}
             </NavLink>
           ))}
         </nav>

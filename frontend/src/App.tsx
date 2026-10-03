@@ -212,6 +212,7 @@ export default function App() {
         <Route path="cash" element={<MyCashPage />} />
         <Route path="tasks" element={<TasksPage />} />
         <Route path="targets" element={<MyTargetsPage />} />
+        <Route path="approvals" element={<ApprovalsPage />} />
         <Route path="whatsapp" element={<EmployeeWhatsAppInboxPage />} />
         <Route path="settings" element={<EmployeeSettingsPage />} />
       </Route>
