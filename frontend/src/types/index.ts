@@ -1335,6 +1335,13 @@ export interface CampaignAnalytics {
   conversionRatePct: number; bestPerformingMonth: string | null;
 }
 
+export interface CampaignMonitoringRow {
+  id: string; name: string; status: string | null; isFromMeta: boolean; metaStatus: string | null;
+  leadsGenerated: number; bookings: number; revenue: number;
+  spend: number | null; hasSpendData: boolean;
+  costPerLead: number | null; costPerBooking: number | null; conversionRatePct: number;
+}
+
 export interface CustomerAnalyticsRow {
   name: string; phone: string; totalSpending: number; lifetimeValue: number;
   tripsCompleted: number; tripsUpcoming: number; tripsCancelled: number;

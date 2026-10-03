@@ -207,6 +207,83 @@ export const getCampaignAnalytics = async (req: AuthenticatedRequest, res: Respo
   }
 };
 
+// ─── Campaign Monitoring (date-ranged, real Meta spend) ──────────────────────
+// Separate from getCampaignAnalytics above (which stays all-time, budget-
+// based, and feeds the existing BI page unchanged). This one powers the
+// Campaign Monitoring page: date-filtered leads/conversions per campaign,
+// joined against CampaignInsight (real daily Meta spend, synced twice a day
+// — see metaInsights.service.ts) instead of the static Campaign.budget.
+// Manually-created (non-Meta) campaigns have no date-bucketed spend data at
+// all, so their spend/CPL come back null rather than a misleading number.
+
+export const getCampaignMonitoring = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const from = String(req.query.from || '');
+    const to = String(req.query.to || '');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) {
+      res.status(400).json({ success: false, error: 'from and to are required as YYYY-MM-DD' });
+      return;
+    }
+    const rangeStart = new Date(`${from}T00:00:00.000Z`);
+    const rangeEnd = new Date(`${to}T23:59:59.999Z`);
+    const insightEnd = new Date(`${to}T00:00:00.000Z`); // CampaignInsight.date is always UTC-midnight
+
+    const campaigns = await prisma.campaign.findMany({
+      where: { ...orgFilter(req), archivedAt: null },
+      select: {
+        id: true, name: true, status: true, isFromMeta: true, metaStatus: true,
+        leads: {
+          where: { deletedAt: null, createdAt: { gte: rangeStart, lte: rangeEnd } },
+          select: { status: true, booking: { select: { finalPrice: true } } },
+        },
+        insights: {
+          where: { date: { gte: rangeStart, lte: insightEnd } },
+          select: { spend: true },
+        },
+      },
+    });
+
+    const rows = campaigns.map((c) => {
+      const leadsGenerated = c.leads.length;
+      const confirmed = c.leads.filter((l) => l.status === 'CONFIRMED' && l.booking);
+      const bookings = confirmed.length;
+      const revenue = confirmed.reduce((s, l) => s + (l.booking?.finalPrice ?? 0), 0);
+      const hasSpendData = c.isFromMeta && c.insights.length > 0;
+      const spend = hasSpendData ? Math.round(c.insights.reduce((s, i) => s + i.spend, 0) * 100) / 100 : null;
+
+      return {
+        id: c.id, name: c.name, status: c.status, isFromMeta: c.isFromMeta, metaStatus: c.metaStatus,
+        leadsGenerated, bookings, revenue,
+        spend, hasSpendData,
+        costPerLead: spend != null && leadsGenerated > 0 ? Math.round((spend / leadsGenerated) * 100) / 100 : null,
+        costPerBooking: spend != null && bookings > 0 ? Math.round((spend / bookings) * 100) / 100 : null,
+        conversionRatePct: leadsGenerated > 0 ? Math.round((bookings / leadsGenerated) * 1000) / 10 : 0,
+      };
+    }).sort((a, b) => b.leadsGenerated - a.leadsGenerated);
+
+    // "No Campaign" baseline row — leads not attributed to any ad campaign
+    // (manual/referral/organic) — so paid vs. organic conversion can be
+    // compared side by side. No spend concept applies here.
+    const noCampaignLeads = await prisma.lead.findMany({
+      where: { ...orgFilter(req), deletedAt: null, campaignId: null, createdAt: { gte: rangeStart, lte: rangeEnd } },
+      select: { status: true, booking: { select: { finalPrice: true } } },
+    });
+    const noCampaignConfirmed = noCampaignLeads.filter((l) => l.status === 'CONFIRMED' && l.booking);
+    const noCampaignRow = {
+      id: 'no-campaign', name: 'No Campaign (Manual/Referral)', status: null, isFromMeta: false, metaStatus: null,
+      leadsGenerated: noCampaignLeads.length, bookings: noCampaignConfirmed.length,
+      revenue: noCampaignConfirmed.reduce((s, l) => s + (l.booking?.finalPrice ?? 0), 0),
+      spend: null, hasSpendData: false, costPerLead: null, costPerBooking: null,
+      conversionRatePct: noCampaignLeads.length > 0 ? Math.round((noCampaignConfirmed.length / noCampaignLeads.length) * 1000) / 10 : 0,
+    };
+
+    res.json({ success: true, data: [...rows, noCampaignRow] });
+  } catch (e) {
+    console.error('[analytics] getCampaignMonitoring error:', e);
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+};
+
 // ─── Customer Analytics ───────────────────────────────────────────────────────
 // "Customer" = a CONFIRMED Lead. Since Booking.leadId is @unique, repeat
 // customers are grouped by phone number across multiple CONFIRMED leads.

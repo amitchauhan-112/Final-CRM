@@ -1,8 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
 import api from '../services/api';
 import {
-  ApiResponse, PackageAnalytics, DestinationAnalytics, CampaignAnalytics, CustomerAnalytics, EmployeeAnalytics,
+  ApiResponse, PackageAnalytics, DestinationAnalytics, CampaignAnalytics, CampaignMonitoringRow, CustomerAnalytics, EmployeeAnalytics,
 } from '../types/index';
+import { DateRange } from '../utils/dateRange';
 
 export function usePackageAnalytics() {
   return useQuery<ApiResponse<PackageAnalytics[]>>({
@@ -22,6 +23,13 @@ export function useCampaignAnalytics() {
   return useQuery<ApiResponse<CampaignAnalytics[]>>({
     queryKey: ['analytics', 'campaigns'],
     queryFn: async () => (await api.get('/analytics/campaigns')).data,
+  });
+}
+
+export function useCampaignMonitoring(range: DateRange) {
+  return useQuery<ApiResponse<CampaignMonitoringRow[]>>({
+    queryKey: ['analytics', 'campaigns', 'monitoring', range.from, range.to],
+    queryFn: async () => (await api.get('/analytics/campaigns/monitoring', { params: range })).data,
   });
 }
 

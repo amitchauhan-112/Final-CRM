@@ -53,3 +53,10 @@ jobs:
     steps:
       - run: |
           curl -sf --max-time 60 -X POST -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" https://final-crm-kappa.vercel.app/api/cron/lead-backfill
+
+  campaign-insights-sync:
+    if: github.event.schedule == '0 */12 * * *' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          curl -sf --max-time 60 -X POST -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" https://final-crm-kappa.vercel.app/api/cron/campaign-insights-sync

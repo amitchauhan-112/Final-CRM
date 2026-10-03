@@ -204,10 +204,30 @@ model Campaign {
   notes       CampaignNote[]
   attachments CampaignAttachment[]
   metaAdMaps  MetaAdMap[]
+  insights    CampaignInsight[]
 
   @@index([organizationId])
   @@index([status])
   @@map("campaigns")
+}
+
+// Daily Meta ad-spend snapshot per campaign — fetched twice a day by a
+// scheduled job (api/cron/campaign-insights-sync.ts), not live per-request,
+// to stay within Meta's rate limits and keep history for campaigns Meta has
+// since ended. Only populated for isFromMeta campaigns.
+model CampaignInsight {
+  id          String   @id @default(uuid())
+  campaignId  String
+  campaign    Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  date        DateTime // UTC midnight of the day this spend bucket covers
+  spend       Float    @default(0)
+  impressions Int?
+  clicks      Int?
+  fetchedAt   DateTime @default(now())
+
+  @@unique([campaignId, date])
+  @@index([campaignId])
+  @@map("campaign_insights")
 }
 
 // Persists the Meta adId → CRM campaign mapping produced by each Meta sync
