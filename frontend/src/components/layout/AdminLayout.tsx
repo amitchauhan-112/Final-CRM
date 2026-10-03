@@ -6,7 +6,7 @@ import {
   MessageSquarePlus, Activity, BarChart2, Building2,
   UserCheck, Database, ChevronRight, Package, BookOpen,
   Contact, Wallet, Map, Home, Gauge, LineChart, FolderKanban, Settings2, Zap, HeartPulse, IndianRupee,
-  MessageCircle, Radar, ShieldCheck, Receipt, Scale, TrendingUp,
+  MessageCircle, Radar, ShieldCheck, Receipt, Scale, TrendingUp, CheckCircle2,
 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import { useNotifications, useMarkAllAsRead, useMarkAsRead } from '../../hooks/useNotifications';
@@ -20,7 +20,11 @@ import LeadLookup from './LeadLookup';
 
 // ─── Nav Configuration ────────────────────────────────────────────────────────
 
-type NavItem = { to: string; label: string; icon: React.ElementType };
+// activeMatch lets an item override NavLink's default pathname-only active
+// check — needed when two items in the same group point at the same route
+// with different query params (Leads vs. Confirmed Bookings both live at
+// /admin/leads), where pathname alone can't tell them apart.
+type NavItem = { to: string; label: string; icon: React.ElementType; activeMatch?: (pathname: string, search: URLSearchParams) => boolean };
 
 type NavEntry =
   | { type: 'item'; to: string; label: string; icon: React.ElementType }
@@ -36,7 +40,8 @@ const NAV: NavEntry[] = [
   {
     type: 'group', label: 'CRM', icon: Users2,
     items: [
-      { to: '/admin/leads',     label: 'Leads',     icon: UserCheck },
+      { to: '/admin/leads',     label: 'Leads',     icon: UserCheck, activeMatch: (p, s) => p === '/admin/leads' && s.get('status') !== 'CONFIRMED' },
+      { to: '/admin/leads?status=CONFIRMED', label: 'Confirmed Bookings', icon: CheckCircle2, activeMatch: (p, s) => p === '/admin/leads' && s.get('status') === 'CONFIRMED' },
       { to: '/admin/campaigns', label: 'Campaigns', icon: Megaphone },
       { to: '/admin/campaign-monitoring', label: 'Campaign Monitoring', icon: TrendingUp },
       { to: '/admin/whatsapp',  label: 'WhatsApp Inbox', icon: MessageCircle },
@@ -126,10 +131,12 @@ function resolveBreadcrumb(pathname: string): { label: string; to?: string }[] {
 function NavGroupItem({
   entry,
   pathname,
+  search,
   onNavClick,
 }: {
   entry: Extract<NavEntry, { type: 'group' }>;
   pathname: string;
+  search: URLSearchParams;
   onNavClick: () => void;
 }) {
   const isActive = entry.items.some((i) => pathname.startsWith(i.to));
@@ -167,14 +174,15 @@ function NavGroupItem({
                 key={item.to}
                 to={item.to}
                 onClick={onNavClick}
-                className={({ isActive: ia }) =>
-                  cn(
+                className={({ isActive: ia }) => {
+                  const active = item.activeMatch ? item.activeMatch(pathname, search) : ia;
+                  return cn(
                     'flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-all',
-                    ia
+                    active
                       ? 'bg-primary-600 text-white shadow-md shadow-primary-900/40'
                       : 'text-slate-400 hover:text-white hover:bg-slate-700/60'
-                  )
-                }
+                  );
+                }}
               >
                 <ItemIcon className="w-4 h-4 flex-shrink-0" />
                 {item.label}
@@ -274,6 +282,7 @@ export default function AdminLayout() {
                   key={entry.label}
                   entry={entry}
                   pathname={location.pathname}
+                  search={new URLSearchParams(location.search)}
                   onNavClick={closeSidebar}
                 />
               );
