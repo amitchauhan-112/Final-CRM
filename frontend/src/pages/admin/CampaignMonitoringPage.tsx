@@ -54,6 +54,7 @@ export default function CampaignMonitoringPage() {
                   <th className="text-left">Campaign</th>
                   <th className="text-right">Leads</th>
                   <th className="text-right">Bookings</th>
+                  <th className="text-right">Travelers</th>
                   <th className="text-right">Conv. % (Leads)</th>
                   <th className="text-right">Conv. % (People)</th>
                   <th className="text-right">Revenue</th>
@@ -87,12 +88,8 @@ export default function CampaignMonitoringPage() {
                         </div>
                       </td>
                       <td className="text-right font-semibold text-slate-700">{c.leadsGenerated}</td>
-                      <td className="text-right text-slate-600">
-                        {c.bookings}
-                        {c.totalTravelers > 0 && c.totalTravelers !== c.bookings && (
-                          <span className="block text-[10px] text-slate-400 font-normal">{c.totalTravelers} travelers</span>
-                        )}
-                      </td>
+                      <td className="text-right text-slate-600">{c.bookings}</td>
+                      <td className="text-right text-slate-600">{c.totalTravelers}</td>
                       <td className={cn('text-right font-semibold', rateColor)}>{c.conversionRatePct}%</td>
                       <td className={cn('text-right font-semibold', peopleRateColor)}>{c.travelerConversionRatePct}%</td>
                       <td className="text-right text-slate-600">{formatCurrency(c.revenue)}</td>
