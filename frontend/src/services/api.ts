@@ -34,11 +34,15 @@ api.interceptors.response.use(
   async (err) => {
     const original = err.config;
 
-    // Not a 401, or already retried, or this IS the refresh call itself — bail out
+    // Not a 401, or already retried, or this IS the refresh call itself, or
+    // this is a login attempt (a wrong-password 401 means "bad credentials",
+    // not "expired token" — silently retrying it via refresh just swallows
+    // the real error and leaves the login button spinning forever) — bail out
     if (
       err.response?.status !== 401 ||
       original._retry ||
-      original.url?.includes('/auth/refresh')
+      original.url?.includes('/auth/refresh') ||
+      original.url?.includes('/auth/login')
     ) {
       if (err.response?.status >= 500) {
         toast.error('Server error. Please try again.');
