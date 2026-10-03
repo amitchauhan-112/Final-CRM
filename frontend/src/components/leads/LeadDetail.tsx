@@ -943,6 +943,8 @@ export default function LeadDetail({ leadId, open, onClose, isStarred, onToggleS
   const [statusNote, setStatusNote] = useState('');
   const [followUpModalOpen, setFollowUpModalOpen] = useState(false);
   const [outcomeModalOpen, setOutcomeModalOpen] = useState(false);
+  const [renameOpen, setRenameOpen] = useState(false);
+  const [renameValue, setRenameValue] = useState('');
 
   const { data, isLoading, isError } = useLead(leadId);
   const updateLead = useUpdateLead();
@@ -1109,6 +1111,15 @@ export default function LeadDetail({ leadId, open, onClose, isStarred, onToggleS
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <h2 className="text-base font-bold text-slate-900 truncate">{lead.name}</h2>
+                    {user?.role === 'ADMIN' && lead.status === 'CONFIRMED' && (
+                      <button
+                        onClick={() => { setRenameValue(lead.name); setRenameOpen(true); }}
+                        className="p-1 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 flex-shrink-0"
+                        title="Fix name"
+                      >
+                        <Edit className="w-3.5 h-3.5" />
+                      </button>
+                    )}
                     {onToggleStar && (
                       <button
                         onClick={onToggleStar}
@@ -1318,6 +1329,35 @@ export default function LeadDetail({ leadId, open, onClose, isStarred, onToggleS
             onCancel={() => setEditOpen(false)}
           />
         )}
+      </Modal>
+
+      {/* ── Rename Modal (Admin-only, available even once CONFIRMED — a typo'd
+           name shouldn't be stuck forever, but the full Edit Lead form stays
+           locked post-confirmation since its other fields can drift out of
+           sync with the booking) ───────────────────────────────────────── */}
+      <Modal
+        open={renameOpen} onClose={() => setRenameOpen(false)} title="Fix Lead Name" size="sm"
+        footer={<>
+          <button onClick={() => setRenameOpen(false)} className="btn-secondary">Cancel</button>
+          <button
+            onClick={() => {
+              if (!lead || !renameValue.trim()) return;
+              updateLead.mutate({ id: lead.id, name: renameValue.trim() }, { onSuccess: () => setRenameOpen(false) });
+            }}
+            disabled={updateLead.isPending || !renameValue.trim()}
+            className="btn-primary"
+          >
+            {updateLead.isPending ? 'Saving…' : 'Save'}
+          </button>
+        </>}
+      >
+        <label className="label">Name</label>
+        <input
+          value={renameValue}
+          onChange={(e) => setRenameValue(e.target.value)}
+          className="input"
+          autoFocus
+        />
       </Modal>
 
       {/* ── Follow-up Date/Time Modal ────────────────────────────────────── */}
