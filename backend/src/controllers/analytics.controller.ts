@@ -234,7 +234,7 @@ export const getCampaignMonitoring = async (req: AuthenticatedRequest, res: Resp
         id: true, name: true, status: true, isFromMeta: true, metaStatus: true,
         leads: {
           where: { deletedAt: null, createdAt: { gte: rangeStart, lte: rangeEnd } },
-          select: { status: true, booking: { select: { finalPrice: true } } },
+          select: { status: true, booking: { select: { finalPrice: true, numberOfTravelers: true } } },
         },
         insights: {
           where: { date: { gte: rangeStart, lte: insightEnd } },
@@ -248,16 +248,22 @@ export const getCampaignMonitoring = async (req: AuthenticatedRequest, res: Resp
       const confirmed = c.leads.filter((l) => l.status === 'CONFIRMED' && l.booking);
       const bookings = confirmed.length;
       const revenue = confirmed.reduce((s, l) => s + (l.booking?.finalPrice ?? 0), 0);
+      // A booking's traveler count (group size) — a single "converted lead"
+      // can represent several real travelers, which plain lead-based
+      // conversion% hides (a 1-booking, 50-traveler group looks the same as
+      // a 1-booking, 1-traveler one otherwise).
+      const totalTravelers = confirmed.reduce((s, l) => s + (l.booking?.numberOfTravelers ?? 0), 0);
       const hasSpendData = c.isFromMeta && c.insights.length > 0;
       const spend = hasSpendData ? Math.round(c.insights.reduce((s, i) => s + i.spend, 0) * 100) / 100 : null;
 
       return {
         id: c.id, name: c.name, status: c.status, isFromMeta: c.isFromMeta, metaStatus: c.metaStatus,
-        leadsGenerated, bookings, revenue,
+        leadsGenerated, bookings, totalTravelers, revenue,
         spend, hasSpendData,
         costPerLead: spend != null && leadsGenerated > 0 ? Math.round((spend / leadsGenerated) * 100) / 100 : null,
         costPerBooking: spend != null && bookings > 0 ? Math.round((spend / bookings) * 100) / 100 : null,
         conversionRatePct: leadsGenerated > 0 ? Math.round((bookings / leadsGenerated) * 1000) / 10 : 0,
+        travelerConversionRatePct: leadsGenerated > 0 ? Math.round((totalTravelers / leadsGenerated) * 1000) / 10 : 0,
       };
     }).sort((a, b) => b.leadsGenerated - a.leadsGenerated);
 
@@ -266,15 +272,17 @@ export const getCampaignMonitoring = async (req: AuthenticatedRequest, res: Resp
     // compared side by side. No spend concept applies here.
     const noCampaignLeads = await prisma.lead.findMany({
       where: { ...orgFilter(req), deletedAt: null, campaignId: null, createdAt: { gte: rangeStart, lte: rangeEnd } },
-      select: { status: true, booking: { select: { finalPrice: true } } },
+      select: { status: true, booking: { select: { finalPrice: true, numberOfTravelers: true } } },
     });
     const noCampaignConfirmed = noCampaignLeads.filter((l) => l.status === 'CONFIRMED' && l.booking);
+    const noCampaignTravelers = noCampaignConfirmed.reduce((s, l) => s + (l.booking?.numberOfTravelers ?? 0), 0);
     const noCampaignRow = {
       id: 'no-campaign', name: 'No Campaign (Manual/Referral)', status: null, isFromMeta: false, metaStatus: null,
-      leadsGenerated: noCampaignLeads.length, bookings: noCampaignConfirmed.length,
+      leadsGenerated: noCampaignLeads.length, bookings: noCampaignConfirmed.length, totalTravelers: noCampaignTravelers,
       revenue: noCampaignConfirmed.reduce((s, l) => s + (l.booking?.finalPrice ?? 0), 0),
       spend: null, hasSpendData: false, costPerLead: null, costPerBooking: null,
       conversionRatePct: noCampaignLeads.length > 0 ? Math.round((noCampaignConfirmed.length / noCampaignLeads.length) * 1000) / 10 : 0,
+      travelerConversionRatePct: noCampaignLeads.length > 0 ? Math.round((noCampaignTravelers / noCampaignLeads.length) * 1000) / 10 : 0,
     };
 
     res.json({ success: true, data: [...rows, noCampaignRow] });

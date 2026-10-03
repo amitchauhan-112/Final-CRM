@@ -54,7 +54,8 @@ export default function CampaignMonitoringPage() {
                   <th className="text-left">Campaign</th>
                   <th className="text-right">Leads</th>
                   <th className="text-right">Bookings</th>
-                  <th className="text-right">Conv. %</th>
+                  <th className="text-right">Conv. % (Leads)</th>
+                  <th className="text-right">Conv. % (People)</th>
                   <th className="text-right">Revenue</th>
                   <th className="text-right">Spend</th>
                   <th className="text-right">CPL</th>
@@ -65,6 +66,8 @@ export default function CampaignMonitoringPage() {
                 {rows.map((c) => {
                   const rate = c.conversionRatePct;
                   const rateColor = rate >= 20 ? 'text-emerald-600' : rate >= 10 ? 'text-amber-600' : 'text-slate-500';
+                  const peopleRate = c.travelerConversionRatePct;
+                  const peopleRateColor = peopleRate >= 20 ? 'text-emerald-600' : peopleRate >= 10 ? 'text-amber-600' : 'text-slate-500';
                   const isBaseline = c.id === 'no-campaign';
                   return (
                     <tr key={c.id} className={cn(isBaseline && 'bg-slate-50')}>
@@ -84,8 +87,14 @@ export default function CampaignMonitoringPage() {
                         </div>
                       </td>
                       <td className="text-right font-semibold text-slate-700">{c.leadsGenerated}</td>
-                      <td className="text-right text-slate-600">{c.bookings}</td>
+                      <td className="text-right text-slate-600">
+                        {c.bookings}
+                        {c.totalTravelers > 0 && c.totalTravelers !== c.bookings && (
+                          <span className="block text-[10px] text-slate-400 font-normal">{c.totalTravelers} travelers</span>
+                        )}
+                      </td>
                       <td className={cn('text-right font-semibold', rateColor)}>{c.conversionRatePct}%</td>
+                      <td className={cn('text-right font-semibold', peopleRateColor)}>{c.travelerConversionRatePct}%</td>
                       <td className="text-right text-slate-600">{formatCurrency(c.revenue)}</td>
                       <td className="text-right text-slate-600">{c.spend != null ? formatCurrency(c.spend) : '—'}</td>
                       <td className="text-right text-slate-600">{c.costPerLead != null ? formatCurrency(c.costPerLead) : '—'}</td>

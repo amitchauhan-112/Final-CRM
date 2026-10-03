@@ -1337,9 +1337,10 @@ export interface CampaignAnalytics {
 
 export interface CampaignMonitoringRow {
   id: string; name: string; status: string | null; isFromMeta: boolean; metaStatus: string | null;
-  leadsGenerated: number; bookings: number; revenue: number;
+  leadsGenerated: number; bookings: number; totalTravelers: number; revenue: number;
   spend: number | null; hasSpendData: boolean;
-  costPerLead: number | null; costPerBooking: number | null; conversionRatePct: number;
+  costPerLead: number | null; costPerBooking: number | null;
+  conversionRatePct: number; travelerConversionRatePct: number;
 }
 
 export interface CustomerAnalyticsRow {
