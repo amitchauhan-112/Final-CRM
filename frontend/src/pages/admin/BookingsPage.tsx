@@ -149,6 +149,7 @@ export default function BookingsPage() {
               <thead>
                 <tr className="border-b border-slate-200 bg-slate-50">
                   <th className="text-left px-4 py-3 font-semibold text-slate-500 text-xs uppercase tracking-wider">Customer</th>
+                  <th className="text-center px-4 py-3 font-semibold text-slate-500 text-xs uppercase tracking-wider hidden sm:table-cell">Type</th>
                   <th className="text-left px-4 py-3 font-semibold text-slate-500 text-xs uppercase tracking-wider hidden sm:table-cell">Tour</th>
                   <th className="text-right px-4 py-3 font-semibold text-slate-500 text-xs uppercase tracking-wider">Price</th>
                   <th className="text-right px-4 py-3 font-semibold text-slate-500 text-xs uppercase tracking-wider hidden md:table-cell">Paid</th>
@@ -169,6 +170,14 @@ export default function BookingsPage() {
                           <span className="text-xs text-slate-400">{b.lead.destination}</span>
                         </div>
                       )}
+                    </td>
+                    <td className="px-4 py-3 align-top text-center hidden sm:table-cell">
+                      <span className={cn(
+                        'inline-flex items-center justify-center text-[10px] font-bold px-2 py-0.5 rounded-full tracking-wide',
+                        b.tourType === 'FIT' ? 'bg-violet-50 text-violet-700' : 'bg-primary-50 text-primary-700'
+                      )}>
+                        {b.tourType}
+                      </span>
                     </td>
                     <td className="px-4 py-3 align-top hidden sm:table-cell">
                       <div className="space-y-0.5">
