@@ -156,7 +156,7 @@ export interface Lead {
   adName?: string;
   tags?: LeadTag[];
   activityLogs?: ActivityLog[];
-  booking?: { package?: { name: string } | null; departureDate?: string | null } | null;
+  booking?: { package?: { name: string } | null; departureDate?: string | null; tourType?: string | null } | null;
   createdAt: string;
   updatedAt: string;
   capturedAt: string;

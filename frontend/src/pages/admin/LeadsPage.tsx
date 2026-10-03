@@ -199,6 +199,16 @@ export default function AdminLeadsPage() {
           headerClassName: 'w-8',
           render: (row) => <PriorityBadge priority={(row as any).priority ?? 'MEDIUM'} />,
         },
+    ...(isConfirmedView ? [{
+          key: 'tourType',
+          header: 'Type',
+          render: (row) => row.booking?.tourType
+            ? <span className={cn(
+                'inline-flex items-center justify-center text-[10px] font-bold px-2 py-0.5 rounded-full tracking-wide',
+                row.booking.tourType === 'FIT' ? 'bg-violet-50 text-violet-700' : 'bg-primary-50 text-primary-700'
+              )}>{row.booking.tourType}</span>
+            : <span className="text-slate-400">—</span>,
+        } as Column<Lead>] : []),
     {
       key: 'source',
       header: 'Source',
