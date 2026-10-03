@@ -903,7 +903,7 @@ function OverviewTab({ lead, canAct, onUpdateLead, onFollowUpDoneClick, booking,
       )}
 
       {/* Customer message */}
-      {lead.message && (
+      {lead.status !== 'CONFIRMED' && lead.message && (
         <div className="space-y-2">
           <div className="flex items-center gap-2">
             <MessageSquare className="w-4 h-4 text-slate-400" />
@@ -924,7 +924,9 @@ function OverviewTab({ lead, canAct, onUpdateLead, onFollowUpDoneClick, booking,
           <InfoCell icon={MapPin} label="Destination" value={lead.destination} />
           <InfoCell icon={Megaphone} label="Campaign" value={lead.campaign?.name} />
           <InfoCell icon={User} label="Assigned To" value={lead.assignedTo?.name} />
-          <InfoCell icon={Users} label="Group Size" value={lead.groupSize ? `${lead.groupSize} people` : undefined} />
+          {lead.status !== 'CONFIRMED' && (
+            <InfoCell icon={Users} label="Group Size" value={lead.groupSize ? `${lead.groupSize} people` : undefined} />
+          )}
           <InfoCell icon={DollarSign} label="Budget" value={formatCurrency(lead.budget)} />
           <InfoCell icon={Calendar} label="Preferred Date" value={formatDate(lead.preferredDate)} />
           {lead.status !== 'CONFIRMED' && (
