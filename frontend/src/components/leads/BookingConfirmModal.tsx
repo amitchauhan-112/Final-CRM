@@ -768,11 +768,12 @@ export default function BookingConfirmModal({ open, onClose, lead, existingBooki
               <p className="text-[10px] text-slate-400 mt-0.5">Used as the default for the whole group — split into different room types below if needed.</p>
             </div>
             <div>
-              <label className="label">Pickup Point</label>
+              <label className="label">Pickup Point *</label>
               <input
-                {...register('pickupPoint')}
+                {...register('pickupPoint', { required: 'Required' })}
                 className="input" placeholder="e.g. Haridwar Railway Station, Platform 2"
               />
+              {errors.pickupPoint && <p className="text-red-500 text-xs mt-1">{errors.pickupPoint.message}</p>}
             </div>
 
             {/* Split into different room types — group bookings only, at creation time */}

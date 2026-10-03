@@ -85,6 +85,9 @@ export const createBooking = async (req: AuthenticatedRequest, res: Response): P
     if (!roomSharing || !ROOM_SHARINGS.includes(roomSharing)) {
       res.status(400).json({ success: false, error: 'A valid room sharing type is required' }); return;
     }
+    if (!pickupPoint?.trim()) {
+      res.status(400).json({ success: false, error: 'Pickup point is required' }); return;
+    }
     if (roomSplit !== undefined) {
       if (!Array.isArray(roomSplit) || roomSplit.length === 0) {
         res.status(400).json({ success: false, error: 'roomSplit must be a non-empty array' }); return;
