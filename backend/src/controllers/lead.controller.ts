@@ -85,6 +85,7 @@ export const getLeads = async (req: AuthenticatedRequest, res: Response): Promis
           campaign: { select: { id: true, name: true, destination: true } },
           assignedTo: { select: { id: true, name: true, email: true } },
           tags: { include: { tag: true } },
+          booking: { select: { package: { select: { name: true } }, departureDate: true } },
         },
         // Tiebreakers make the order deterministic when the primary sort
         // field is identical across rows (e.g. two leads confirmed in the

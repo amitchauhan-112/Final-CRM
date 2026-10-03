@@ -152,6 +152,11 @@ export default function AdminLeadsPage() {
     setBulkSelected(bulkSelected.length === leads.length ? [] : leads.map((l) => l.id));
   };
 
+  // Once a lead is booked, priority/follow-up/tags stop mattering — Package
+  // and Departure Date are what Sales actually needs to see for a confirmed
+  // trip, so this view swaps columns rather than showing both sets.
+  const isConfirmedView = status === 'CONFIRMED';
+
   const columns: Column<Lead>[] = [
     {
       key: 'select',
@@ -180,12 +185,20 @@ export default function AdminLeadsPage() {
         </div>
       ),
     },
-    {
-      key: 'priority',
-      header: 'P',
-      headerClassName: 'w-8',
-      render: (row) => <PriorityBadge priority={(row as any).priority ?? 'MEDIUM'} />,
-    },
+    isConfirmedView
+      ? {
+          key: 'package',
+          header: 'Package',
+          render: (row) => row.booking?.package?.name
+            ? <span className="text-sm text-slate-600 truncate max-w-[140px] block">{row.booking.package.name}</span>
+            : <span className="text-slate-400">—</span>,
+        }
+      : {
+          key: 'priority',
+          header: 'P',
+          headerClassName: 'w-8',
+          render: (row) => <PriorityBadge priority={(row as any).priority ?? 'MEDIUM'} />,
+        },
     {
       key: 'source',
       header: 'Source',
@@ -196,7 +209,7 @@ export default function AdminLeadsPage() {
       header: 'Status',
       render: (row) => <Badge status={row.status} />,
     },
-    {
+    ...(isConfirmedView ? [] : [{
       key: 'tags',
       header: 'Tags',
       render: (row) => {
@@ -211,7 +224,7 @@ export default function AdminLeadsPage() {
           </div>
         );
       },
-    },
+    } as Column<Lead>]),
     {
       key: 'campaign',
       header: 'Campaign',
@@ -229,7 +242,7 @@ export default function AdminLeadsPage() {
         </div>
       ) : <span className="text-slate-400">—</span>,
     },
-    {
+    ...(isConfirmedView ? [] : [{
       key: 'followUpDate',
       header: 'Follow-up',
       render: (row) => {
@@ -247,12 +260,20 @@ export default function AdminLeadsPage() {
         );
         return <span className="text-xs font-medium text-orange-600">{formatDate(row.followUpDate)}</span>;
       },
-    },
-    {
-      key: 'createdAt',
-      header: 'Created',
-      render: (row) => <span className="text-xs text-slate-500">{formatDate(row.createdAt)}</span>,
-    },
+    } as Column<Lead>]),
+    isConfirmedView
+      ? {
+          key: 'departureDate',
+          header: 'Departure Date',
+          render: (row) => row.booking?.departureDate
+            ? <span className="text-xs text-slate-500">{formatDate(row.booking.departureDate)}</span>
+            : <span className="text-slate-400">—</span>,
+        }
+      : {
+          key: 'createdAt',
+          header: 'Created',
+          render: (row) => <span className="text-xs text-slate-500">{formatDate(row.createdAt)}</span>,
+        },
     {
       key: 'actions',
       header: 'Actions',

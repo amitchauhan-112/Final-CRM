@@ -197,6 +197,14 @@ export default function BookingConfirmModal({ open, onClose, lead, existingBooki
   ]);
   const [splitError, setSplitError] = useState<string | null>(null);
 
+  // Every traveler's name/mobile/Aadhar, collected up front at confirm time
+  // (new bookings only — once confirmed, Operations' Passenger Table is the
+  // place to edit these, same scoping as the room split above).
+  const [travelers, setTravelers] = useState<{ name: string; mobile: string; aadharNumber: string }[]>([
+    { name: '', mobile: '', aadharNumber: '' },
+  ]);
+  const [travelersError, setTravelersError] = useState<string | null>(null);
+
   // Inline "create a new FIT package" — Sales can already create FIT
   // packages (the backend allows it: only GIT is Admin-only), but previously
   // had to leave this form and go to the Package Master screen to do it.
@@ -259,6 +267,23 @@ export default function BookingConfirmModal({ open, onClose, lead, existingBooki
   const watchedDepartureDate = useWatch({ control, name: 'departureDate' });
   const watchedPaymentMode = useWatch({ control, name: 'paymentMode' });
   const watchedNumberOfTravelers = useWatch({ control, name: 'numberOfTravelers' });
+
+  // Resize the traveler-details list to match the headcount — new rows
+  // start blank, index 0 defaults to the lead's own name/phone the first
+  // time it's created (not re-applied on every resize, so typed-in edits
+  // to traveler 1 survive bumping the count up and back down).
+  useEffect(() => {
+    if (isEdit) return;
+    const count = Math.max(1, Number(watchedNumberOfTravelers) || 1);
+    setTravelers((prev) => {
+      if (prev.length === count) return prev;
+      const next = [...prev];
+      while (next.length < count) next.push({ name: '', mobile: '', aadharNumber: '' });
+      next.length = count;
+      if (!next[0].name && !next[0].mobile) next[0] = { ...next[0], name: lead.name, mobile: lead.phone?.replace(/\D/g, '').slice(-10) ?? '' };
+      return next;
+    });
+  }, [watchedNumberOfTravelers, isEdit, lead.name, lead.phone]);
 
   const balanceAmount = Math.max(0, Number(finalPrice || 0) - Number(amountPaid || 0));
 
@@ -339,6 +364,8 @@ export default function BookingConfirmModal({ open, onClose, lead, existingBooki
       setSplitEnabled(false);
       setRoomSplit([{ count: 0, roomSharing: 'DOUBLE' }]);
       setSplitError(null);
+      setTravelers([{ name: lead.name, mobile: lead.phone?.replace(/\D/g, '').slice(-10) ?? '', aadharNumber: '' }]);
+      setTravelersError(null);
       setShowCreatePackage(false);
       setNewPkg({ name: '', nights: '3', pricePerPerson: '' });
       setNewPkgRows(buildPkgItineraryRows(3));
@@ -364,11 +391,21 @@ export default function BookingConfirmModal({ open, onClose, lead, existingBooki
       setSplitError(null);
     }
 
+    if (!isEdit) {
+      const incomplete = travelers.find((t) => !t.name.trim() || !/^[6-9]\d{9}$/.test(t.mobile.trim()) || !/^\d{12}$/.test(t.aadharNumber.replace(/\s/g, '')));
+      if (incomplete) {
+        setTravelersError('Every traveler needs a name, a valid 10-digit mobile number, and a valid 12-digit Aadhar number.');
+        return;
+      }
+      setTravelersError(null);
+    }
+
     const payload = {
       leadId: lead.id,
-      travelerName: data.travelerName,
+      travelerName: isEdit ? data.travelerName : travelers[0].name,
       numberOfTravelers: Number(data.numberOfTravelers),
-      aadharNumber: data.aadharNumber || undefined,
+      aadharNumber: isEdit ? (data.aadharNumber || undefined) : travelers[0].aadharNumber,
+      travelers: isEdit ? undefined : travelers.map((t) => ({ name: t.name.trim(), mobile: t.mobile.trim(), aadharNumber: t.aadharNumber.replace(/\s/g, '') })),
       foodPreference: data.foodPreference as FoodPreference,
       roomSharing: data.roomSharing as RoomSharing,
       pickupPoint: data.pickupPoint || undefined,
@@ -722,11 +759,15 @@ export default function BookingConfirmModal({ open, onClose, lead, existingBooki
         <div>
           <SectionHeader icon={Users} label="Traveler Details" />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="sm:col-span-2">
-              <label className="label">Lead / Traveler Name *</label>
-              <input {...register('travelerName', { required: 'Name is required' })} className="input" />
-              {errors.travelerName && <p className="text-red-500 text-xs mt-1">{errors.travelerName.message}</p>}
-            </div>
+            {isEdit && (
+              <>
+                <div className="sm:col-span-2">
+                  <label className="label">Lead / Traveler Name *</label>
+                  <input {...register('travelerName', { required: 'Name is required' })} className="input" />
+                  {errors.travelerName && <p className="text-red-500 text-xs mt-1">{errors.travelerName.message}</p>}
+                </div>
+              </>
+            )}
             <div>
               <label className="label">No. of Travelers *</label>
               <input
@@ -736,14 +777,44 @@ export default function BookingConfirmModal({ open, onClose, lead, existingBooki
               />
               {errors.numberOfTravelers && <p className="text-red-500 text-xs mt-1">{errors.numberOfTravelers.message}</p>}
             </div>
-            <div>
-              <label className="label">Aadhar Card No.</label>
-              <input
-                {...register('aadharNumber', { validate: (v) => !v || /^\d{12}$/.test(v.replace(/\s/g, '')) || 'Aadhar number must be 12 digits' })}
-                className="input font-mono" placeholder="XXXX XXXX XXXX" maxLength={14}
-              />
-              {errors.aadharNumber && <p className="text-red-500 text-xs mt-1">{errors.aadharNumber.message}</p>}
-            </div>
+            {isEdit && (
+              <div>
+                <label className="label">Aadhar Card No.</label>
+                <input
+                  {...register('aadharNumber', { validate: (v) => !v || /^\d{12}$/.test(v.replace(/\s/g, '')) || 'Aadhar number must be 12 digits' })}
+                  className="input font-mono" placeholder="XXXX XXXX XXXX" maxLength={14}
+                />
+                {errors.aadharNumber && <p className="text-red-500 text-xs mt-1">{errors.aadharNumber.message}</p>}
+              </div>
+            )}
+            {!isEdit && (
+              <div className="sm:col-span-2 rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-3">
+                <p className="text-xs font-semibold text-slate-600">Every traveler's details (required to confirm)</p>
+                {travelers.map((t, idx) => (
+                  <div key={idx} className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    <input
+                      value={t.name}
+                      onChange={(e) => setTravelers((prev) => prev.map((row, i) => i === idx ? { ...row, name: e.target.value } : row))}
+                      placeholder={`Traveler ${idx + 1} name`}
+                      className="input text-sm"
+                    />
+                    <input
+                      value={t.mobile}
+                      onChange={(e) => setTravelers((prev) => prev.map((row, i) => i === idx ? { ...row, mobile: e.target.value.replace(/\D/g, '').slice(0, 10) } : row))}
+                      placeholder="10-digit mobile"
+                      className="input text-sm font-mono"
+                    />
+                    <input
+                      value={t.aadharNumber}
+                      onChange={(e) => setTravelers((prev) => prev.map((row, i) => i === idx ? { ...row, aadharNumber: e.target.value.replace(/\D/g, '').slice(0, 12) } : row))}
+                      placeholder="12-digit Aadhar"
+                      className="input text-sm font-mono"
+                    />
+                  </div>
+                ))}
+                {travelersError && <p className="text-red-500 text-xs">{travelersError}</p>}
+              </div>
+            )}
             <div>
               <label className="label">Food Preference *</label>
               <select {...register('foodPreference', { required: 'Required' })} className="input">

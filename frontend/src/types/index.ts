@@ -156,6 +156,7 @@ export interface Lead {
   adName?: string;
   tags?: LeadTag[];
   activityLogs?: ActivityLog[];
+  booking?: { package?: { name: string } | null; departureDate?: string | null } | null;
   createdAt: string;
   updatedAt: string;
   capturedAt: string;
@@ -1337,7 +1338,7 @@ export interface CampaignAnalytics {
 }
 
 export interface CampaignMonitoringRow {
-  id: string; name: string; status: string | null; isFromMeta: boolean; metaStatus: string | null;
+  id: string; name: string; status: string | null; isFromMeta: boolean; metaStatus: string | null; createdAt: string | null;
   leadsGenerated: number; bookings: number; totalTravelers: number; revenue: number;
   spend: number | null; hasSpendData: boolean;
   costPerLead: number | null; costPerBooking: number | null;

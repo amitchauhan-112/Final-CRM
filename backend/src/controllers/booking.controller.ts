@@ -2,11 +2,12 @@ import { Response } from 'express';
 import prisma from '../lib/prisma.js';
 import { AuthenticatedRequest } from '../types/index.js';
 import { generateTasksFromItinerary } from './bookingTask.controller.js';
-import { linkBookingToDeparture, createPlaceholderTravelers, issueTravelerPortalToken } from './departure.controller.js';
+import { linkBookingToDeparture, createPlaceholderTravelers, createTravelersFromDetails, issueTravelerPortalToken } from './departure.controller.js';
 import { generatePaymentSchedule } from './paymentSchedule.controller.js';
 import { notifyFinanceTeam, createNotification } from '../services/notification.service.js';
 import { fireEvent } from '../services/automationEngine.service.js';
 import { isWholeAmount, WHOLE_AMOUNT_ERROR } from '../utils/amountValidation.js';
+import { validateTravelerInput } from '../utils/travelerValidation.js';
 
 const orgId = (req: AuthenticatedRequest) => req.user?.organizationId ?? null;
 
@@ -66,7 +67,7 @@ export const getBookingDocuments = async (req: AuthenticatedRequest, res: Respon
 export const createBooking = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const {
-      leadId, travelerName, numberOfTravelers, aadharNumber,
+      leadId, numberOfTravelers, travelers,
       foodPreference, roomSharing, roomSplit, departureLocation, departurePackage, pickupPoint,
       tourType, specialRequest, finalPrice, amountPaid, balanceDueDate,
       packageId, departureDate, returnDate, bookingNotes,
@@ -74,8 +75,23 @@ export const createBooking = async (req: AuthenticatedRequest, res: Response): P
     } = req.body;
 
     if (!leadId) { res.status(400).json({ success: false, error: 'leadId is required' }); return; }
-    if (!travelerName?.trim()) { res.status(400).json({ success: false, error: 'Traveler name is required' }); return; }
     if (!numberOfTravelers || isNaN(Number(numberOfTravelers))) { res.status(400).json({ success: false, error: 'Number of travelers is required' }); return; }
+    // Every traveler's identity is collected up front at confirm time now —
+    // no more blank "Traveler 2/3/..." placeholders left for the customer to
+    // fill in later via the portal.
+    if (!Array.isArray(travelers) || travelers.length !== Number(numberOfTravelers)) {
+      res.status(400).json({ success: false, error: `Name, mobile, and Aadhar are required for all ${numberOfTravelers} traveler(s)` }); return;
+    }
+    for (let i = 0; i < travelers.length; i++) {
+      const t = travelers[i];
+      if (!t?.name?.trim() || !t?.mobile?.trim() || !t?.aadharNumber?.trim()) {
+        res.status(400).json({ success: false, error: `Traveler ${i + 1}: name, mobile, and Aadhar are all required` }); return;
+      }
+      const err = validateTravelerInput({ name: t.name, mobile: t.mobile, govIdType: 'AADHAR', govIdNumber: t.aadharNumber });
+      if (err) { res.status(400).json({ success: false, error: `Traveler ${i + 1}: ${err}` }); return; }
+    }
+    const travelerName = travelers[0].name;
+    const aadharNumber = travelers[0].aadharNumber;
     if (finalPrice === undefined || isNaN(Number(finalPrice))) { res.status(400).json({ success: false, error: 'Final price is required' }); return; }
     if (!isWholeAmount(finalPrice)) { res.status(400).json({ success: false, error: WHOLE_AMOUNT_ERROR }); return; }
     if (!isWholeAmount(amountPaid)) { res.status(400).json({ success: false, error: WHOLE_AMOUNT_ERROR }); return; }
@@ -98,9 +114,6 @@ export const createBooking = async (req: AuthenticatedRequest, res: Response): P
       if (sum !== Number(numberOfTravelers)) {
         res.status(400).json({ success: false, error: `Room split must add up to ${numberOfTravelers} travelers (got ${sum})` }); return;
       }
-    }
-    if (aadharNumber && !/^\d{12}$/.test(String(aadharNumber).replace(/\s/g, ''))) {
-      res.status(400).json({ success: false, error: 'Aadhar number must be 12 digits' }); return;
     }
     if (amountPaid !== undefined && Number(amountPaid) > Number(finalPrice)) {
       res.status(400).json({ success: false, error: 'Amount paid cannot exceed the final price' }); return;
@@ -283,14 +296,12 @@ export const createBooking = async (req: AuthenticatedRequest, res: Response): P
       await linkBookingToDeparture(booking.id, orgId(req), packageId || null, depDate, destination, tripDays).catch(console.error);
     }
 
-    // Materialize the headcount into real per-traveler placeholder records —
-    // Traveler 1 is seeded with the booking contact's name/phone/email, since
-    // that's who almost always ends up being the first traveler — and issue a
-    // Traveler Portal link (only if this booking doesn't already have one) so
-    // the customer can submit the rest of their own details.
-    await createPlaceholderTravelers(
-      booking.id, Number(numberOfTravelers),
-      { name: travelerName, mobile: lead?.phone, email: lead?.email },
+    // Every traveler's name/mobile/Aadhar was already collected above at
+    // confirm time — write real Traveler rows instead of blank placeholders.
+    // Traveler 1 also gets the booking contact's email, since that's not
+    // separately collected per-traveler on this form.
+    await createTravelersFromDetails(
+      booking.id, travelers, lead?.email,
       Array.isArray(roomSplit) && roomSplit.length > 0 ? roomSplit : undefined,
     ).catch(console.error);
     await generatePaymentSchedule(booking.id, price, depDate).catch(console.error);

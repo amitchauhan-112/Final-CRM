@@ -71,6 +71,45 @@ export async function createPlaceholderTravelers(
   }
 }
 
+// Confirm-time variant of the placeholder creator above — the Confirm
+// Booking form now collects every traveler's name/mobile/Aadhar up front
+// (validated by the caller), so real Traveler rows are written directly
+// instead of blanks the customer would otherwise fill in later via the
+// portal. Re-submitting the same booking (e.g. fixing a typo'd Aadhar
+// before departure) updates existing rows by position instead of only
+// topping up new ones, so edits here actually take effect.
+export async function createTravelersFromDetails(
+  bookingId: string,
+  travelers: Array<{ name: string; mobile: string; aadharNumber: string }>,
+  primaryEmail?: string | null,
+  roomSplit?: Array<{ count: number; roomSharing: string }>
+): Promise<void> {
+  const existing = await prisma.traveler.findMany({ where: { bookingId }, orderBy: { createdAt: 'asc' }, select: { id: true } });
+
+  const roomByIndex: (string | undefined)[] = [];
+  if (roomSplit && roomSplit.length > 0) {
+    for (const group of roomSplit) for (let i = 0; i < group.count; i++) roomByIndex.push(group.roomSharing);
+  }
+
+  for (let i = 0; i < travelers.length; i++) {
+    const t = travelers[i];
+    const data = {
+      name: t.name.trim(),
+      mobile: t.mobile.trim(),
+      govIdType: 'AADHAR',
+      govIdNumber: t.aadharNumber.trim(),
+      roomSharing: roomByIndex[i] ?? null,
+    };
+    if (existing[i]) {
+      await prisma.traveler.update({ where: { id: existing[i].id }, data });
+    } else {
+      await prisma.traveler.create({
+        data: { ...data, bookingId, email: i === 0 ? primaryEmail?.trim() || null : null, verificationStatus: 'SUBMITTED' },
+      });
+    }
+  }
+}
+
 // ─── Traveler Portal token ────────────────────────────────────────────────────
 // Generates a random link token, stores only its SHA-256 hash (never the raw
 // value — same idiom as RefreshToken), and returns the raw token once so the

@@ -231,7 +231,7 @@ export const getCampaignMonitoring = async (req: AuthenticatedRequest, res: Resp
     const campaigns = await prisma.campaign.findMany({
       where: { ...orgFilter(req), archivedAt: null },
       select: {
-        id: true, name: true, status: true, isFromMeta: true, metaStatus: true,
+        id: true, name: true, status: true, isFromMeta: true, metaStatus: true, createdAt: true,
         leads: {
           where: { deletedAt: null, createdAt: { gte: rangeStart, lte: rangeEnd } },
           select: { status: true, booking: { select: { finalPrice: true, numberOfTravelers: true } } },
@@ -257,7 +257,7 @@ export const getCampaignMonitoring = async (req: AuthenticatedRequest, res: Resp
       const spend = hasSpendData ? Math.round(c.insights.reduce((s, i) => s + i.spend, 0) * 100) / 100 : null;
 
       return {
-        id: c.id, name: c.name, status: c.status, isFromMeta: c.isFromMeta, metaStatus: c.metaStatus,
+        id: c.id, name: c.name, status: c.status, isFromMeta: c.isFromMeta, metaStatus: c.metaStatus, createdAt: c.createdAt.toISOString(),
         leadsGenerated, bookings, totalTravelers, revenue,
         spend, hasSpendData,
         costPerLead: spend != null && leadsGenerated > 0 ? Math.round((spend / leadsGenerated) * 100) / 100 : null,
@@ -277,7 +277,7 @@ export const getCampaignMonitoring = async (req: AuthenticatedRequest, res: Resp
     const noCampaignConfirmed = noCampaignLeads.filter((l) => l.status === 'CONFIRMED' && l.booking);
     const noCampaignTravelers = noCampaignConfirmed.reduce((s, l) => s + (l.booking?.numberOfTravelers ?? 0), 0);
     const noCampaignRow = {
-      id: 'no-campaign', name: 'No Campaign (Manual/Referral)', status: null, isFromMeta: false, metaStatus: null,
+      id: 'no-campaign', name: 'No Campaign (Manual/Referral)', status: null, isFromMeta: false, metaStatus: null, createdAt: null,
       leadsGenerated: noCampaignLeads.length, bookings: noCampaignConfirmed.length, totalTravelers: noCampaignTravelers,
       revenue: noCampaignConfirmed.reduce((s, l) => s + (l.booking?.finalPrice ?? 0), 0),
       spend: null, hasSpendData: false, costPerLead: null, costPerBooking: null,
