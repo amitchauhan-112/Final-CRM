@@ -325,6 +325,15 @@ function BookingSummary({ booking, onEdit }: { booking: Booking; onEdit: () => v
             </div>
           </div>
         )}
+        {booking.pickupPoint && (
+          <div className="flex items-start gap-2 col-span-2">
+            <MapPin className="w-3.5 h-3.5 text-emerald-600 mt-0.5 flex-shrink-0" />
+            <div>
+              <p className="text-[10px] text-emerald-600 font-semibold uppercase tracking-wider">Pickup Point</p>
+              <p className="text-sm font-medium text-slate-800">{booking.pickupPoint}</p>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Payment strip */}

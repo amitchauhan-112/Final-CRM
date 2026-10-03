@@ -535,6 +535,7 @@ export interface Booking {
   roomSharing: RoomSharing;
   departureLocation?: string;
   departurePackage?: string;
+  pickupPoint?: string;
   tourType: TourType;
   specialRequest?: string;
   bookingNotes?: string;

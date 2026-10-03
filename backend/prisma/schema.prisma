@@ -811,6 +811,7 @@ model Booking {
   roomSharing       String  @default("DOUBLE")        // SINGLE | DOUBLE | TRIPLE | QUAD
   departureLocation String?
   departurePackage  String?
+  pickupPoint       String? // free-text local pickup location for this traveler
   tourType          String  @default("GIT")           // FIT | GIT
   specialRequest    String?
   bookingNotes      String?

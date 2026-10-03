@@ -21,6 +21,7 @@ interface BookingForm {
   aadharNumber: string;
   foodPreference: string;
   roomSharing: string;
+  pickupPoint: string;
   tourType: string;
   specialRequest: string;
   bookingNotes: string;
@@ -234,6 +235,7 @@ export default function BookingConfirmModal({ open, onClose, lead, existingBooki
       aadharNumber: existingBooking?.aadharNumber ?? '',
       foodPreference: existingBooking?.foodPreference ?? 'NO_PREFERENCE',
       roomSharing: existingBooking?.roomSharing ?? 'DOUBLE',
+      pickupPoint: existingBooking?.pickupPoint ?? '',
       tourType: existingBooking?.tourType ?? 'GIT',
       specialRequest: existingBooking?.specialRequest ?? '',
       bookingNotes: existingBooking?.bookingNotes ?? '',
@@ -320,6 +322,7 @@ export default function BookingConfirmModal({ open, onClose, lead, existingBooki
       setValue('aadharNumber', existingBooking?.aadharNumber ?? '');
       setValue('foodPreference', existingBooking?.foodPreference ?? 'NO_PREFERENCE');
       setValue('roomSharing', existingBooking?.roomSharing ?? 'DOUBLE');
+      setValue('pickupPoint', existingBooking?.pickupPoint ?? '');
       setValue('tourType', existingBooking?.tourType ?? 'GIT');
       setValue('specialRequest', existingBooking?.specialRequest ?? '');
       setValue('bookingNotes', existingBooking?.bookingNotes ?? '');
@@ -368,6 +371,7 @@ export default function BookingConfirmModal({ open, onClose, lead, existingBooki
       aadharNumber: data.aadharNumber || undefined,
       foodPreference: data.foodPreference as FoodPreference,
       roomSharing: data.roomSharing as RoomSharing,
+      pickupPoint: data.pickupPoint || undefined,
       roomSplit: splitEnabled ? roomSplit.filter((r) => r.count > 0) : undefined,
       tourType: data.tourType as TourType,
       specialRequest: data.specialRequest || undefined,
@@ -762,6 +766,13 @@ export default function BookingConfirmModal({ open, onClose, lead, existingBooki
               </select>
               {errors.roomSharing && <p className="text-red-500 text-xs mt-1">{errors.roomSharing.message}</p>}
               <p className="text-[10px] text-slate-400 mt-0.5">Used as the default for the whole group — split into different room types below if needed.</p>
+            </div>
+            <div>
+              <label className="label">Pickup Point</label>
+              <input
+                {...register('pickupPoint')}
+                className="input" placeholder="e.g. Haridwar Railway Station, Platform 2"
+              />
             </div>
 
             {/* Split into different room types — group bookings only, at creation time */}

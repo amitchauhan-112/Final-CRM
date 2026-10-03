@@ -67,7 +67,7 @@ export const createBooking = async (req: AuthenticatedRequest, res: Response): P
   try {
     const {
       leadId, travelerName, numberOfTravelers, aadharNumber,
-      foodPreference, roomSharing, roomSplit, departureLocation, departurePackage,
+      foodPreference, roomSharing, roomSplit, departureLocation, departurePackage, pickupPoint,
       tourType, specialRequest, finalPrice, amountPaid, balanceDueDate,
       packageId, departureDate, returnDate, bookingNotes,
       paymentMode, paymentMethod, paymentReference, handoverToId,
@@ -174,6 +174,7 @@ export const createBooking = async (req: AuthenticatedRequest, res: Response): P
           roomSharing: roomSharing || 'DOUBLE',
           departureLocation: departureLocation?.trim() || null,
           departurePackage: departurePackage?.trim() || null,
+          pickupPoint: pickupPoint?.trim() || null,
           tourType: tourType || 'GIT',
           specialRequest: specialRequest?.trim() || null,
           bookingNotes: bookingNotes?.trim() || null,
@@ -193,6 +194,7 @@ export const createBooking = async (req: AuthenticatedRequest, res: Response): P
           roomSharing: roomSharing || 'DOUBLE',
           departureLocation: departureLocation?.trim() || null,
           departurePackage: departurePackage?.trim() || null,
+          pickupPoint: pickupPoint?.trim() || null,
           tourType: tourType || 'GIT',
           specialRequest: specialRequest?.trim() || null,
           bookingNotes: bookingNotes?.trim() || null,
@@ -371,7 +373,7 @@ export async function applyBookingChanges(
 
   const {
     travelerName, numberOfTravelers, aadharNumber,
-    foodPreference, roomSharing, departureLocation, departurePackage,
+    foodPreference, roomSharing, departureLocation, departurePackage, pickupPoint,
     tourType, specialRequest, bookingNotes, finalPrice,
     balanceDueDate, status, packageId, departureDate, returnDate,
   } = changes;
@@ -394,6 +396,7 @@ export async function applyBookingChanges(
       roomSharing: roomSharing ?? existing.roomSharing,
       departureLocation: departureLocation !== undefined ? departureLocation?.trim() || null : existing.departureLocation,
       departurePackage: departurePackage !== undefined ? departurePackage?.trim() || null : existing.departurePackage,
+      pickupPoint: pickupPoint !== undefined ? pickupPoint?.trim() || null : existing.pickupPoint,
       tourType: tourType ?? existing.tourType,
       specialRequest: specialRequest !== undefined ? specialRequest?.trim() || null : existing.specialRequest,
       bookingNotes: bookingNotes !== undefined ? bookingNotes?.trim() || null : existing.bookingNotes,
@@ -488,7 +491,7 @@ export async function applyBookingChanges(
 // and would otherwise turn a one-field edit into a wall of no-op rows.
 const BOOKING_CHANGE_FIELDS = [
   'travelerName', 'numberOfTravelers', 'aadharNumber', 'foodPreference', 'roomSharing',
-  'departureLocation', 'departurePackage', 'tourType', 'specialRequest', 'bookingNotes',
+  'departureLocation', 'departurePackage', 'pickupPoint', 'tourType', 'specialRequest', 'bookingNotes',
   'finalPrice', 'balanceDueDate', 'status', 'packageId', 'departureDate', 'returnDate',
 ] as const;
 const BOOKING_DATE_ONLY_FIELDS = new Set(['balanceDueDate', 'departureDate', 'returnDate']);
@@ -518,7 +521,7 @@ function computeBookingChangeDiff(existing: Record<string, any>, body: Record<st
     } else if (field === 'packageId') {
       normalizedNew = raw || null;
       normalizedOld = existing[field];
-    } else if (['aadharNumber', 'departureLocation', 'departurePackage', 'specialRequest', 'bookingNotes'].includes(field)) {
+    } else if (['aadharNumber', 'departureLocation', 'departurePackage', 'pickupPoint', 'specialRequest', 'bookingNotes'].includes(field)) {
       normalizedNew = (raw as string | undefined)?.trim() || null;
       normalizedOld = existing[field];
     } else {
