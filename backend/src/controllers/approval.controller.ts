@@ -12,8 +12,11 @@ const orgId = (req: AuthenticatedRequest) => req.user?.organizationId ?? null;
 // also happen to hold the approving role/id (e.g. a Finance user correcting
 // a payment they themselves recorded) — that would defeat the whole point of
 // routing it to a second person.
-const canResolve = (req: AuthenticatedRequest, request: { requestedById: string; approverRole: string | null; approverId: string | null }) => {
+const canResolve = (req: AuthenticatedRequest, request: { type: string; requestedById: string; approverRole: string | null; approverId: string | null }) => {
   if (request.requestedById === req.user?.id) return req.user?.role === 'ADMIN';
+  // A payment correction belongs to the person who recorded that payment —
+  // Admin can see it as oversight but doesn't act on it.
+  if (request.type === 'PAYMENT_CORRECTION' && request.approverId) return request.approverId === req.user?.id;
   if (req.user?.role === 'ADMIN') return true;
   if (request.approverId) return request.approverId === req.user?.id;
   if (request.approverRole) return request.approverRole === req.user?.role;
@@ -49,7 +52,7 @@ export const listPendingApprovals = async (req: AuthenticatedRequest, res: Respo
       } else if (r.type === 'PAYMENT_CORRECTION') {
         leadId = (await prisma.payment.findUnique({ where: { id: r.entityId }, select: { booking: { select: { leadId: true } } } }))?.booking.leadId;
       }
-      return { ...r, leadId, payload: JSON.parse(r.payload) };
+      return { ...r, leadId, payload: JSON.parse(r.payload), canResolve: canResolve(req, r) };
     }));
 
     res.json({ success: true, data: withLeadId });

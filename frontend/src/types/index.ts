@@ -466,6 +466,10 @@ export interface Payment {
   updatedAt: string;
   booking?: {
     id: string; bookingNumber?: string; travelerName: string; finalPrice: number;
+    amountPaid: number; balanceAmount: number; balanceDueDate?: string | null;
+    numberOfTravelers: number; tourType: string; createdAt: string;
+    departureDate?: string | null; returnDate?: string | null;
+    package?: { name: string } | null;
     lead: Pick<Lead, 'id' | 'name' | 'phone'> & { assignedTo?: Pick<User, 'id' | 'name'> };
     departure?: { destination: string; departureDate: string };
   };
@@ -576,6 +580,7 @@ export type ApprovalStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
 
 export interface ApprovalRequest {
   id: string;
+  canResolve?: boolean;
   type: ApprovalType;
   entityType: 'BOOKING' | 'PAYMENT';
   entityId: string;

@@ -83,6 +83,8 @@ function ApprovalCard({ request }: { request: ApprovalRequest }) {
             <button onClick={() => setRejecting(false)} className="btn-secondary text-xs">Cancel</button>
           </div>
         </div>
+      ) : request.canResolve === false ? (
+        <p className="text-xs text-slate-400 pt-1">Waiting on the sales person who recorded this payment to approve or reject it.</p>
       ) : (
         <div className="flex items-center gap-2 pt-1">
           <button onClick={() => approve.mutate(request.id)} disabled={approve.isPending} className="btn-primary text-xs">

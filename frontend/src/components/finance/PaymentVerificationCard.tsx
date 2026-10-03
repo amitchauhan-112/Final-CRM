@@ -29,6 +29,7 @@ export default function PaymentVerificationCard({ payment }: { payment: Payment 
   const proposedAmountValid = proposedAmount.trim() !== '' && Number.isInteger(Number(proposedAmount)) && Number(proposedAmount) > 0;
   const proposedHandoverValid = proposedMethod !== 'CASH' || !!proposedHandoverToId;
 
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const booking = payment.booking;
   const fullProofUrl = payment.proofUrl?.startsWith('/') ? `${window.location.origin}${payment.proofUrl}` : payment.proofUrl;
 
@@ -36,7 +37,9 @@ export default function PaymentVerificationCard({ payment }: { payment: Payment 
     <div className="card p-4 space-y-3">
       <div className="flex items-start justify-between flex-wrap gap-2">
         <div>
-          <p className="font-semibold text-slate-800 text-sm">{booking?.lead?.name ?? booking?.travelerName}</p>
+          <button onClick={() => setDetailsOpen(true)} className="font-semibold text-slate-800 text-sm hover:text-primary-600 hover:underline text-left">
+            {booking?.lead?.name ?? booking?.travelerName}
+          </button>
           <div className="flex items-center gap-3 text-xs text-slate-400 mt-0.5 flex-wrap">
             <span className="flex items-center gap-1"><Phone className="w-3 h-3" />{booking?.lead?.phone}</span>
             {booking?.departure && <span className="flex items-center gap-1"><Map className="w-3 h-3" />{booking.departure.destination}</span>}
@@ -190,6 +193,38 @@ export default function PaymentVerificationCard({ payment }: { payment: Payment 
           <div>
             <label className="label">Note (optional)</label>
             <textarea value={proposedNote} onChange={(e) => setProposedNote(e.target.value)} rows={2} className="input" placeholder="Why this correction is needed..." />
+          </div>
+        </div>
+      </Modal>
+
+      <Modal open={detailsOpen} onClose={() => setDetailsOpen(false)} title="Booking Details" size="lg">
+        <div className="space-y-4 text-sm">
+          <div>
+            <p className="font-semibold text-slate-800">{booking?.lead?.name ?? booking?.travelerName}</p>
+            <p className="text-xs text-slate-400">{booking?.lead?.phone} · Booking {booking?.bookingNumber ?? '—'}</p>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
+            <div><p className="text-slate-400">Destination</p><p className="font-medium text-slate-700">{booking?.departure?.destination ?? '—'}</p></div>
+            <div><p className="text-slate-400">Package</p><p className="font-medium text-slate-700">{booking?.package?.name ?? '—'}</p></div>
+            <div><p className="text-slate-400">Tour Type</p><p className="font-medium text-slate-700">{booking?.tourType ?? '—'}</p></div>
+            <div><p className="text-slate-400">Departure</p><p className="font-medium text-slate-700">{booking?.departureDate ? formatDate(booking.departureDate) : '—'}</p></div>
+            <div><p className="text-slate-400">Return</p><p className="font-medium text-slate-700">{booking?.returnDate ? formatDate(booking.returnDate) : '—'}</p></div>
+            <div><p className="text-slate-400">Travelers</p><p className="font-medium text-slate-700">{booking?.numberOfTravelers ?? '—'}</p></div>
+            <div><p className="text-slate-400">Booked On</p><p className="font-medium text-slate-700">{booking?.createdAt ? formatDate(booking.createdAt) : '—'}</p></div>
+            <div><p className="text-slate-400">Sold For</p><p className="font-medium text-slate-700">{booking ? formatCurrency(booking.finalPrice) : '—'}</p></div>
+            <div><p className="text-slate-400">Received So Far</p><p className="font-medium text-emerald-600">{booking ? formatCurrency(booking.amountPaid) : '—'}</p></div>
+            <div><p className="text-slate-400">Balance Pending</p><p className="font-semibold text-orange-500">{booking ? formatCurrency(booking.balanceAmount) : '—'}</p></div>
+            <div><p className="text-slate-400">Balance Due By</p><p className="font-medium text-slate-700">{booking?.balanceDueDate ? formatDate(booking.balanceDueDate) : '—'}</p></div>
+            <div><p className="text-slate-400">Sales Executive</p><p className="font-medium text-slate-700">{booking?.lead?.assignedTo?.name ?? '—'}</p></div>
+          </div>
+
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs space-y-1">
+            <p className="text-slate-400 font-semibold uppercase tracking-wide text-[10px]">This payment</p>
+            <p className="font-medium text-slate-700">
+              {formatCurrency(payment.amount)} · {METHOD_LABEL[payment.method] ?? payment.method} · {payment.status.replace(/_/g, ' ')}
+            </p>
+            {payment.reference && <p className="text-slate-500">Ref: {payment.reference}</p>}
           </div>
         </div>
       </Modal>

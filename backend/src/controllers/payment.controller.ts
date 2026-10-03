@@ -567,6 +567,7 @@ export const listPaymentsForVerification = async (req: AuthenticatedRequest, res
             include: {
               lead: { select: { id: true, name: true, phone: true, assignedTo: { select: { id: true, name: true } } } },
               departure: { select: { destination: true, departureDate: true } },
+              package: { select: { name: true } },
             },
           },
           recordedBy: { select: { id: true, name: true } },

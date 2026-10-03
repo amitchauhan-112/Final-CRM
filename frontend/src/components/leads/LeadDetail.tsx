@@ -766,22 +766,26 @@ function PaymentsTab({ booking }: { booking: Booking }) {
                           <span className="font-semibold text-slate-700">{String(correction.payload.changes[field] ?? '—')}</span>
                         </div>
                       ))}
-                      <div className="flex items-center gap-2 pt-1">
-                        <button
-                          onClick={() => approveRequest.mutate(correction.id)}
-                          disabled={approveRequest.isPending}
-                          className="btn-primary text-[11px] py-1 px-2"
-                        >
-                          <Check className="w-3 h-3" />Confirm
-                        </button>
-                        <button
-                          onClick={() => rejectRequest.mutate({ id: correction.id })}
-                          disabled={rejectRequest.isPending}
-                          className="btn-secondary text-[11px] py-1 px-2"
-                        >
-                          <X className="w-3 h-3" />Reject
-                        </button>
-                      </div>
+                      {correction.canResolve === false ? (
+                        <p className="text-[11px] text-slate-400 pt-1">Waiting on the sales person who recorded this payment.</p>
+                      ) : (
+                        <div className="flex items-center gap-2 pt-1">
+                          <button
+                            onClick={() => approveRequest.mutate(correction.id)}
+                            disabled={approveRequest.isPending}
+                            className="btn-primary text-[11px] py-1 px-2"
+                          >
+                            <Check className="w-3 h-3" />Confirm
+                          </button>
+                          <button
+                            onClick={() => rejectRequest.mutate({ id: correction.id })}
+                            disabled={rejectRequest.isPending}
+                            className="btn-secondary text-[11px] py-1 px-2"
+                          >
+                            <X className="w-3 h-3" />Reject
+                          </button>
+                        </div>
+                      )}
                     </div>
                   );
                 })()}
