@@ -7,16 +7,15 @@ import Pagination from '../../components/ui/Pagination';
 import DeleteDepartureReasonModal from '../../components/operations/DeleteDepartureReasonModal';
 import { DepartureListItem } from '../../types/index';
 import { formatCurrency, cn } from '../../utils/helpers';
-import { isDepartureOverdue } from '../../utils/departureStatus';
 import { useAuthStore } from '../../store/authStore';
 
 const STATUSES = [
   { value: '', label: 'All Statuses' },
   { value: 'UPCOMING', label: 'Upcoming' },
   { value: 'ACTIVE', label: 'Active' },
+  { value: 'OVERDUE', label: 'Overdue' },
   { value: 'COMPLETED', label: 'Completed' },
   { value: 'CANCELLED', label: 'Cancelled' },
-  { value: 'OVERDUE', label: 'Overdue' },
 ];
 
 const STATUS_BADGE: Record<string, string> = {
@@ -121,11 +120,10 @@ export default function DeparturesPage() {
     {
       key: 'status',
       header: 'Status',
-      render: (d) => isDepartureOverdue(d) ? (
-        <span className={cn('badge', STATUS_BADGE.OVERDUE)}>OVERDUE</span>
-      ) : (
-        <span className={cn('badge', STATUS_BADGE[d.status])}>{d.status}</span>
-      ),
+      render: (d) => {
+        const label = d.displayStatus ?? d.status;
+        return <span className={cn('badge', STATUS_BADGE[label])}>{label}</span>;
+      },
     },
     {
       key: 'action',

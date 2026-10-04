@@ -551,6 +551,10 @@ export interface Booking {
   finalPrice: number;
   amountPaid: number;
   balanceAmount: number;
+  discountAmount?: number;
+  discountNote?: string | null;
+  extraExpenseAmount?: number;
+  extraExpenseNote?: string | null;
   balanceDueDate?: string;
   salesExecutiveId?: string;
   opsExecutiveId?: string;
@@ -966,6 +970,7 @@ export interface Departure {
   departureDate: string;
   returnDate?: string;
   status: DepartureStatus;
+  displayStatus?: string;
   tripCaptainName?: string;
   tripCaptainPhone?: string;
   tripCaptainStatus: TripCaptainStatus;
@@ -1059,6 +1064,7 @@ export interface DepartureListItem {
   departureDate: string;
   returnDate?: string;
   status: DepartureStatus;
+  displayStatus?: string;
   tripCaptainStatus: TripCaptainStatus;
   totalTravelers: number;
   totalRevenue: number;

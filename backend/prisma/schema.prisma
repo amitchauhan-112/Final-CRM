@@ -827,6 +827,14 @@ model Booking {
 
   finalPrice     Float
   amountPaid     Float    @default(0)
+
+  // Recorded by Finance / Operations / Admin until the trip is Completed.
+  // Discount is shown against finalPrice (net = finalPrice - discount); it does
+  // not change finalPrice or the payment balance on its own.
+  discountAmount      Float    @default(0)
+  discountNote        String?
+  extraExpenseAmount  Float    @default(0)
+  extraExpenseNote    String?
   balanceAmount  Float    @default(0)
   balanceDueDate DateTime?
 

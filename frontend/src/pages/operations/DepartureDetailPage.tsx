@@ -19,7 +19,7 @@ import DocumentsTab from '../../components/operations/DocumentsTab';
 import NotesTab from '../../components/operations/NotesTab';
 import B2BSaleCard from '../../components/operations/B2BSaleCard';
 import { cn } from '../../utils/helpers';
-import { isDepartureOverdue } from '../../utils/departureStatus';
+import DepartureBookingAdjustments from '../../components/bookings/DepartureBookingAdjustments';
 
 const STATUS_BADGE: Record<string, string> = {
   UPCOMING: 'bg-primary-50 text-primary-700',
@@ -104,7 +104,7 @@ export default function DepartureDetailPage() {
                   <option value="COMPLETED">COMPLETED</option>
                   <option value="CANCELLED">CANCELLED</option>
                 </select>
-                {isDepartureOverdue(departure) && (
+                {departure.displayStatus === 'OVERDUE' && (
                   <span className="badge bg-red-100 text-red-700">OVERDUE — mark completed once the trip is done</span>
                 )}
               </div>
@@ -128,6 +128,7 @@ export default function DepartureDetailPage() {
       <Tabs tabs={TABS} active={tab} onChange={setTab} />
 
       {tab === 'overview' && <TripOverviewTab departure={departure} onChangeTab={(t) => setTab(t as Tab)} />}
+      {tab === 'overview' && <DepartureBookingAdjustments departure={departure} />}
       {tab === 'passengers' && <PassengerTable departure={departure} />}
       {tab === 'captain' && <TripCaptainTab departure={departure} />}
       {tab === 'hotels' && <HotelsTab

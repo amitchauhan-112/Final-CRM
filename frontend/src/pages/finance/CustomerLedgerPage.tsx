@@ -8,6 +8,7 @@ import PaymentScheduleView from '../../components/finance/PaymentScheduleView';
 import FinanceDocumentsPanel from '../../components/finance/FinanceDocumentsPanel';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { formatCurrency } from '../../utils/helpers';
+import { AdjustmentValues, AdjustmentEditButton } from '../../components/bookings/BookingAdjustments';
 
 export default function CustomerLedgerPage() {
   const [search, setSearch] = useState('');
@@ -52,17 +53,26 @@ export default function CustomerLedgerPage() {
           ) : bookings.length === 0 ? (
             <div className="p-4 text-sm text-slate-400">No bookings found</div>
           ) : bookings.map((b) => (
-            <button
+            <div
               key={b.id}
+              role="button"
+              tabIndex={0}
               onClick={() => setSelectedBookingId(b.id)}
-              className="w-full flex items-center justify-between px-4 py-3 hover:bg-slate-50 text-left transition-colors"
+              onKeyDown={(e) => { if (e.key === 'Enter') setSelectedBookingId(b.id); }}
+              className="w-full flex items-center justify-between gap-4 px-4 py-3 hover:bg-slate-50 text-left transition-colors cursor-pointer"
             >
               <div>
                 <p className="font-medium text-slate-800 text-sm">{b.lead.name}</p>
                 <p className="text-xs text-slate-400">{b.lead.phone} · {b.bookingNumber ?? b.id.slice(0, 8)}</p>
               </div>
-              <p className="text-sm font-semibold text-slate-700">{formatCurrency(b.finalPrice)}</p>
-            </button>
+              <div className="flex items-center gap-4">
+                <AdjustmentValues booking={b} />
+                <div className="text-right">
+                  <p className="text-sm font-semibold text-slate-700">{formatCurrency(b.finalPrice)}</p>
+                  <div className="mt-1 flex justify-end"><AdjustmentEditButton booking={b} /></div>
+                </div>
+              </div>
+            </div>
           ))}
         </div>
       )}

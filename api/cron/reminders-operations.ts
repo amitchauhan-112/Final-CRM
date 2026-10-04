@@ -1,6 +1,7 @@
 import { isAuthorizedCronRequest } from './_shared.js';
 import { runTrackedJob } from '../../backend/src/services/jobTracker.service.js';
 import { updateDepartureStatuses, sendOperationsReminders } from '../../backend/src/services/notification.service.js';
+import { completeFinishedDepartures } from '../../backend/src/services/departureStatus.service.js';
 
 export default async function handler(req: any, res: any) {
   if (!isAuthorizedCronRequest(req)) {
@@ -9,6 +10,7 @@ export default async function handler(req: any, res: any) {
   }
   await runTrackedJob('operations-reminders', async () => {
     await updateDepartureStatuses();
+    await completeFinishedDepartures();
     await sendOperationsReminders();
   });
   res.status(200).json({ success: true });

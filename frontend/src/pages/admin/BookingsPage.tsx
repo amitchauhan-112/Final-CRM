@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { useAllBookings } from '../../hooks/useErp';
 import { useDeleteBooking } from '../../hooks/useBookings';
+import { AdjustmentValues, AdjustmentEditButton } from '../../components/bookings/BookingAdjustments';
 import { BookingWithLead } from '../../types/index';
 import { Skeleton } from '../../components/ui/Skeleton';
 import DeleteBookingReasonModal from '../../components/leads/DeleteBookingReasonModal';
@@ -154,6 +155,7 @@ export default function BookingsPage() {
                   <th className="text-right px-4 py-3 font-semibold text-slate-500 text-xs uppercase tracking-wider">Price</th>
                   <th className="text-right px-4 py-3 font-semibold text-slate-500 text-xs uppercase tracking-wider hidden md:table-cell">Paid</th>
                   <th className="text-right px-4 py-3 font-semibold text-slate-500 text-xs uppercase tracking-wider hidden md:table-cell">Balance</th>
+                  <th className="text-right px-4 py-3 font-semibold text-slate-500 text-xs uppercase tracking-wider hidden lg:table-cell">Discount / Extra</th>
                   <th className="text-center px-4 py-3 font-semibold text-slate-500 text-xs uppercase tracking-wider">Payment</th>
                   <th className="px-4 py-3" />
                 </tr>
@@ -207,6 +209,10 @@ export default function BookingsPage() {
                       {b.balanceDueDate && b.balanceAmount > 0 && (
                         <p className="text-[10px] text-slate-400">Due {formatDate(b.balanceDueDate)}</p>
                       )}
+                    </td>
+                    <td className="px-4 py-3 align-top text-right hidden lg:table-cell">
+                      <AdjustmentValues booking={b} />
+                      <div className="mt-1 flex justify-end"><AdjustmentEditButton booking={b} /></div>
                     </td>
                     <td className="px-4 py-3 align-top text-center">
                       <PaymentBadge booking={b} />

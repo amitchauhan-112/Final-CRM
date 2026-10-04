@@ -9,6 +9,8 @@ import { validateTravelerInput } from '../utils/travelerValidation.js';
 import { roomsForBookingList, computeFitGitRoomRequirement, emptyRoomCounts, addRoomCounts, ROOM_CAPACITY } from '../services/roomRequirement.service.js';
 import { deriveStayBlocks } from '../services/stayBlocks.service.js';
 import { syncVendorPayment } from '../services/vendorPaymentSync.service.js';
+import { completeFinishedDepartures } from '../services/departureStatus.service.js';
+import { tabWhere, displayStatus, DEPARTURE_TABS, DepartureTab } from '../utils/departureTabs.js';
 
 const orgId = (req: AuthenticatedRequest) => req.user?.organizationId ?? null;
 const orgFilter = (req: AuthenticatedRequest) => (orgId(req) ? { organizationId: orgId(req) } : {});
@@ -474,17 +476,11 @@ export const listDepartures = async (req: AuthenticatedRequest, res: Response): 
     const { search, status, from, to, page = '1', limit = '20' } = req.query;
     const skip = (Number(page) - 1) * Number(limit);
 
+    await completeFinishedDepartures().catch((e) => console.error('[operations] completeFinishedDepartures error:', e));
+
     const where: Record<string, unknown> = { ...orgFilter(req) };
-    if (status === 'OVERDUE') {
-      // Not a stored status: ACTIVE trips whose end date has already passed.
-      // Mirrors isDepartureOverdue() on the frontend.
-      const todayStart = new Date();
-      todayStart.setHours(0, 0, 0, 0);
-      where.status = 'ACTIVE';
-      where.OR = [
-        { returnDate: { lt: todayStart } },
-        { returnDate: null, departureDate: { lt: todayStart } },
-      ];
+    if (status && (DEPARTURE_TABS as readonly string[]).includes(String(status))) {
+      where.AND = [tabWhere(String(status) as DepartureTab)];
     } else if (status) {
       where.status = status;
     }
@@ -514,6 +510,7 @@ export const listDepartures = async (req: AuthenticatedRequest, res: Response): 
 
     const data = departures.map((d) => ({
       ...d,
+      displayStatus: displayStatus(d),
       totalTravelers: d.bookings.reduce((s, b) => s + b.numberOfTravelers, 0),
       totalRevenue: d.bookings.reduce((s, b) => s + b.finalPrice, 0),
       totalPending: d.bookings.reduce((s, b) => s + b.balanceAmount, 0),
@@ -534,6 +531,9 @@ export const listDepartures = async (req: AuthenticatedRequest, res: Response): 
 export const getDepartureDetail = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
+    // Opening a trip re-checks it, so a finished trip with all details filled
+    // flips to Completed without waiting for the daily cron.
+    await completeFinishedDepartures().catch((e) => console.error('[operations] completeFinishedDepartures error:', e));
     const departure = await prisma.departure.findFirst({
       where: { id, ...orgFilter(req) },
       include: {
@@ -682,7 +682,7 @@ export const getDepartureDetail = async (req: AuthenticatedRequest, res: Respons
       return { ...block, roomsNeeded, fulfilled: !!matchedHotel, matchedHotelId: matchedHotel?.id };
     });
 
-    res.json({ success: true, data: { ...departure, groupSummary, checklist, tripProfitability, journeySummaries, hotelRequirements } });
+    res.json({ success: true, data: { ...departure, displayStatus: displayStatus(departure), groupSummary, checklist, tripProfitability, journeySummaries, hotelRequirements } });
   } catch (e) {
     console.error('[operations] getDepartureDetail error:', e);
     res.status(500).json({ success: false, error: 'Internal server error' });
