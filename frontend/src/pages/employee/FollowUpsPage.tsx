@@ -12,6 +12,7 @@ import Modal from '../../components/ui/Modal';
 import Badge from '../../components/ui/Badge';
 import DateTimePicker from '../../components/ui/DateTimePicker';
 import { formatDate, formatDateTime, isOverdue, cn } from '../../utils/helpers';
+import type { LostPayload } from '../../utils/lostReasons';
 import { useForm, Controller } from 'react-hook-form';
 
 interface RescheduleForm {
@@ -335,10 +336,10 @@ export default function EmployeeFollowUpsPage() {
       { onSuccess: () => { setOutcomeLead(null); setBookingLead(lead); } }
     );
   };
-  const handleOutcomeLost = (reason: string, otherText?: string) => {
+  const handleOutcomeLost = (lost: LostPayload) => {
     if (!outcomeLead) return;
     updateLead.mutate(
-      { id: outcomeLead.id, status: 'LOST', followUpDone: true, lostReason: reason, lostReasonOther: otherText },
+      { id: outcomeLead.id, status: 'LOST', followUpDone: true, ...lost },
       { onSuccess: () => setOutcomeLead(null) }
     );
   };

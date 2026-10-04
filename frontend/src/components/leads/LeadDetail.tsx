@@ -21,6 +21,7 @@ import Modal from '../ui/Modal';
 import LeadForm from './LeadForm';
 import FollowUpModal from './FollowUpModal';
 import FollowUpOutcomeModal from './FollowUpOutcomeModal';
+import { formatLostReason, type LostPayload } from '../../utils/lostReasons';
 import PriorityBadge from '../ui/PriorityBadge';
 import TagChip from '../ui/TagChip';
 import CommentsSection from './CommentsSection';
@@ -855,15 +856,20 @@ function OverviewTab({ lead, canAct, onUpdateLead, onFollowUpDoneClick, booking,
       )}
 
       {/* Lost reason banner */}
-      {lead.status === 'LOST' && (lead as any).lostReason && (
+      {lead.status === 'LOST' && lead.lostReason && (
         <div className="flex items-start gap-3 px-4 py-3 bg-red-50 border border-red-200 rounded-xl text-sm">
           <span className="text-red-500 mt-0.5">❌</span>
           <div>
             <p className="font-semibold text-red-700">Lost Reason</p>
-            <p className="text-red-600 mt-0.5">
-              {(lead as any).lostReason === 'Other' ? (lead as any).lostReasonOther : (lead as any).lostReason}
-            </p>
+            <p className="text-red-600 mt-0.5">{formatLostReason(lead)}</p>
           </div>
+        </div>
+      )}
+
+      {lead.status !== 'LOST' && lead.revivedAt && (
+        <div className="flex items-start gap-3 px-4 py-3 bg-blue-50 border border-blue-200 rounded-xl text-sm">
+          <span className="text-blue-500 mt-0.5">↺</span>
+          <p className="text-blue-700">Revived from the lost pool on {formatDate(lead.revivedAt)} — see the Admin's comment below.</p>
         </div>
       )}
 
@@ -1057,13 +1063,13 @@ export default function LeadDetail({ leadId, open, onClose, isStarred, onToggleS
       { onSuccess: () => { setOutcomeModalOpen(false); setBookingOpen(true); } }
     );
   };
-  const handleOutcomeLost = (reason: string, otherText?: string) => {
+  const handleOutcomeLost = (lost: LostPayload) => {
     if (!lead) return;
     updateLead.mutate(
       {
         id: lead.id, status: 'LOST', followUpDone: true,
-        lostReason: reason, lostReasonOther: otherText,
-        statusNote: `Marked lost — ${otherText?.trim() || reason}`,
+        ...lost,
+        statusNote: `Marked lost — ${formatLostReason(lost)}`,
       },
       { onSuccess: () => setOutcomeModalOpen(false) }
     );

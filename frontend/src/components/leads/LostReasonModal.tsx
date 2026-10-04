@@ -1,43 +1,33 @@
 import { useState } from 'react';
 import { XCircle } from 'lucide-react';
 import Modal from '../ui/Modal';
-import { cn } from '../../utils/helpers';
-
-const DEFAULT_REASONS = [
-  'Budget Issue',
-  'No Response',
-  'Booked Elsewhere',
-  'Date Not Suitable',
-  'Cancelled Trip',
-  'Not Interested',
-  'Other',
-];
+import LostReasonPicker, { EMPTY_LOST_SELECTION, LostSelection, lostSelectionError, toLostPayload } from './LostReasonPicker';
+import type { LostPayload } from '../../utils/lostReasons';
 
 interface Props {
   open: boolean;
-  onConfirm: (reason: string, otherText?: string) => void;
+  onConfirm: (payload: LostPayload) => void;
   onCancel: () => void;
-  reasons?: string[];
 }
 
-export default function LostReasonModal({ open, onConfirm, onCancel, reasons = DEFAULT_REASONS }: Props) {
-  const [selected, setSelected] = useState('');
-  const [other, setOther] = useState('');
+export default function LostReasonModal({ open, onConfirm, onCancel }: Props) {
+  const [selection, setSelection] = useState<LostSelection>(EMPTY_LOST_SELECTION);
   const [error, setError] = useState('');
 
-  const handleConfirm = () => {
-    if (!selected) { setError('Please select a reason'); return; }
-    if (selected === 'Other' && !other.trim()) { setError('Please describe the reason'); return; }
-    onConfirm(selected, selected === 'Other' ? other.trim() : undefined);
-    setSelected('');
-    setOther('');
+  const reset = () => {
+    setSelection(EMPTY_LOST_SELECTION);
     setError('');
   };
 
+  const handleConfirm = () => {
+    const err = lostSelectionError(selection);
+    if (err) { setError(err); return; }
+    onConfirm(toLostPayload(selection));
+    reset();
+  };
+
   const handleCancel = () => {
-    setSelected('');
-    setOther('');
-    setError('');
+    reset();
     onCancel();
   };
 
@@ -51,39 +41,10 @@ export default function LostReasonModal({ open, onConfirm, onCancel, reasons = D
           </p>
         </div>
 
-        <div className="space-y-2">
-          <p className="text-sm font-medium text-slate-700">Reason <span className="text-red-500">*</span></p>
-          <div className="grid grid-cols-1 gap-2">
-            {reasons.map((r) => (
-              <button
-                key={r}
-                type="button"
-                onClick={() => { setSelected(r); setError(''); }}
-                className={cn(
-                  'text-left px-4 py-2.5 rounded-xl border text-sm font-medium transition-all',
-                  selected === r
-                    ? 'bg-red-50 border-red-400 text-red-700 ring-1 ring-red-300'
-                    : 'border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-slate-50'
-                )}
-              >
-                {r}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {selected === 'Other' && (
-          <div>
-            <label className="label">Describe the reason <span className="text-red-500">*</span></label>
-            <textarea
-              value={other}
-              onChange={(e) => { setOther(e.target.value); setError(''); }}
-              rows={2}
-              className="input resize-none"
-              placeholder="Briefly describe why the lead was lost..."
-            />
-          </div>
-        )}
+        <LostReasonPicker
+          value={selection}
+          onChange={(next) => { setSelection(next); setError(''); }}
+        />
 
         {error && <p className="text-red-500 text-xs">{error}</p>}
 

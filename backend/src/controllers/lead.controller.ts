@@ -5,6 +5,7 @@ import { createLead, getLeadStats, assignEmployeeForCampaign } from '../services
 import { createNotification, emitLeadUpdated } from '../services/notification.service.js';
 import { fireEvent } from '../services/automationEngine.service.js';
 import { isWholeAmount, WHOLE_AMOUNT_ERROR } from '../utils/amountValidation.js';
+import { resolveLostFields } from '../utils/lostReasons.js';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -208,7 +209,7 @@ export const createLeadManual = async (req: AuthenticatedRequest, res: Response)
     const {
       name, phone, email, source, message, destination, notes,
       followUpDate, followUpNotes, status, campaignId, assignedToId,
-      groupSize, budget, preferredDate, priority, lostReason, lostReasonOther, tagIds,
+      groupSize, budget, preferredDate, priority, lostReason, lostReasonOther, postponedTo, tagIds,
     } = req.body;
 
     if (!name?.trim() || !phone?.trim()) {
@@ -220,6 +221,10 @@ export const createLeadManual = async (req: AuthenticatedRequest, res: Response)
       return;
     }
     if (!isWholeAmount(budget)) { res.status(400).json({ success: false, error: WHOLE_AMOUNT_ERROR }); return; }
+    const lostFields = status === 'LOST'
+      ? resolveLostFields({ lostReason, lostReasonOther, postponedTo })
+      : { ok: true as const, lostReason: null, lostReasonOther: null, postponedTo: null };
+    if (!lostFields.ok) { res.status(400).json({ success: false, error: lostFields.error }); return; }
 
     // A lead placed under a campaign that has employees assigned belongs to
     // them (same round-robin rule webhook-created leads follow) — only when
@@ -237,8 +242,10 @@ export const createLeadManual = async (req: AuthenticatedRequest, res: Response)
         notes: notes || null,
         status: status || 'NEW',
         priority: priority || 'MEDIUM',
-        lostReason: status === 'LOST' ? (lostReason || null) : null,
-        lostReasonOther: status === 'LOST' && lostReason === 'Other' ? (lostReasonOther || null) : null,
+        lostReason: lostFields.lostReason,
+        lostReasonOther: lostFields.lostReasonOther,
+        postponedTo: lostFields.postponedTo,
+        lostAt: status === 'LOST' ? new Date() : null,
         campaignId: campaignId || null,
         assignedToId: resolvedAssignedToId || null,
         groupSize: groupSize && !isNaN(Number(groupSize)) ? Number(groupSize) : null,
@@ -299,7 +306,7 @@ export const updateLead = async (req: AuthenticatedRequest, res: Response): Prom
       res.status(403).json({ success: false, error: 'Access denied' }); return;
     }
 
-    const { status, notes, followUpDate, followUpNotes, followUpDone, campaignId, assignedToId, priority, lostReason, lostReasonOther, tagIds, budget, statusNote, ...rest } = req.body;
+    const { status, notes, followUpDate, followUpNotes, followUpDone, campaignId, assignedToId, priority, lostReason, lostReasonOther, postponedTo, tagIds, budget, statusNote, ...rest } = req.body;
     if (!isWholeAmount(budget)) { res.status(400).json({ success: false, error: WHOLE_AMOUNT_ERROR }); return; }
     const updateData: Record<string, unknown> = { ...rest, ...(budget !== undefined ? { budget: budget === null || budget === '' ? null : Number(budget) } : {}) };
 
@@ -346,8 +353,14 @@ export const updateLead = async (req: AuthenticatedRequest, res: Response): Prom
       }
       updateData.status = status;
       if (status === 'LOST') {
-        updateData.lostReason = lostReason || existing.lostReason || null;
-        updateData.lostReasonOther = lostReason === 'Other' ? (lostReasonOther || null) : null;
+        // A re-save without a fresh reason keeps the stored one.
+        const lostFields = resolveLostFields(lostReason !== undefined
+          ? { lostReason, lostReasonOther, postponedTo }
+          : { lostReason: existing.lostReason, lostReasonOther: existing.lostReasonOther, postponedTo: existing.postponedTo });
+        if (!lostFields.ok) { res.status(400).json({ success: false, error: lostFields.error }); return; }
+        updateData.lostReason = lostFields.lostReason;
+        updateData.lostReasonOther = lostFields.lostReasonOther;
+        updateData.postponedTo = lostFields.postponedTo;
         // Stamp when it was marked lost — but don't reset it if it was
         // already LOST and is just being re-saved.
         if (existing.status !== 'LOST') updateData.lostAt = new Date();
@@ -356,6 +369,7 @@ export const updateLead = async (req: AuthenticatedRequest, res: Response): Prom
         updateData.lostAt = null;
         updateData.lostReason = null;
         updateData.lostReasonOther = null;
+        updateData.postponedTo = null;
       }
     }
     if (priority !== undefined) updateData.priority = priority;

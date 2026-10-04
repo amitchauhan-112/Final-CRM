@@ -9,6 +9,7 @@ import { useSettings } from '../../hooks/useSettings';
 import { useDestinations } from '../../hooks/useMasters';
 import DuplicateWarningDialog from './DuplicateWarningDialog';
 import LostReasonModal from './LostReasonModal';
+import type { LostPayload } from '../../utils/lostReasons';
 import TagInput from '../ui/TagInput';
 import DateTimePicker from '../ui/DateTimePicker';
 import api from '../../services/api';
@@ -36,6 +37,7 @@ interface LeadFormData {
   tagIds?: string[];
   lostReason?: string;
   lostReasonOther?: string;
+  postponedTo?: string | null;
 }
 
 interface LeadFormProps {
@@ -234,10 +236,10 @@ export default function LeadForm({ defaultValues, onSubmit, isLoading, onCancel 
     }
   };
 
-  const handleLostConfirm = (reason: string, otherText?: string) => {
+  const handleLostConfirm = (lost: LostPayload) => {
     setLostModalOpen(false);
     if (!pendingLostData) return;
-    const payload = { ...pendingLostData, lostReason: reason, lostReasonOther: otherText };
+    const payload = { ...pendingLostData, ...lost };
     setPendingLostData(null);
 
     if (!isEditMode && duplicates.length > 0) {
@@ -518,7 +520,6 @@ export default function LeadForm({ defaultValues, onSubmit, isLoading, onCancel 
         open={lostModalOpen}
         onConfirm={handleLostConfirm}
         onCancel={() => { setLostModalOpen(false); setPendingLostData(null); }}
-        reasons={settings?.lostReasons}
       />
     </>
   );

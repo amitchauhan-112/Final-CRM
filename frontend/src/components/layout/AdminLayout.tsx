@@ -6,7 +6,7 @@ import {
   MessageSquarePlus, Activity, BarChart2, Building2,
   UserCheck, Database, ChevronRight, Package, BookOpen,
   Contact, Wallet, Map, Home, Gauge, LineChart, FolderKanban, Settings2, Zap, HeartPulse, IndianRupee,
-  MessageCircle, Radar, ShieldCheck, Receipt, Scale, TrendingUp, CheckCircle2,
+  MessageCircle, Radar, ShieldCheck, Receipt, Scale, TrendingUp, CheckCircle2, XCircle,
 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import { useNotifications, useMarkAllAsRead, useMarkAsRead } from '../../hooks/useNotifications';
@@ -42,6 +42,7 @@ const NAV: NavEntry[] = [
     items: [
       { to: '/admin/leads',     label: 'Leads',     icon: UserCheck, activeMatch: (p, s) => p === '/admin/leads' && s.get('status') !== 'CONFIRMED' },
       { to: '/admin/leads?status=CONFIRMED', label: 'Confirmed Bookings', icon: CheckCircle2, activeMatch: (p, s) => p === '/admin/leads' && s.get('status') === 'CONFIRMED' },
+      { to: '/admin/lost-leads', label: 'Lost Leads', icon: XCircle },
       { to: '/admin/campaigns', label: 'Campaigns', icon: Megaphone },
       { to: '/admin/campaign-monitoring', label: 'Campaign Monitoring', icon: TrendingUp },
       { to: '/admin/whatsapp',  label: 'WhatsApp Inbox', icon: MessageCircle },

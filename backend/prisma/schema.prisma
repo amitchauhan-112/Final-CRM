@@ -321,6 +321,12 @@ model Lead {
   // Set when status becomes LOST, cleared if the lead is ever moved back
   // out of LOST — so it always reads as "lost since X" or null.
   lostAt          DateTime?
+  // "YYYY-MM" — the month the customer asked to be contacted again. Only set
+  // when lostReason is "Plan Postponed". Drives the Postponed sub-tabs on the
+  // Admin Lost Leads page; the lead never moves on its own.
+  postponedTo     String?
+  // Set when an Admin revives a lost lead back to NEW. Null for never-revived leads.
+  revivedAt       DateTime?
 
   destination String?
   campaign    Campaign? @relation(fields: [campaignId], references: [id])

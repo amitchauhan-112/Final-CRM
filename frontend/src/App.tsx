@@ -29,6 +29,7 @@ import AdminReportsPage from './pages/admin/ReportsPage';
 import EmployeeMonitoringPage from './pages/admin/EmployeeMonitoringPage';
 import CampaignMonitoringPage from './pages/admin/CampaignMonitoringPage';
 import DeletedLeadsPage from './pages/admin/DeletedLeadsPage';
+import LostLeadsPage from './pages/admin/LostLeadsPage';
 import MastersPage from './pages/admin/MastersPage';
 import PackagesPage from './pages/admin/PackagesPage';
 import BookingsPage from './pages/admin/BookingsPage';
@@ -113,6 +114,7 @@ export default function App() {
         <Route path="system-health" element={<SystemHealthPage />} />
         <Route path="leads" element={<AdminLeadsPage />} />
         <Route path="leads/deleted" element={<DeletedLeadsPage />} />
+        <Route path="lost-leads" element={<LostLeadsPage />} />
         <Route path="campaigns" element={<AdminCampaignsPage />} />
         <Route path="employee-monitoring" element={<EmployeeMonitoringPage />} />
         <Route path="campaign-monitoring" element={<CampaignMonitoringPage />} />

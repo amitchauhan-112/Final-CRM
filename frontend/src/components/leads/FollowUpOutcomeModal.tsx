@@ -2,18 +2,9 @@ import { useState } from 'react';
 import { Calendar, TrendingUp, CheckCircle, XCircle, ArrowLeft, Clock } from 'lucide-react';
 import Modal from '../ui/Modal';
 import DateTimePicker from '../ui/DateTimePicker';
-import { cn } from '../../utils/helpers';
 import type { Lead } from '../../types';
-
-const LOST_REASONS = [
-  'Budget Issue',
-  'No Response',
-  'Booked Elsewhere',
-  'Date Not Suitable',
-  'Cancelled Trip',
-  'Not Interested',
-  'Other',
-];
+import type { LostPayload } from '../../utils/lostReasons';
+import LostReasonPicker, { EMPTY_LOST_SELECTION, LostSelection, lostSelectionError, toLostPayload } from './LostReasonPicker';
 
 function toLocalDatetimeInput(d: Date): string {
   const pad = (n: number) => String(n).padStart(2, '0');
@@ -29,7 +20,7 @@ interface Props {
   onReschedule: (followUpDate: string, followUpNotes?: string) => void;
   onInterested: () => void;
   onConfirmed: () => void;
-  onLost: (reason: string, otherText?: string) => void;
+  onLost: (payload: LostPayload) => void;
 }
 
 // Shown whenever a follow-up is marked done — a completed follow-up must
@@ -42,16 +33,14 @@ export default function FollowUpOutcomeModal({
   const [step, setStep] = useState<Step>('choose');
   const [date, setDate] = useState('');
   const [notes, setNotes] = useState('');
-  const [reason, setReason] = useState('');
-  const [other, setOther] = useState('');
+  const [lostSel, setLostSel] = useState<LostSelection>(EMPTY_LOST_SELECTION);
   const [error, setError] = useState('');
 
   const reset = () => {
     setStep('choose');
     setDate('');
     setNotes('');
-    setReason('');
-    setOther('');
+    setLostSel(EMPTY_LOST_SELECTION);
     setError('');
   };
 
@@ -68,9 +57,9 @@ export default function FollowUpOutcomeModal({
   };
 
   const handleLostSubmit = () => {
-    if (!reason) { setError('Please select a reason'); return; }
-    if (reason === 'Other' && !other.trim()) { setError('Please describe the reason'); return; }
-    onLost(reason, reason === 'Other' ? other.trim() : undefined);
+    const err = lostSelectionError(lostSel);
+    if (err) { setError(err); return; }
+    onLost(toLostPayload(lostSel));
     reset();
   };
 
@@ -174,38 +163,10 @@ export default function FollowUpOutcomeModal({
             <XCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
             <p className="text-sm text-red-700">Please select a reason for marking this lead as lost.</p>
           </div>
-          <div className="space-y-2">
-            <p className="text-sm font-medium text-slate-700">Reason <span className="text-red-500">*</span></p>
-            <div className="grid grid-cols-1 gap-2">
-              {LOST_REASONS.map((r) => (
-                <button
-                  key={r}
-                  type="button"
-                  onClick={() => { setReason(r); setError(''); }}
-                  className={cn(
-                    'text-left px-4 py-2.5 rounded-xl border text-sm font-medium transition-all',
-                    reason === r
-                      ? 'bg-red-50 border-red-400 text-red-700 ring-1 ring-red-300'
-                      : 'border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-slate-50'
-                  )}
-                >
-                  {r}
-                </button>
-              ))}
-            </div>
-          </div>
-          {reason === 'Other' && (
-            <div>
-              <label className="label">Describe the reason <span className="text-red-500">*</span></label>
-              <textarea
-                value={other}
-                onChange={(e) => { setOther(e.target.value); setError(''); }}
-                rows={2}
-                className="input resize-none"
-                placeholder="Briefly describe why the lead was lost..."
-              />
-            </div>
-          )}
+          <LostReasonPicker
+            value={lostSel}
+            onChange={(next) => { setLostSel(next); setError(''); }}
+          />
           {error && <p className="text-red-500 text-xs">{error}</p>}
           <div className="flex gap-3 pt-1">
             <button type="button" onClick={() => { reset(); setStep('choose'); }} className="btn-secondary flex items-center gap-1.5">

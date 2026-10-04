@@ -143,6 +143,8 @@ export interface Lead {
   assignedTo?: Pick<User, 'id' | 'name' | 'email'>;
   lostReason?: string;
   lostReasonOther?: string;
+  postponedTo?: string | null;
+  revivedAt?: string | null;
   followUpDate?: string;
   followUpNotes?: string;
   followUpDone: boolean;
