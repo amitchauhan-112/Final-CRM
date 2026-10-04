@@ -19,6 +19,7 @@ import DocumentsTab from '../../components/operations/DocumentsTab';
 import NotesTab from '../../components/operations/NotesTab';
 import B2BSaleCard from '../../components/operations/B2BSaleCard';
 import { cn } from '../../utils/helpers';
+import { isDepartureOverdue } from '../../utils/departureStatus';
 
 const STATUS_BADGE: Record<string, string> = {
   UPCOMING: 'bg-primary-50 text-primary-700',
@@ -103,6 +104,9 @@ export default function DepartureDetailPage() {
                   <option value="COMPLETED">COMPLETED</option>
                   <option value="CANCELLED">CANCELLED</option>
                 </select>
+                {isDepartureOverdue(departure) && (
+                  <span className="badge bg-red-100 text-red-700">OVERDUE — mark completed once the trip is done</span>
+                )}
               </div>
               <p className="text-sm text-slate-500 flex items-center gap-1.5 mt-1">
                 <Calendar className="w-3.5 h-3.5" />

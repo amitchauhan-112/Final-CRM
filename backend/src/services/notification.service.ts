@@ -224,20 +224,14 @@ export const sendOperationsReminders = async () => {
 // keeps Active Trips / Completed Trips dashboard counts accurate without manual input.
 export const updateDepartureStatuses = async () => {
   const now = new Date();
-  const today = new Date(now); today.setHours(0, 0, 0, 0);
 
   await prisma.departure.updateMany({
     where: { status: 'UPCOMING', departureDate: { lte: now } },
     data: { status: 'ACTIVE' },
   });
 
-  const active = await prisma.departure.findMany({ where: { status: 'ACTIVE' }, select: { id: true, departureDate: true, returnDate: true } });
-  const toComplete = active
-    .filter((d) => (d.returnDate ?? d.departureDate) < today)
-    .map((d) => d.id);
-  if (toComplete.length) {
-    await prisma.departure.updateMany({ where: { id: { in: toComplete } }, data: { status: 'COMPLETED' } });
-  }
+  // Never auto-COMPLETE here. A trip is only complete when Operations marks it
+  // so; past-return ACTIVE departures are shown as OVERDUE in the UI instead.
 };
 
 // ─── Finance Panel ───────────────────────────────────────────────────────────

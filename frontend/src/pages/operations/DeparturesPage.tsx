@@ -7,6 +7,7 @@ import Pagination from '../../components/ui/Pagination';
 import DeleteDepartureReasonModal from '../../components/operations/DeleteDepartureReasonModal';
 import { DepartureListItem } from '../../types/index';
 import { formatCurrency, cn } from '../../utils/helpers';
+import { isDepartureOverdue } from '../../utils/departureStatus';
 import { useAuthStore } from '../../store/authStore';
 
 const STATUSES = [
@@ -15,6 +16,7 @@ const STATUSES = [
   { value: 'ACTIVE', label: 'Active' },
   { value: 'COMPLETED', label: 'Completed' },
   { value: 'CANCELLED', label: 'Cancelled' },
+  { value: 'OVERDUE', label: 'Overdue' },
 ];
 
 const STATUS_BADGE: Record<string, string> = {
@@ -22,6 +24,7 @@ const STATUS_BADGE: Record<string, string> = {
   ACTIVE: 'bg-emerald-50 text-emerald-700',
   COMPLETED: 'bg-slate-100 text-slate-600',
   CANCELLED: 'bg-red-50 text-red-600',
+  OVERDUE: 'bg-red-100 text-red-700',
 };
 
 function formatDatePretty(dateStr: string) {
@@ -118,7 +121,9 @@ export default function DeparturesPage() {
     {
       key: 'status',
       header: 'Status',
-      render: (d) => (
+      render: (d) => isDepartureOverdue(d) ? (
+        <span className={cn('badge', STATUS_BADGE.OVERDUE)}>OVERDUE</span>
+      ) : (
         <span className={cn('badge', STATUS_BADGE[d.status])}>{d.status}</span>
       ),
     },

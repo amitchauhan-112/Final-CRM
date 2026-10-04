@@ -475,7 +475,19 @@ export const listDepartures = async (req: AuthenticatedRequest, res: Response): 
     const skip = (Number(page) - 1) * Number(limit);
 
     const where: Record<string, unknown> = { ...orgFilter(req) };
-    if (status) where.status = status;
+    if (status === 'OVERDUE') {
+      // Not a stored status: ACTIVE trips whose end date has already passed.
+      // Mirrors isDepartureOverdue() on the frontend.
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      where.status = 'ACTIVE';
+      where.OR = [
+        { returnDate: { lt: todayStart } },
+        { returnDate: null, departureDate: { lt: todayStart } },
+      ];
+    } else if (status) {
+      where.status = status;
+    }
     if (search) where.destination = { contains: String(search), mode: 'insensitive' };
     if (from || to) {
       const range: Record<string, Date> = {};
