@@ -1096,6 +1096,7 @@ export default function LeadDetail({ leadId, open, onClose, isStarred, onToggleS
   useEffect(() => {
     setPendingStatus(null);
     setStatusNote('');
+    setLostModalOpen(false);
   }, [leadId, lead?.status]);
 
   const handleEdit = (formData: any) => {

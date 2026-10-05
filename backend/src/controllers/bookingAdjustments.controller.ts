@@ -28,7 +28,7 @@ export const updateBookingAdjustments = async (req: AuthenticatedRequest, res: R
 
     const { id } = req.params;
     const existing = await prisma.booking.findFirst({
-      where: { id, organizationId: orgId(req) },
+      where: { id, ...(orgId(req) ? { organizationId: orgId(req) } : {}) },
       include: { departure: { select: { status: true } } },
     });
     if (!existing) { res.status(404).json({ success: false, error: 'Booking not found' }); return; }
