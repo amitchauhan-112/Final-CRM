@@ -12,6 +12,8 @@ import Pagination from '../../components/ui/Pagination';
 import LeadForm from '../../components/leads/LeadForm';
 import LeadDetail from '../../components/leads/LeadDetail';
 import KanbanBoard from '../../components/leads/KanbanBoard';
+import LostReasonModal from '../../components/leads/LostReasonModal';
+import { formatLostReason, type LostPayload } from '../../utils/lostReasons';
 import Badge from '../../components/ui/Badge';
 import Avatar from '../../components/ui/Avatar';
 import PriorityBadge from '../../components/ui/PriorityBadge';
@@ -42,6 +44,7 @@ const SOURCES: { value: string; label: string }[] = [
 export default function AdminLeadsPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const [kanbanLostLeadId, setKanbanLostLeadId] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState(searchParams.get('status') || '');
@@ -501,6 +504,7 @@ export default function AdminLeadsPage() {
           leads={leads}
           onOpenDetail={(id) => setDetailLeadId(id)}
           onStatusChange={(id, s) => {
+            if (s === 'LOST') { setKanbanLostLeadId(id); return; }
             const note = window.prompt(`Add a note for moving this lead to "${s.replace(/_/g, ' ')}":`)?.trim();
             if (!note) { toast.error('A note is required to change status.'); return; }
             updateLead.mutate({ id, status: s, statusNote: note });
@@ -561,6 +565,19 @@ export default function AdminLeadsPage() {
         onCancel={() => setDeleteLeadId(null)}
         onConfirm={handleDelete}
         isLoading={deleteLead.isPending}
+      />
+
+      {/* Kanban drag-to-Lost — same categorized picker as everywhere else */}
+      <LostReasonModal
+        open={!!kanbanLostLeadId}
+        onCancel={() => setKanbanLostLeadId(null)}
+        onConfirm={(lost: LostPayload) => {
+          if (!kanbanLostLeadId) return;
+          updateLead.mutate(
+            { id: kanbanLostLeadId, status: 'LOST', ...lost, statusNote: `Marked lost — ${formatLostReason(lost)}` },
+            { onSuccess: () => setKanbanLostLeadId(null) }
+          );
+        }}
       />
 
       {/* Detail modal */}

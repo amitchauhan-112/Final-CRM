@@ -21,6 +21,7 @@ import Modal from '../ui/Modal';
 import LeadForm from './LeadForm';
 import FollowUpModal from './FollowUpModal';
 import FollowUpOutcomeModal from './FollowUpOutcomeModal';
+import LostReasonModal from './LostReasonModal';
 import { formatLostReason, type LostPayload } from '../../utils/lostReasons';
 import PriorityBadge from '../ui/PriorityBadge';
 import TagChip from '../ui/TagChip';
@@ -969,6 +970,7 @@ export default function LeadDetail({ leadId, open, onClose, isStarred, onToggleS
   const [statusNote, setStatusNote] = useState('');
   const [followUpModalOpen, setFollowUpModalOpen] = useState(false);
   const [outcomeModalOpen, setOutcomeModalOpen] = useState(false);
+  const [lostModalOpen, setLostModalOpen] = useState(false);
   const [renameOpen, setRenameOpen] = useState(false);
   const [renameValue, setRenameValue] = useState('');
   const [renameSource, setRenameSource] = useState('');
@@ -1001,10 +1003,24 @@ export default function LeadDetail({ leadId, open, onClose, isStarred, onToggleS
       setFollowUpModalOpen(true);
       return;
     }
-    // Simple statuses (New, Not Contacted, Contacted, Interested, Lost) are
-    // staged, not saved immediately — the employee reviews and clicks Save
-    // Changes to commit.
+    // Lost always needs a categorized reason, never just a free-text note —
+    // same picker as everywhere else a lead gets marked lost.
+    if (status === 'LOST') {
+      setLostModalOpen(true);
+      return;
+    }
+    // Simple statuses (New, Not Contacted, Contacted, Interested) are staged,
+    // not saved immediately — the employee reviews and clicks Save Changes
+    // to commit.
     setPendingStatus(status);
+  };
+
+  const handleLostConfirm = (lost: LostPayload) => {
+    if (!lead) return;
+    updateLead.mutate(
+      { id: lead.id, status: 'LOST', ...lost, statusNote: `Marked lost — ${formatLostReason(lost)}` },
+      { onSuccess: () => setLostModalOpen(false) }
+    );
   };
 
   const handleSaveStatus = () => {
@@ -1407,6 +1423,12 @@ export default function LeadDetail({ leadId, open, onClose, isStarred, onToggleS
       />
 
       {/* ── Follow-up Outcome Modal (shown on Mark Done) ─────────────────── */}
+      <LostReasonModal
+        open={lostModalOpen}
+        onConfirm={handleLostConfirm}
+        onCancel={() => setLostModalOpen(false)}
+      />
+
       <FollowUpOutcomeModal
         open={outcomeModalOpen}
         lead={lead ?? null}
