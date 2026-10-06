@@ -478,7 +478,9 @@ export const listDepartures = async (req: AuthenticatedRequest, res: Response): 
 
     await completeFinishedDepartures().catch((e) => console.error('[operations] completeFinishedDepartures error:', e));
 
-    const where: Record<string, unknown> = { ...orgFilter(req) };
+    // Only trips with at least one confirmed booking appear here. Empty
+    // departures (no sale behind them) are noise for Operations, not trips.
+    const where: Record<string, unknown> = { ...orgFilter(req), bookings: { some: {} } };
     if (status && (DEPARTURE_TABS as readonly string[]).includes(String(status))) {
       where.AND = [tabWhere(String(status) as DepartureTab)];
     } else if (status) {
