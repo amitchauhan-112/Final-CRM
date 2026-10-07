@@ -22,6 +22,8 @@ import AdminLeadsPage from './pages/admin/LeadsPage';
 import AdminCampaignsPage from './pages/admin/CampaignsPage';
 import OrganizationPage from './pages/admin/OrganizationPage';
 import ApprovalsPage from './pages/admin/ApprovalsPage';
+import PartnerLedgerPage from './pages/shared/PartnerLedgerPage';
+import MyExpenseClaimsPage from './pages/shared/MyExpenseClaimsPage';
 import AdminSettingsPage from './pages/admin/SettingsPage';
 import AdminFeedbackPage from './pages/admin/FeedbackPage';
 import AdminActivityFeedPage from './pages/admin/ActivityFeedPage';
@@ -121,6 +123,8 @@ export default function App() {
         <Route path="employees" element={<Navigate to="/admin/organization" replace />} />
         <Route path="organization" element={<OrganizationPage />} />
         <Route path="approvals" element={<ApprovalsPage />} />
+        <Route path="partner-ledger" element={<PartnerLedgerPage />} />
+        <Route path="my-expenses" element={<MyExpenseClaimsPage />} />
         <Route path="settings" element={<AdminSettingsPage />} />
         <Route path="feedback" element={<AdminFeedbackPage />} />
         <Route path="activity" element={<AdminActivityFeedPage />} />
@@ -169,6 +173,9 @@ export default function App() {
         <Route path="rooms-required" element={<RoomsRequiredPage />} />
         <Route path="vendors" element={<VendorsPage />} />
         <Route path="vendors/:id" element={<VendorDetailPage />} />
+        <Route path="approvals" element={<ApprovalsPage />} />
+        <Route path="partner-ledger" element={<PartnerLedgerPage />} />
+        <Route path="my-expenses" element={<MyExpenseClaimsPage />} />
         <Route path="settings" element={<EmployeeSettingsPage />} />
       </Route>
 
@@ -191,6 +198,9 @@ export default function App() {
         <Route path="vendor-credits" element={<VendorCreditsPage />} />
         <Route path="expenses" element={<ExpensesPage />} />
         <Route path="employee-cash" element={<EmployeeCashPage />} />
+        <Route path="approvals" element={<ApprovalsPage />} />
+        <Route path="partner-ledger" element={<PartnerLedgerPage />} />
+        <Route path="my-expenses" element={<MyExpenseClaimsPage />} />
         <Route path="reports" element={<FinanceReportsPage />} />
         <Route path="payroll" element={<FinancePayrollPage />} />
         <Route path="settings" element={<EmployeeSettingsPage />} />
@@ -215,6 +225,8 @@ export default function App() {
         <Route path="tasks" element={<TasksPage />} />
         <Route path="targets" element={<MyTargetsPage />} />
         <Route path="approvals" element={<ApprovalsPage />} />
+        <Route path="partner-ledger" element={<PartnerLedgerPage />} />
+        <Route path="my-expenses" element={<MyExpenseClaimsPage />} />
         <Route path="whatsapp" element={<EmployeeWhatsAppInboxPage />} />
         <Route path="settings" element={<EmployeeSettingsPage />} />
       </Route>

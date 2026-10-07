@@ -3,7 +3,7 @@ import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
   Mountain, LayoutDashboard, Users, Calendar, Bell,
   LogOut, ChevronDown, Menu, X, Settings, UserCircle,
-  Package, UserCheck, CheckSquare, Target, MessageCircle, BookOpen, Wallet, ShieldCheck,
+  Package, UserCheck, CheckSquare, Target, MessageCircle, BookOpen, Wallet, ShieldCheck, Handshake, Receipt,
 } from 'lucide-react';
 import { usePendingApprovals } from '../../hooks/useApprovals';
 import LeadLookup from './LeadLookup';
@@ -28,6 +28,8 @@ const navLinks = [
   { to: '/employee/cash',       label: 'My Cash',      icon: Wallet },
   { to: '/employee/targets',    label: 'My Targets',   icon: Target },
   { to: '/employee/approvals',  label: 'Approvals',    icon: ShieldCheck },
+  { to: '/employee/partner-ledger', label: 'Partner Ledger', icon: Handshake },
+  { to: '/employee/my-expenses', label: 'My Expense Claims', icon: Receipt },
   { to: '/employee/settings',   label: 'Settings',     icon: Settings },
 ];
 

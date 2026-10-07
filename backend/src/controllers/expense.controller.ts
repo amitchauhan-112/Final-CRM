@@ -36,6 +36,25 @@ export const listExpenses = async (req: AuthenticatedRequest, res: Response): Pr
   }
 };
 
+// ─── My claims — any authenticated user, their own self-logged expenses ─────
+
+export const listMyExpenseClaims = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const expenses = await prisma.expense.findMany({
+      where: { createdById: req.user!.id, isClaim: true, ...orgFilter(req) },
+      include: {
+        paidByPartner: { select: { id: true, name: true } },
+        approvedBy: { select: { id: true, name: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    res.json({ success: true, data: expenses });
+  } catch (e) {
+    console.error('[finance] listMyExpenseClaims error:', e);
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+};
+
 // ─── Log an expense — always PENDING until Finance/Admin approves it, mirroring
 // the Payment verification workflow so nothing hits trip/package cost unverified.
 
@@ -49,6 +68,20 @@ export const createExpense = async (req: AuthenticatedRequest, res: Response): P
     if (!isWholeAmount(amount)) { res.status(400).json({ success: false, error: WHOLE_AMOUNT_ERROR }); return; }
 
     const billUrl = req.file ? buildUploadUrl(req.file) : null;
+    // Self-logged by anyone outside Finance/Admin — e.g. an employee's own
+    // small reimbursement claim, or a partner logging their own spend — only
+    // an Admin may approve/reject it (see approveExpense/rejectExpense).
+    // Finance keeps approving everything else, same as before.
+    const isClaim = req.user!.role !== 'ADMIN' && req.user!.role !== 'FINANCE';
+    // A self-claimant can only attribute the spend to themselves, never to
+    // another partner — otherwise anyone could pin their own expense on
+    // someone else's name.
+    if (isClaim && paidByPartnerId) {
+      const own = await prisma.partner.findFirst({ where: { userId: req.user!.id, ...(orgId(req) ? { organizationId: orgId(req) } : {}) } });
+      if (!own || own.id !== paidByPartnerId) {
+        res.status(403).json({ success: false, error: 'You can only log this as paid by your own linked partner profile' }); return;
+      }
+    }
 
     const expense = await prisma.expense.create({
       data: {
@@ -60,6 +93,7 @@ export const createExpense = async (req: AuthenticatedRequest, res: Response): P
         packageId: packageId || null,
         vendorId: vendorId || null,
         paidByPartnerId: paidByPartnerId || null,
+        isClaim,
         billUrl,
         status: 'PENDING',
         createdById: req.user!.id,
@@ -94,6 +128,9 @@ export const approveExpense = async (req: AuthenticatedRequest, res: Response): 
     const expense = await prisma.expense.findFirst({ where: { id, ...orgFilter(req) } });
     if (!expense) { res.status(404).json({ success: false, error: 'Expense not found' }); return; }
     if (expense.status === 'APPROVED') { res.status(400).json({ success: false, error: 'Expense already approved' }); return; }
+    if (expense.isClaim && req.user?.role !== 'ADMIN') {
+      res.status(403).json({ success: false, error: 'Only an Admin can approve a self-logged claim' }); return;
+    }
 
     const updated = await prisma.expense.update({
       where: { id },
@@ -131,6 +168,9 @@ export const rejectExpense = async (req: AuthenticatedRequest, res: Response): P
     const expense = await prisma.expense.findFirst({ where: { id, ...orgFilter(req) } });
     if (!expense) { res.status(404).json({ success: false, error: 'Expense not found' }); return; }
     if (expense.status === 'APPROVED') { res.status(400).json({ success: false, error: 'Cannot reject an already-approved expense' }); return; }
+    if (expense.isClaim && req.user?.role !== 'ADMIN') {
+      res.status(403).json({ success: false, error: 'Only an Admin can reject a self-logged claim' }); return;
+    }
 
     const updated = await prisma.expense.update({
       where: { id },

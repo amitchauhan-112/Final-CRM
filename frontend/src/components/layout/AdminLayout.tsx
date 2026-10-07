@@ -6,7 +6,7 @@ import {
   MessageSquarePlus, Activity, BarChart2, Building2,
   UserCheck, Database, ChevronRight, Package, BookOpen,
   Contact, Wallet, Map, Home, Gauge, LineChart, FolderKanban, Settings2, Zap, HeartPulse, IndianRupee,
-  MessageCircle, Radar, ShieldCheck, Receipt, Scale, TrendingUp, CheckCircle2, XCircle,
+  MessageCircle, Radar, ShieldCheck, Receipt, Scale, TrendingUp, CheckCircle2, XCircle, Handshake,
 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import { useNotifications, useMarkAllAsRead, useMarkAsRead } from '../../hooks/useNotifications';
@@ -51,6 +51,8 @@ const NAV: NavEntry[] = [
   },
   { type: 'item', to: '/admin/organization', label: 'Organization', icon: Building2 },
   { type: 'item', to: '/admin/approvals', label: 'Approvals', icon: ShieldCheck },
+  { type: 'item', to: '/admin/partner-ledger', label: 'Partner Ledger', icon: Handshake },
+  { type: 'item', to: '/admin/my-expenses', label: 'My Expense Claims', icon: Receipt },
 
   { type: 'divider', label: 'ERP' },
   {

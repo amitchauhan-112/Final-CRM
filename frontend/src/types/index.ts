@@ -1271,6 +1271,7 @@ export interface Expense {
   vendor?: { id: string; name: string };
   paidByPartnerId?: string;
   paidByPartner?: { id: string; name: string };
+  isClaim?: boolean;
   billUrl?: string;
   status: ExpenseStatus;
   approvedById?: string;

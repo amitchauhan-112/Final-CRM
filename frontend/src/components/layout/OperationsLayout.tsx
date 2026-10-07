@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
   Mountain, LayoutDashboard, CalendarRange, Truck, Bell,
-  LogOut, ChevronDown, Menu, X, Settings, UserCircle, Map, BedDouble,
+  LogOut, ChevronDown, Menu, X, Settings, UserCircle, Map, BedDouble, ShieldCheck, Handshake, Receipt,
 } from 'lucide-react';
 import LeadLookup from './LeadLookup';
 import GlobalSearch from './GlobalSearch';
@@ -19,6 +19,9 @@ const navLinks = [
   { to: '/operations/stay-plan',  label: 'Stay Planning', icon: Map },
   { to: '/operations/rooms-required', label: 'Rooms Required', icon: BedDouble },
   { to: '/operations/vendors',    label: 'Vendors',       icon: Truck },
+  { to: '/operations/approvals',  label: 'Approvals',     icon: ShieldCheck },
+  { to: '/operations/partner-ledger', label: 'Partner Ledger', icon: Handshake },
+  { to: '/operations/my-expenses', label: 'My Expense Claims', icon: Receipt },
   { to: '/operations/settings',   label: 'Settings',      icon: Settings },
 ];
 

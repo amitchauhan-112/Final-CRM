@@ -49,6 +49,18 @@ export function useRejectRequest() {
   });
 }
 
+// Anyone asks Finance to pay someone — a lightweight request, not a real
+// payment; Finance records the actual payment themselves once approved.
+export function useCreatePaymentRequest() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { payeeName: string; amount: number; reason: string }) =>
+      (await api.post('/approvals/payment-requests', input)).data.data,
+    onSuccess: () => { invalidateApprovals(qc); toast.success('Payment request sent to Finance'); },
+    onError: (e: any) => toast.error(e?.response?.data?.error || 'Failed to send request'),
+  });
+}
+
 export function useCancelRequest() {
   const qc = useQueryClient();
   return useMutation({

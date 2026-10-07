@@ -1,13 +1,15 @@
 import { useState } from 'react';
-import { ShieldCheck, Check, X, ArrowRight } from 'lucide-react';
-import { usePendingApprovals, useApproveRequest, useRejectRequest } from '../../hooks/useApprovals';
+import { ShieldCheck, Check, X, ArrowRight, Plus } from 'lucide-react';
+import { usePendingApprovals, useApproveRequest, useRejectRequest, useCreatePaymentRequest } from '../../hooks/useApprovals';
 import { Skeleton } from '../../components/ui/Skeleton';
+import Modal from '../../components/ui/Modal';
 import { ApprovalRequest } from '../../types/index';
 import { formatCurrency, formatDate, formatRelativeTime, cn } from '../../utils/helpers';
 
 const TYPE_LABEL: Record<string, string> = {
   BOOKING_CHANGE: 'Booking Change',
   PAYMENT_CORRECTION: 'Payment Correction',
+  PAYMENT_REQUEST: 'Payment Request',
 };
 
 const FIELD_LABEL: Record<string, string> = {
@@ -17,6 +19,7 @@ const FIELD_LABEL: Record<string, string> = {
   bookingNotes: 'Booking Notes', finalPrice: 'Final Price', balanceDueDate: 'Balance Due Date',
   status: 'Status', packageId: 'Package', departureDate: 'Departure Date', returnDate: 'Return Date',
   amount: 'Amount', method: 'Payment Method', reference: 'Reference', notes: 'Notes', handoverToId: 'Handover To',
+  payeeName: 'Pay To', reason: 'Reason',
 };
 
 const CURRENCY_FIELDS = new Set(['finalPrice', 'amount']);
@@ -99,18 +102,67 @@ function ApprovalCard({ request }: { request: ApprovalRequest }) {
   );
 }
 
+function PaymentRequestModal({ onClose }: { onClose: () => void }) {
+  const [payeeName, setPayeeName] = useState('');
+  const [amount, setAmount] = useState('');
+  const [reason, setReason] = useState('');
+  const [error, setError] = useState('');
+  const create = useCreatePaymentRequest();
+
+  const submit = () => {
+    const amt = Number(amount);
+    if (!payeeName.trim()) { setError('Who is this payment for?'); return; }
+    if (!amt || amt <= 0 || !Number.isInteger(amt)) { setError('Enter a whole rupee amount'); return; }
+    if (!reason.trim()) { setError('Add a reason'); return; }
+    create.mutate({ payeeName: payeeName.trim(), amount: amt, reason: reason.trim() }, { onSuccess: onClose });
+  };
+
+  return (
+    <Modal open onClose={onClose} title="Request a Payment" size="sm">
+      <div className="space-y-4">
+        <p className="text-xs text-slate-500">Sends Finance a request to pay someone. Finance reviews it and records the actual payment themselves.</p>
+        <div>
+          <label className="label">Pay to <span className="text-red-500">*</span></label>
+          <input value={payeeName} onChange={(e) => { setPayeeName(e.target.value); setError(''); }} className="input" placeholder="Vendor / person name" />
+        </div>
+        <div>
+          <label className="label">Amount (₹) <span className="text-red-500">*</span></label>
+          <input type="number" min={1} value={amount} onChange={(e) => { setAmount(e.target.value); setError(''); }} className="input" />
+        </div>
+        <div>
+          <label className="label">Reason <span className="text-red-500">*</span></label>
+          <textarea value={reason} onChange={(e) => { setReason(e.target.value); setError(''); }} rows={2} className="input resize-none" placeholder="What is this for?" />
+        </div>
+        {error && <p className="text-red-500 text-xs">{error}</p>}
+        <div className="flex justify-end gap-3">
+          <button onClick={onClose} className="btn-secondary">Cancel</button>
+          <button onClick={submit} disabled={create.isPending} className="btn-primary">{create.isPending ? 'Sending…' : 'Send to Finance'}</button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
 export default function ApprovalsPage() {
   const [typeFilter, setTypeFilter] = useState('');
+  const [requestOpen, setRequestOpen] = useState(false);
   const { data, isLoading } = usePendingApprovals();
   const requests = data?.data ?? [];
   const filtered = typeFilter ? requests.filter((r) => r.type === typeFilter) : requests;
 
   return (
     <div className="space-y-5">
-      <div>
-        <h2 className="page-title">Approvals</h2>
-        <p className="text-sm text-slate-500 mt-0.5">Everything waiting on your sign-off, in one queue</p>
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div>
+          <h2 className="page-title">Approvals</h2>
+          <p className="text-sm text-slate-500 mt-0.5">Everything waiting on your sign-off, in one queue</p>
+        </div>
+        <button onClick={() => setRequestOpen(true)} className="btn-secondary gap-1.5">
+          <Plus className="w-4 h-4" /> Request a Payment
+        </button>
       </div>
+
+      {requestOpen && <PaymentRequestModal onClose={() => setRequestOpen(false)} />}
 
       <div className="tabs">
         <button onClick={() => setTypeFilter('')} className={typeFilter === '' ? 'tab-item-active' : 'tab-item'}>All ({requests.length})</button>

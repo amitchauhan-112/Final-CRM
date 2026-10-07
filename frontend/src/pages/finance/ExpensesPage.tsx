@@ -8,6 +8,7 @@ import Modal from '../../components/ui/Modal';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { Expense } from '../../types/index';
 import { formatCurrency, formatDate, cn } from '../../utils/helpers';
+import { useAuthStore } from '../../store/authStore';
 
 const STATUS_BADGE: Record<string, string> = {
   PENDING: 'bg-amber-50 text-amber-700',
@@ -28,12 +29,19 @@ function ExpenseCard({ expense }: { expense: Expense }) {
   const [rejectOpen, setRejectOpen] = useState(false);
   const [reason, setReason] = useState('');
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const role = useAuthStore((s) => s.user?.role);
+  // A self-logged claim can only be approved/rejected by an Admin — Finance
+  // sees it here for visibility, but the buttons are hidden for them.
+  const canResolve = !expense.isClaim || role === 'ADMIN';
 
   return (
     <div className="card p-4 space-y-2">
       <div className="flex items-start justify-between">
         <div>
-          <p className="font-semibold text-slate-800 text-sm">{CATEGORY_LABEL[expense.category] ?? expense.category}</p>
+          <p className="font-semibold text-slate-800 text-sm flex items-center gap-1.5">
+            {CATEGORY_LABEL[expense.category] ?? expense.category}
+            {expense.isClaim && <span className="badge bg-sky-50 text-sky-700 text-[10px]">Self Claim</span>}
+          </p>
           <p className="text-xs text-slate-400">
             {expense.departure ? expense.departure.destination : 'Company overhead'}
             {expense.package ? ` · ${expense.package.name}` : ''}
@@ -58,12 +66,15 @@ function ExpenseCard({ expense }: { expense: Expense }) {
             <ExternalLink className="w-3 h-3" />Bill
           </a>
         )}
-        {expense.status === 'PENDING' && (
+        {expense.status === 'PENDING' && canResolve && (
           <>
             <button onClick={() => approve.mutate(expense.id)} disabled={approve.isPending} className="text-xs font-medium text-emerald-600 hover:text-emerald-700 flex items-center gap-1"><Check className="w-3 h-3" />Approve</button>
             <button onClick={() => setRejectOpen(true)} className="text-xs font-medium text-red-500 hover:text-red-600 flex items-center gap-1"><X className="w-3 h-3" />Reject</button>
             <button onClick={() => setDeleteOpen(true)} className="text-xs font-medium text-slate-400 hover:text-slate-600 flex items-center gap-1"><Trash2 className="w-3 h-3" />Remove</button>
           </>
+        )}
+        {expense.status === 'PENDING' && !canResolve && (
+          <p className="text-xs text-slate-400">Waiting on an Admin to approve this claim.</p>
         )}
       </div>
 

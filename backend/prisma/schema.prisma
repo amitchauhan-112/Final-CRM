@@ -39,6 +39,7 @@ model Organization {
   metaAdMaps    MetaAdMap[]
   employeeCashLedgers EmployeeCashLedger[]
   partners      Partner[]
+  partnerCollections PartnerCollection[]
   approvalRequests ApprovalRequest[]
 
   @@map("organizations")
@@ -114,6 +115,9 @@ model User {
   uploadedVendorDocuments VendorDocument[] @relation("VendorDocumentUploader")
   createdExpenses       Expense[]       @relation("ExpenseCreator")
   approvedExpenses      Expense[]       @relation("ExpenseApprover")
+  partner                    Partner?            @relation("PartnerUser")
+  createdPartnerCollections  PartnerCollection[] @relation("PartnerCollectionCreator")
+  approvedPartnerCollections PartnerCollection[] @relation("PartnerCollectionApprover")
   generatedFinanceDocuments FinanceDocument[] @relation("FinanceDocumentGenerator")
   updatedBusinessRules      BusinessRule[]    @relation("BusinessRuleUpdater")
   createdAutomationRules    AutomationRule[]  @relation("AutomationRuleCreator")
@@ -1877,6 +1881,11 @@ model Expense {
   paidByPartnerId String?
   paidByPartner   Partner? @relation(fields: [paidByPartnerId], references: [id], onDelete: SetNull)
 
+  // True when this was self-logged by someone who isn't Finance/Admin (an
+  // employee or partner claiming their own small spend) — only an Admin may
+  // approve/reject a claim; Finance still approves everything else here.
+  isClaim Boolean @default(false)
+
   billUrl String?
 
   status       String    @default("PENDING") // PENDING | APPROVED | REJECTED
@@ -1909,13 +1918,52 @@ model Partner {
   name     String
   isActive Boolean @default(true)
 
-  expenses Expense[]
+  // Set only for a partner who also has their own login (so they can enter
+  // their own collect/paid entries) — null for a partner who is name-only,
+  // like "Company Account", or one Admin/Finance enters on behalf of.
+  userId String? @unique
+  user   User?   @relation("PartnerUser", fields: [userId], references: [id])
+
+  expenses    Expense[]
+  collections PartnerCollection[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([organizationId])
   @@map("partners")
+}
+
+// Money a partner personally collected on the company's behalf (e.g. cash
+// from a customer) — the other half of the partner ledger from Expense's
+// paidByPartnerId. Needs approval before it counts, same as a partner's paid
+// expense, so the equalization math only ever reflects verified amounts.
+model PartnerCollection {
+  id             String        @id @default(uuid())
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+
+  partnerId   String
+  partner     Partner  @relation(fields: [partnerId], references: [id])
+  amount      Float
+  description String?
+  collectedAt DateTime @default(now())
+
+  status          String    @default("PENDING") // PENDING | APPROVED | REJECTED
+  approvedById    String?
+  approvedBy      User?     @relation("PartnerCollectionApprover", fields: [approvedById], references: [id])
+  approvedAt      DateTime?
+  rejectionReason String?
+
+  createdById String
+  createdBy   User   @relation("PartnerCollectionCreator", fields: [createdById], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([organizationId])
+  @@index([partnerId])
+  @@index([status])
+  @@map("partner_collections")
 }
 
 // ─── Sales Targets, Salary & Incentives ───────────────────────────────────────

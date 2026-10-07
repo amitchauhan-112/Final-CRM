@@ -1,4 +1,5 @@
 import { Response } from 'express';
+import { randomUUID } from 'node:crypto';
 import prisma from '../lib/prisma.js';
 import { AuthenticatedRequest } from '../types/index.js';
 import { applyBookingChanges, validateBookingChangePayload } from './booking.controller.js';
@@ -170,9 +171,11 @@ export const approveRequest = async (req: AuthenticatedRequest, res: Response): 
 
     const resolved = await prisma.approvalRequest.findUnique({ where: { id } });
 
-    await createNotification(request.requestedById, 'APPROVAL_APPROVED', 'Your Change Was Approved',
-      request.type === 'BOOKING_CHANGE' ? 'Your proposed booking change has been approved and applied.' : 'Your proposed payment correction has been approved and applied.',
-      leadId);
+    const approvedMessage =
+      request.type === 'BOOKING_CHANGE' ? 'Your proposed booking change has been approved and applied.' :
+      request.type === 'PAYMENT_REQUEST' ? 'Finance approved your payment request and will process it.' :
+      'Your proposed payment correction has been approved and applied.';
+    await createNotification(request.requestedById, 'APPROVAL_APPROVED', 'Your Change Was Approved', approvedMessage, leadId);
 
     res.json({ success: true, data: resolved });
   } catch (e) {
@@ -289,12 +292,54 @@ export const cancelRequest = async (req: AuthenticatedRequest, res: Response): P
     // An Admin cancelling someone else's request removes it from that
     // person's view without them ever hearing why — let them know.
     if (!isOwnRequest) {
+      const typeLabel = request.type === 'BOOKING_CHANGE' ? 'booking change' : request.type === 'PAYMENT_REQUEST' ? 'payment' : 'payment correction';
       await createNotification(request.requestedById, 'APPROVAL_REJECTED', 'Your Request Was Cancelled',
-        `${req.user!.name} (Admin) cancelled your pending ${request.type === 'BOOKING_CHANGE' ? 'booking change' : 'payment correction'} request.`);
+        `${req.user!.name} (Admin) cancelled your pending ${typeLabel} request.`);
     }
 
     res.json({ success: true, data: { cancelled: true } });
   } catch {
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+};
+
+// ─── Create a payment request — anyone asks Finance to pay someone ──────────
+// Nothing is applied automatically on approval; Finance reviews it here and
+// then records the real VendorPayment/Expense themselves as usual. This just
+// gives every request one shared queue and a paper trail.
+
+export const createPaymentRequest = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const { payeeName, amount, reason } = req.body;
+    if (!payeeName?.trim()) { res.status(400).json({ success: false, error: 'Who this is being paid to is required' }); return; }
+    if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) { res.status(400).json({ success: false, error: 'Valid amount is required' }); return; }
+    if (!reason?.trim()) { res.status(400).json({ success: false, error: 'A reason is required' }); return; }
+
+    const request = await prisma.approvalRequest.create({
+      data: {
+        organizationId: orgId(req),
+        type: 'PAYMENT_REQUEST',
+        entityType: 'PAYMENT_REQUEST',
+        entityId: randomUUID(),
+        payload: JSON.stringify({ changes: { payeeName: payeeName.trim(), amount: Number(amount), reason: reason.trim() } }),
+        requestedById: req.user!.id,
+        approverRole: 'FINANCE',
+      },
+    });
+
+    // Small org — loop over Finance + Admin rather than a broadcast helper.
+    const recipients = await prisma.user.findMany({
+      where: { role: { in: ['FINANCE', 'ADMIN'] }, isActive: true, ...(orgId(req) ? { organizationId: orgId(req) } : {}) },
+      select: { id: true },
+    });
+    await Promise.all(recipients.map((u) =>
+      createNotification(u.id, 'NEW_EXPENSE_SUBMITTED', 'New Payment Request',
+        `${req.user!.name} is requesting ₹${Number(amount).toLocaleString()} be paid to ${payeeName.trim()}.`)
+    ));
+
+    res.status(201).json({ success: true, data: request });
+  } catch (e) {
+    console.error('[approval] createPaymentRequest error:', e);
     res.status(500).json({ success: false, error: 'Internal server error' });
   }
 };

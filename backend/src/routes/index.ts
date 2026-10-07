@@ -36,6 +36,8 @@ import whatsappConversationRoutes from './whatsappConversation.routes.js';
 import employeeCashRoutes from './employeeCash.routes.js';
 import tripCaptainRoutes from './tripCaptain.routes.js';
 import approvalRoutes from './approval.routes.js';
+import expenseClaimRoutes from './expenseClaim.routes.js';
+import partnerLedgerRoutes from './partnerLedger.routes.js';
 
 const router = Router();
 
@@ -78,5 +80,7 @@ router.use('/whatsapp', whatsappConversationRoutes);
 router.use('/employee-cash', employeeCashRoutes);
 router.use('/trip-captain', tripCaptainRoutes);
 router.use('/approvals', approvalRoutes);
+router.use('/expense-claims', expenseClaimRoutes);
+router.use('/partner-ledger', partnerLedgerRoutes);
 
 export default router;
