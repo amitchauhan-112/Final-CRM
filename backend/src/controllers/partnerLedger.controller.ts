@@ -28,6 +28,25 @@ async function canViewLedger(req: AuthenticatedRequest): Promise<boolean> {
   return !!linked;
 }
 
+// ─── GET /partner-ledger/handover-options — who "Handover To" can pick ──────
+// Any authenticated user — cash handover now only ever goes to one of the
+// partners (Amit, Nitin, Saurabh, …), not any employee, so Sales picks from
+// this short list instead of the full employee directory.
+
+export const listHandoverOptions = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const partners = await prisma.partner.findMany({
+      where: { ...orgFilter(req), isActive: true, userId: { not: null } },
+      select: { userId: true, name: true },
+      orderBy: { name: 'asc' },
+    });
+    res.json({ success: true, data: partners.map((p) => ({ id: p.userId as string, name: p.name })) });
+  } catch (e) {
+    console.error('[partnerLedger] listHandoverOptions error:', e);
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+};
+
 // ─── GET /partner-ledger/mine — am I linked to a partner profile? ───────────
 // Any authenticated user — used by the expense-claim form to offer "mark as
 // my own partner-paid expense" only to someone who actually has one.
@@ -49,8 +68,9 @@ export const getPartnerLedger = async (req: AuthenticatedRequest, res: Response)
     if (!(await canViewLedger(req))) { res.status(403).json({ success: false, error: 'Access denied' }); return; }
 
     const partners = await prisma.partner.findMany({ where: { ...orgFilter(req), isActive: true }, orderBy: { name: 'asc' } });
+    const linkedUserIds = partners.map((p) => p.userId).filter((id): id is string => !!id);
 
-    const [paidRows, collectedRows] = await Promise.all([
+    const [paidRows, collectedRows, cashRows] = await Promise.all([
       prisma.expense.groupBy({
         by: ['paidByPartnerId'],
         where: { ...orgFilter(req), status: 'APPROVED', paidByPartnerId: { not: null } },
@@ -61,13 +81,30 @@ export const getPartnerLedger = async (req: AuthenticatedRequest, res: Response)
         where: { ...orgFilter(req), status: 'APPROVED' },
         _sum: { amount: true },
       }),
+      // Cash a partner is currently holding after Finance verifies a CASH
+      // payment handed over to them (see approvePayment) — same HANDOVER minus
+      // COLLECTION formula employeeCash.controller.ts uses, counted here too
+      // so a Sales handover automatically becomes that partner's "collected".
+      linkedUserIds.length
+        ? prisma.employeeCashLedger.groupBy({
+            by: ['employeeId', 'type'],
+            where: { ...orgFilter(req), employeeId: { in: linkedUserIds } },
+            _sum: { amount: true },
+          })
+        : Promise.resolve([] as { employeeId: string; type: string; _sum: { amount: number | null } }[]),
     ]);
     const paidMap = new Map(paidRows.map((r) => [r.paidByPartnerId as string, r._sum.amount ?? 0]));
     const collectedMap = new Map(collectedRows.map((r) => [r.partnerId, r._sum.amount ?? 0]));
+    const cashByUser = new Map<string, number>();
+    for (const r of cashRows) {
+      const sign = r.type === 'HANDOVER' ? 1 : -1;
+      cashByUser.set(r.employeeId, (cashByUser.get(r.employeeId) ?? 0) + sign * (r._sum.amount ?? 0));
+    }
 
     const rows = partners.map((p) => {
       const paid = paidMap.get(p.id) ?? 0;
-      const collected = collectedMap.get(p.id) ?? 0;
+      const cashHeld = p.userId ? (cashByUser.get(p.userId) ?? 0) : 0;
+      const collected = (collectedMap.get(p.id) ?? 0) + cashHeld;
       return { id: p.id, name: p.name, isLinkedToLogin: !!p.userId, paid, collected, net: collected - paid };
     });
 

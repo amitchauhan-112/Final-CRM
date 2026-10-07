@@ -13,6 +13,7 @@ import { useBookingPayments, useRecordPayment, useDeletePayment } from '../../ho
 import JourneyTracker from './JourneyTracker';
 import { useBookingTasks, useUpdateTask, useCreateTask } from '../../hooks/useTasks';
 import { useUsers } from '../../hooks/useUsers';
+import { usePartnerHandoverOptions } from '../../hooks/usePartnerLedger';
 import { useSettings } from '../../hooks/useSettings';
 import BookingConfirmModal from './BookingConfirmModal';
 import Badge from '../ui/Badge';
@@ -559,11 +560,6 @@ function TaskRow({ task, onStatusChange }: { task: BookingTask; onStatusChange: 
 function PaymentsTab({ booking }: { booking: Booking }) {
   const { user } = useAuthStore();
   const { data, isLoading } = useBookingPayments(booking.id);
-  // allRoles: true — cash can genuinely be handed to anyone in the org
-  // (Finance, Operations, Trip Captain, Admin), not just fellow Sales
-  // employees, so this picker shouldn't be narrowed the way the lead-transfer
-  // picker elsewhere on this page deliberately is.
-  const { data: usersData } = useUsers({ limit: 100, allRoles: true });
   const recordPayment = useRecordPayment();
   const deletePayment = useDeletePayment();
   // Finance's proposed payment corrections that are waiting on me (the
@@ -574,13 +570,14 @@ function PaymentsTab({ booking }: { booking: Booking }) {
   const pendingCorrectionFor = (paymentId: string) =>
     (approvalsData?.data ?? []).find((a) => a.type === 'PAYMENT_CORRECTION' && a.entityId === paymentId && a.status === 'PENDING');
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ amount: '', type: 'PARTIAL', method: 'CASH', reference: '', notes: '', handoverToId: user?.id ?? '' });
+  const [form, setForm] = useState({ amount: '', type: 'PARTIAL', method: 'CASH', reference: '', notes: '', handoverToId: '' });
   const [proofFile, setProofFile] = useState<File | null>(null);
 
-  // Any active employee can hold cash, not just Sales — a real dropdown,
+  // Cash only ever goes to a partner, not any employee — a real dropdown,
   // never free text (see recordPayment in payment.controller.ts, which
   // rejects anything that isn't an active user's id).
-  const activeEmployees = (usersData?.data ?? []).filter((u) => u.isActive);
+  const { data: handoverData } = usePartnerHandoverOptions();
+  const handoverOptions = handoverData?.data ?? [];
 
   const payments = data?.data ?? [];
 
@@ -694,13 +691,22 @@ function PaymentsTab({ booking }: { booking: Booking }) {
                   onChange={(e) => setForm((f) => ({ ...f, handoverToId: e.target.value }))}
                   className="input text-sm"
                 >
-                  <option value="">Select employee…</option>
-                  {activeEmployees.map((emp) => (
-                    <option key={emp.id} value={emp.id}>{emp.name}{emp.id === user?.id ? ' (Me)' : ''}</option>
+                  <option value="">Select…</option>
+                  {handoverOptions.map((p) => (
+                    <option key={p.id} value={p.id}>{p.name}{p.id === user?.id ? ' (Me)' : ''}</option>
                   ))}
                 </select>
               </div>
             )}
+            <div className="sm:col-span-2">
+              <label className="label text-xs">Notes</label>
+              <input
+                value={form.notes}
+                onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
+                className="input text-sm"
+                placeholder={form.method === 'CASH' ? 'What was this for? (carried onto the cash handover record)' : 'Optional'}
+              />
+            </div>
             <div className="sm:col-span-2">
               <label className="label text-xs">Payment Screenshot / Proof</label>
               <input type="file" onChange={(e) => setProofFile(e.target.files?.[0] ?? null)} className="input text-sm" accept="image/*,.pdf" />

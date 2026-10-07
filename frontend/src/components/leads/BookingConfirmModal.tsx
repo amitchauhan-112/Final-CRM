@@ -9,7 +9,7 @@ import { Lead, Booking, FoodPreference, RoomSharing, TourType } from '../../type
 import { useCreateBooking, useUpdateBooking, usePendingBookingChange } from '../../hooks/useBookings';
 import { useCancelRequest } from '../../hooks/useApprovals';
 import { usePackages, usePackage, useCreatePackage } from '../../hooks/usePackages';
-import { useUsers } from '../../hooks/useUsers';
+import { usePartnerHandoverOptions } from '../../hooks/usePartnerLedger';
 import { useBookingPayments, useUpdatePendingPayment } from '../../hooks/usePayments';
 import { useAuthStore } from '../../store/authStore';
 import { formatCurrency, cn, blockDecimalKey, wholeNumberRule } from '../../utils/helpers';
@@ -167,13 +167,11 @@ export default function BookingConfirmModal({ open, onClose, lead, existingBooki
   const updateBooking = useUpdateBooking();
   const updatePendingPayment = useUpdatePendingPayment();
   const { user } = useAuthStore();
-  // Any active employee can hold cash, not just Sales — a real dropdown,
+  // Cash only ever goes to a partner, not any employee — a real dropdown,
   // never free text (see createBooking in booking.controller.ts, which
-  // rejects anything that isn't an active user's id). allRoles: true so a
-  // non-admin sees the whole org here (Finance, Operations, Trip Captain,
-  // Admin too), not just fellow Sales employees.
-  const { data: usersData } = useUsers({ limit: 100, allRoles: true });
-  const activeEmployees = (usersData?.data ?? []).filter((u) => u.isActive);
+  // rejects anything that isn't an active user's id).
+  const { data: handoverData } = usePartnerHandoverOptions();
+  const handoverOptions = handoverData?.data ?? [];
   const isEdit = !!existingBooking;
 
   // The original advance payment recorded at confirmation time — editable
@@ -1065,9 +1063,9 @@ export default function BookingConfirmModal({ open, onClose, lead, existingBooki
                     })}
                     className="input bg-white"
                   >
-                    <option value="">Select employee…</option>
-                    {activeEmployees.map((emp) => (
-                      <option key={emp.id} value={emp.id}>{emp.name}{emp.id === user?.id ? ' (Me)' : ''}</option>
+                    <option value="">Select…</option>
+                    {handoverOptions.map((p) => (
+                      <option key={p.id} value={p.id}>{p.name}{p.id === user?.id ? ' (Me)' : ''}</option>
                     ))}
                   </select>
                   {errors.handoverToId && <p className="text-red-500 text-xs mt-1">{errors.handoverToId.message}</p>}

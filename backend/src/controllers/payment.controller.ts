@@ -227,6 +227,9 @@ export const approvePayment = async (req: AuthenticatedRequest, res: Response): 
             type: 'HANDOVER',
             amount: payment.amount,
             paymentId: payment.id,
+            // Carries over whatever Sales typed in the payment's own notes,
+            // so the ledger entry stays traceable to what it was for.
+            notes: payment.notes || null,
           },
         }),
       ] : []),

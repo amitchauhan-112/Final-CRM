@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { authenticate } from '../middleware/auth.js';
 import {
-  getPartnerLedger, getMyPartner, listPartnerCollections, createPartnerCollection,
+  getPartnerLedger, getMyPartner, listHandoverOptions, listPartnerCollections, createPartnerCollection,
   approvePartnerCollection, rejectPartnerCollection,
 } from '../controllers/partnerLedger.controller.js';
 
@@ -13,6 +13,7 @@ router.use(authenticate);
 
 router.get('/', getPartnerLedger);
 router.get('/mine', getMyPartner);
+router.get('/handover-options', listHandoverOptions);
 router.get('/collections', listPartnerCollections);
 router.post('/collections', createPartnerCollection);
 router.put('/collections/:id/approve', approvePartnerCollection);

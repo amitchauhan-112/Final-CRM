@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Phone, Map, User, IndianRupee, Hash, Image, Check, X, MessageSquareWarning, PencilLine } from 'lucide-react';
 import { useApprovePayment, useRejectPayment, useRequestCorrection, useProposeCorrection } from '../../hooks/useFinance';
-import { useUsers } from '../../hooks/useUsers';
+import { usePartnerHandoverOptions } from '../../hooks/usePartnerLedger';
 import { Payment } from '../../types/index';
 import Modal from '../ui/Modal';
 import { formatCurrency, formatDate, cn, blockDecimalKey } from '../../utils/helpers';
@@ -13,8 +13,8 @@ export default function PaymentVerificationCard({ payment }: { payment: Payment 
   const reject = useRejectPayment();
   const requestCorrection = useRequestCorrection();
   const proposeCorrection = useProposeCorrection();
-  const { data: usersData } = useUsers({ limit: 100, allRoles: true });
-  const activeEmployees = (usersData?.data ?? []).filter((u) => u.isActive);
+  const { data: handoverData } = usePartnerHandoverOptions();
+  const handoverOptions = handoverData?.data ?? [];
   const [rejectOpen, setRejectOpen] = useState(false);
   const [correctionOpen, setCorrectionOpen] = useState(false);
   const [proposeOpen, setProposeOpen] = useState(false);
@@ -181,8 +181,8 @@ export default function PaymentVerificationCard({ payment }: { payment: Payment 
             <div>
               <label className="label">Handover To *</label>
               <select value={proposedHandoverToId} onChange={(e) => setProposedHandoverToId(e.target.value)} className="input">
-                <option value="">Select employee…</option>
-                {activeEmployees.map((emp) => <option key={emp.id} value={emp.id}>{emp.name}</option>)}
+                <option value="">Select…</option>
+                {handoverOptions.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
             </div>
           )}

@@ -20,6 +20,14 @@ export function usePartnerLedger() {
   });
 }
 
+// Who "Handover To" can pick — just the partners, not every employee.
+export function usePartnerHandoverOptions() {
+  return useQuery<{ success: boolean; data: { id: string; name: string }[] }>({
+    queryKey: ['partner-ledger', 'handover-options'],
+    queryFn: async () => (await api.get('/partner-ledger/handover-options')).data,
+  });
+}
+
 // Null if the current user isn't linked to a partner profile.
 export function useMyPartner() {
   return useQuery<{ success: boolean; data: { id: string; name: string } | null }>({
